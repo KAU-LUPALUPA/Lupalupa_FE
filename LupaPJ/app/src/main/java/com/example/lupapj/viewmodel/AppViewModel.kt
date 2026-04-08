@@ -99,9 +99,7 @@ class AppViewModel(
 
     private fun runBootstrap() {
         viewModelScope.launch {
-            delay(900)
-            _uiState.update { it.copy(loadingMessage = "로딩 완료") }
-            delay(350)
+            delay(150)
             _uiState.update { it.copy(authPopupVisible = true) }
         }
     }

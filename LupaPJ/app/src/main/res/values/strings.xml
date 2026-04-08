@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">루파루파</string>
+    <string name="splash_subtitle">성격 기반 자율 행동 캐릭터와 함께하는 힐링 서비스</string>
+    <string name="splash_loading_1">루파가 기지개를 켜고 있어요... (%1$d%%)</string>
+    <string name="splash_loading_2">루파가 자기 방을 정리하고 있어요... (%1$d%%)</string>
+    <string name="splash_loading_3">루파가 오늘의 간식을 고르는 중이에요... (%1$d%%)</string>
+    <string name="splash_loading_4">루파가 문을 열고 나올 준비를 해요... (%1$d%%)</string>
+    <string name="splash_loading_5">루파가 곧 나타날 거예요... (%1$d%%)</string>
+    <string name="splash_loading_complete">루파가 등장했어요!</string>
 </resources>
