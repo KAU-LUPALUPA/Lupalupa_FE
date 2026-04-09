@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="splash_subtitle_text_size">13sp</dimen>
+    <dimen name="splash_subtitle_margin_top">8dp</dimen>
+    <dimen name="splash_loading_bar_height">22dp</dimen>
+    <dimen name="splash_loading_text_size">13sp</dimen>
+    <dimen name="splash_loading_text_margin_top">8dp</dimen>
+    <dimen name="splash_loading_bar_stroke_width">2dp</dimen>
+</resources>
