@@ -1,30 +1,28 @@
 package com.example.lupapj.ui.screens.main
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.lupapj.data.model.BottomNavItem
 import com.example.lupapj.data.model.RoomObjectType
-import com.example.lupapj.data.model.RoomPoint
 import com.example.lupapj.data.model.RoomUiState
+import com.example.lupapj.data.model.scene.FloorAnchor
 import com.example.lupapj.ui.components.BottomActionButtons
 import com.example.lupapj.ui.components.BottomNavBar
 import com.example.lupapj.ui.components.InventorySheet
@@ -40,7 +38,7 @@ fun RoomScreen(
     onButtonBClick: () -> Unit,
     onInventoryDismiss: () -> Unit,
     onRoomObjectClick: (RoomObjectType) -> Unit,
-    onFloorTap: (RoomPoint) -> Unit,
+    onFloorTap: (FloorAnchor) -> Unit,
     onBottomNavItemClick: (BottomNavItem) -> Unit,
     onPlaceholderMessageConsumed: () -> Unit
 ) {
@@ -56,60 +54,51 @@ fun RoomScreen(
     val room = uiState ?: return
 
     Scaffold(
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.windowInsetsPadding(
+                    WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
+                )
+            )
+        }
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
                 .padding(innerPadding)
         ) {
-            Column(
+            RoomViewport(
+                uiState = room,
+                onRoomObjectClick = onRoomObjectClick,
+                onFloorTap = onFloorTap,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 18.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(
+                            WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
+                        )
+                    )
             ) {
-                Surface(
-                    shape = MaterialTheme.shapes.extraLarge,
-                    color = MaterialTheme.colorScheme.surfaceVariant
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = "루파루파",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = room.statusText,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                RoomViewport(
-                    uiState = room,
-                    onRoomObjectClick = onRoomObjectClick,
-                    onFloorTap = onFloorTap,
+                AnimatedVisibility(
+                    visible = room.navBarVisible,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                )
-
-                AnimatedVisibility(visible = room.navBarVisible) {
+                        .align(Alignment.BottomCenter)
+                        .padding(start = 16.dp, end = 16.dp, bottom = 108.dp)
+                ) {
                     BottomNavBar(onItemClick = onBottomNavItemClick)
                 }
 
                 BottomActionButtons(
                     onButtonAClick = onButtonAClick,
                     onButtonBClick = onButtonBClick,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(start = 16.dp, end = 16.dp, bottom = 20.dp)
                 )
             }
         }

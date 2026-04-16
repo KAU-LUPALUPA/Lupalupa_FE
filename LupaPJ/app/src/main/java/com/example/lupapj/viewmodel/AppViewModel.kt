@@ -6,11 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.example.lupapj.data.model.AppPhase
 import com.example.lupapj.data.model.BottomNavItem
 import com.example.lupapj.data.model.RoomObjectType
-import com.example.lupapj.data.model.RoomPoint
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.repository.AuthRepository
 import com.example.lupapj.data.repository.RoomRepository
 import com.example.lupapj.data.model.label
+import com.example.lupapj.data.model.scene.FloorAnchor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -75,7 +75,7 @@ class AppViewModel(
         }
     }
 
-    fun onFloorTap(position: RoomPoint) {
+    fun onFloorTap(position: FloorAnchor) {
         val room = _uiState.value.room ?: return
         if (!room.feedMode) return
 

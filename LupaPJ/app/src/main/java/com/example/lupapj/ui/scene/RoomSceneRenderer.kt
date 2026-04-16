@@ -1,0 +1,707 @@
+package com.example.lupapj.ui.scene
+
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import com.example.lupapj.R
+import com.example.lupapj.data.model.RoomObjectType
+import com.example.lupapj.data.model.scene.DefaultFloorPivot
+import com.example.lupapj.data.model.scene.FloorAnchor
+import com.example.lupapj.data.model.scene.HouseSceneState
+import com.example.lupapj.data.model.scene.IsoRoomProjectionSpec
+import com.example.lupapj.data.model.scene.RoomSceneDefinition
+import com.example.lupapj.data.model.scene.SceneObjectDefinition
+import com.example.lupapj.data.model.scene.SceneSpriteSpec
+import com.example.lupapj.data.model.scene.WallAnchor
+import com.example.lupapj.data.model.scene.WallFace
+import com.example.lupapj.data.model.scene.defaultPivotFor
+import com.example.lupapj.data.model.scene.toFloorAnchor
+import kotlin.math.roundToInt
+
+private const val PET_MOVE_DURATION_MS = 460
+
+private val PetSprite = SceneSpriteSpec(
+    assetKey = "room/characters/lupa_default",
+    fallbackLabel = "루파",
+    widthRatio = 0.16f,
+    heightRatio = 1.26f,
+    minWidthDp = 56f,
+    maxWidthDp = 92f,
+    isoTileFillRatio = 0.86f,
+    pivot = DefaultFloorPivot
+)
+
+private val FoodSprite = SceneSpriteSpec(
+    assetKey = "room/objects/food_drop",
+    fallbackLabel = "사료",
+    widthRatio = 0.055f,
+    heightRatio = 1.0f,
+    minWidthDp = 18f,
+    maxWidthDp = 24f,
+    pivot = DefaultFloorPivot
+)
+
+private data class ContactShadowStyle(
+    val widthMultiplier: Float,
+    val heightMultiplier: Float,
+    val baseAlpha: Float,
+    val yLiftPx: Float = 0f
+)
+
+@Composable
+fun RoomSceneRenderer(
+    sceneDefinition: RoomSceneDefinition,
+    houseSceneState: HouseSceneState,
+    feedMode: Boolean,
+    onFloorTap: (FloorAnchor) -> Unit,
+    onSceneObjectClick: (SceneObjectDefinition) -> Unit,
+    modifier: Modifier = Modifier,
+    uiOverlay: @Composable BoxScope.() -> Unit = {}
+) {
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        val density = LocalDensity.current
+        val viewportWidthPx = with(density) { maxWidth.toPx() }
+        val viewportHeightPx = with(density) { maxHeight.toPx() }
+
+        val animatedPetU by animateFloatAsState(
+            targetValue = houseSceneState.pet.anchor.u,
+            animationSpec = tween(
+                durationMillis = PET_MOVE_DURATION_MS,
+                easing = FastOutSlowInEasing
+            ),
+            label = "PetAnchorU"
+        )
+        val animatedPetV by animateFloatAsState(
+            targetValue = houseSceneState.pet.anchor.v,
+            animationSpec = tween(
+                durationMillis = PET_MOVE_DURATION_MS,
+                easing = FastOutSlowInEasing
+            ),
+            label = "PetAnchorV"
+        )
+        val animatedPetAnchor = FloorAnchor(
+            u = animatedPetU,
+            v = animatedPetV
+        )
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            RoomBackground(
+                projectionSpec = sceneDefinition.projectionSpec,
+                spec = RoomBackgroundSpec(
+                    roomColumns = 3,
+                    wallMiddleRows = 1,
+                    floorRows = 1
+                ),
+                wallDecor = sceneDefinition.fixedDecor.filter { it.anchor is WallAnchor },
+                sideWallFace = sceneDefinition.sideWallFace ?: WallFace.RIGHT,
+                highlightFloor = feedMode
+            )
+
+            FloorInteractionLayer(
+                enabled = feedMode,
+                viewportWidthPx = viewportWidthPx,
+                viewportHeightPx = viewportHeightPx,
+                projectionSpec = sceneDefinition.projectionSpec,
+                onFloorTap = onFloorTap
+            )
+
+            // Future furniture and character layers continue to stack above the tiled background.
+            sceneDefinition.fixedDecor
+                .filterNot { it.anchor is WallAnchor }
+                .forEach { decor ->
+                key(decor.id) {
+                    val node = projectSceneObject(
+                        sceneObject = decor,
+                        projectionSpec = sceneDefinition.projectionSpec,
+                        viewportWidthPx = viewportWidthPx,
+                        viewportHeightPx = viewportHeightPx,
+                        density = density
+                    )
+                    ProjectedNodeBox(
+                        node = node,
+                        density = density
+                    ) {
+                        SceneObjectPlaceholder(
+                            objectType = decor.type,
+                            label = decor.sprite.fallbackLabel,
+                            clickable = false
+                        )
+                    }
+                }
+            }
+
+            val floorRenderables = buildFloorRenderables(
+                sceneObjects = sceneDefinition.objects,
+                projectionSpec = sceneDefinition.projectionSpec,
+                houseSceneState = houseSceneState,
+                petAnchor = animatedPetAnchor,
+                viewportWidthPx = viewportWidthPx,
+                viewportHeightPx = viewportHeightPx,
+                density = density
+            )
+
+            sortFloorRenderables(floorRenderables).forEach { entry ->
+                key(entry.key) {
+                    val renderable = entry.value
+                    shadowStyleFor(renderable)?.let { style ->
+                        ContactShadow(
+                            node = renderable.node,
+                            style = style,
+                            density = density
+                        )
+                    }
+
+                    ProjectedNodeBox(
+                        node = renderable.node,
+                        density = density
+                    ) {
+                        when (renderable) {
+                            is FloorRenderableModel.SceneObjectRenderable -> {
+                                SceneObjectPlaceholder(
+                                    objectType = renderable.sceneObject.type,
+                                    label = renderable.sceneObject.sprite.fallbackLabel,
+                                    clickable = renderable.sceneObject.clickable,
+                                    onClick = {
+                                        if (renderable.sceneObject.clickable) {
+                                            onSceneObjectClick(renderable.sceneObject)
+                                        }
+                                    }
+                                )
+                            }
+
+                            is FloorRenderableModel.PetRenderable -> {
+                                CharacterPlaceholder(label = PetSprite.fallbackLabel)
+                            }
+
+                            is FloorRenderableModel.FoodRenderable -> {
+                                FoodPlaceholder()
+                            }
+                        }
+                    }
+                }
+            }
+
+            sceneDefinition.frontOccluders.forEach { occluder ->
+                key(occluder.id) {
+                    val node = projectSceneObject(
+                        sceneObject = occluder,
+                        projectionSpec = sceneDefinition.projectionSpec,
+                        viewportWidthPx = viewportWidthPx,
+                        viewportHeightPx = viewportHeightPx,
+                        density = density
+                    )
+                    ProjectedNodeBox(
+                        node = node,
+                        density = density
+                    ) {
+                        FrontOccluderPlaceholder()
+                    }
+                }
+            }
+
+            uiOverlay()
+        }
+    }
+}
+
+private sealed interface FloorRenderableModel {
+    val key: String
+    val node: ProjectedNode
+
+    data class SceneObjectRenderable(
+        val sceneObject: SceneObjectDefinition,
+        override val node: ProjectedNode
+    ) : FloorRenderableModel {
+        override val key: String = sceneObject.id
+    }
+
+    data class PetRenderable(
+        override val node: ProjectedNode
+    ) : FloorRenderableModel {
+        override val key: String = "pet"
+    }
+
+    data class FoodRenderable(
+        override val node: ProjectedNode
+    ) : FloorRenderableModel {
+        override val key: String = "dropped_food"
+    }
+}
+
+private fun buildFloorRenderables(
+    sceneObjects: List<SceneObjectDefinition>,
+    projectionSpec: IsoRoomProjectionSpec,
+    houseSceneState: HouseSceneState,
+    petAnchor: FloorAnchor,
+    viewportWidthPx: Float,
+    viewportHeightPx: Float,
+    density: Density
+): List<DepthSortable<FloorRenderableModel>> {
+    val renderables = mutableListOf<DepthSortable<FloorRenderableModel>>()
+    val metrics = resolveIsoRoomMetrics(
+        viewportWidthPx = viewportWidthPx,
+        viewportHeightPx = viewportHeightPx,
+        projectionSpec = projectionSpec
+    )
+
+    sceneObjects.forEach { sceneObject ->
+        val node = projectSceneObject(
+            sceneObject = sceneObject,
+            projectionSpec = projectionSpec,
+            viewportWidthPx = viewportWidthPx,
+            viewportHeightPx = viewportHeightPx,
+            density = density
+        )
+        renderables += DepthSortable(
+            key = sceneObject.id,
+            sortDepth = node.sortDepth,
+            value = FloorRenderableModel.SceneObjectRenderable(
+                sceneObject = sceneObject,
+                node = node
+            )
+        )
+    }
+
+    houseSceneState.currentSceneRuntime.droppedFoodAnchor?.let { droppedFood ->
+        val node = projectFloorAnchor(
+            anchor = droppedFood,
+            projectionSpec = projectionSpec,
+            viewportWidthPx = viewportWidthPx,
+            viewportHeightPx = viewportHeightPx,
+            spriteSizePx = resolveSpriteSizePx(
+                viewportWidthPx = viewportWidthPx,
+                sprite = FoodSprite,
+                minWidthPx = with(density) { FoodSprite.minWidthDp.dp.toPx() },
+                maxWidthPx = with(density) { FoodSprite.maxWidthDp.dp.toPx() }
+            ),
+            pivot = FoodSprite.pivot ?: DefaultFloorPivot,
+            depthBias = -0.01f
+        )
+        renderables += DepthSortable(
+            key = "dropped_food",
+            sortDepth = node.sortDepth,
+            value = FloorRenderableModel.FoodRenderable(node = node)
+        )
+    }
+
+    val petNode = projectFloorAnchor(
+        anchor = petAnchor,
+        projectionSpec = projectionSpec,
+        viewportWidthPx = viewportWidthPx,
+        viewportHeightPx = viewportHeightPx,
+        spriteSizePx = resolvePetSpriteSizePx(
+            sprite = PetSprite,
+            minWidthPx = with(density) { PetSprite.minWidthDp.dp.toPx() },
+            maxWidthPx = with(density) { PetSprite.maxWidthDp.dp.toPx() },
+            metrics = metrics
+        ),
+        pivot = PetSprite.pivot ?: DefaultFloorPivot
+    )
+    renderables += DepthSortable(
+        key = "pet",
+        sortDepth = petNode.sortDepth,
+        value = FloorRenderableModel.PetRenderable(node = petNode)
+    )
+
+    return renderables
+}
+
+private fun projectSceneObject(
+    sceneObject: SceneObjectDefinition,
+    projectionSpec: IsoRoomProjectionSpec,
+    viewportWidthPx: Float,
+    viewportHeightPx: Float,
+    density: Density
+): ProjectedNode {
+    val sprite = sceneObject.sprite
+    val pivot = sprite.pivot ?: defaultPivotFor(sceneObject.anchor)
+
+    return when (val anchor = sceneObject.anchor) {
+        is FloorAnchor -> {
+            val metrics = resolveIsoRoomMetrics(
+                viewportWidthPx = viewportWidthPx,
+                viewportHeightPx = viewportHeightPx,
+                projectionSpec = projectionSpec
+            )
+            val resolvedAnchor = sceneObject.tilePlacement?.toFloorAnchor(projectionSpec) ?: anchor
+            val spriteSizePx = resolveFloorSpriteSizePx(
+                viewportWidthPx = viewportWidthPx,
+                sprite = sprite,
+                minWidthPx = with(density) { sprite.minWidthDp.dp.toPx() },
+                maxWidthPx = with(density) { sprite.maxWidthDp.dp.toPx() },
+                metrics = metrics,
+                tilePlacement = sceneObject.tilePlacement
+            )
+            projectFloorAnchor(
+                anchor = resolvedAnchor,
+                projectionSpec = projectionSpec,
+                viewportWidthPx = viewportWidthPx,
+                viewportHeightPx = viewportHeightPx,
+                spriteSizePx = spriteSizePx,
+                pivot = pivot,
+                depthBias = sceneObject.depthBias
+            )
+        }
+
+        is WallAnchor -> {
+            val spriteSizePx = resolveSpriteSizePx(
+                viewportWidthPx = viewportWidthPx,
+                sprite = sprite,
+                minWidthPx = with(density) { sprite.minWidthDp.dp.toPx() },
+                maxWidthPx = with(density) { sprite.maxWidthDp.dp.toPx() }
+            )
+            projectWallAnchor(
+                projectionSpec = projectionSpec,
+                viewportWidthPx = viewportWidthPx,
+                viewportHeightPx = viewportHeightPx,
+                spriteSizePx = spriteSizePx,
+                pivot = pivot,
+                anchor = anchor,
+                depthBias = sceneObject.depthBias
+            )
+        }
+    }
+}
+
+@Composable
+private fun BoxScope.FloorInteractionLayer(
+    enabled: Boolean,
+    viewportWidthPx: Float,
+    viewportHeightPx: Float,
+    projectionSpec: IsoRoomProjectionSpec,
+    onFloorTap: (FloorAnchor) -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(enabled, projectionSpec) {
+                if (enabled) {
+                    detectTapGestures { offset ->
+                        resolveFloorAnchorFromViewport(
+                            tapXPx = offset.x,
+                            tapYPx = offset.y,
+                            viewportWidthPx = viewportWidthPx,
+                            viewportHeightPx = viewportHeightPx,
+                            projectionSpec = projectionSpec
+                        )?.let(onFloorTap)
+                    }
+                }
+            }
+    )
+}
+
+@Composable
+private fun BoxScope.ContactShadow(
+    node: ProjectedNode,
+    style: ContactShadowStyle,
+    density: Density
+) {
+    val shadowWidthPx = node.widthPx * style.widthMultiplier
+    val shadowHeightPx = node.heightPx * style.heightMultiplier
+    val alpha = (style.baseAlpha * node.perspectiveScale.coerceIn(0.82f, 1.18f)).coerceIn(0.08f, 0.32f)
+
+    Box(
+        modifier = Modifier
+            .offset {
+                IntOffset(
+                    x = (node.footXpx - shadowWidthPx / 2f).roundToInt(),
+                    y = (node.footYpx - shadowHeightPx * 0.40f + style.yLiftPx).roundToInt()
+                )
+            }
+            .size(
+                width = with(density) { shadowWidthPx.toDp() },
+                height = with(density) { shadowHeightPx.toDp() }
+            )
+            .drawBehind {
+                drawOval(
+                    color = Color.Black.copy(alpha = alpha),
+                    size = size
+                )
+            }
+    )
+}
+
+@Composable
+private fun ProjectedNodeBox(
+    node: ProjectedNode,
+    density: Density,
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit
+) {
+    Box(
+        modifier = modifier
+            .offset {
+                IntOffset(
+                    x = node.xPx.roundToInt(),
+                    y = node.yPx.roundToInt()
+                )
+            }
+            .size(
+                width = with(density) { node.widthPx.toDp() },
+                height = with(density) { node.heightPx.toDp() }
+            ),
+        content = content
+    )
+}
+
+@Composable
+private fun SceneObjectPlaceholder(
+    objectType: RoomObjectType,
+    label: String,
+    clickable: Boolean,
+    onClick: () -> Unit = {}
+) {
+    when (objectType) {
+        RoomObjectType.WINDOW -> {
+            Image(
+                painter = painterResource(id = R.drawable.window_object),
+                contentDescription = label,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        RoomObjectType.BED -> Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(enabled = clickable, onClick = onClick),
+            shape = RoundedCornerShape(24.dp),
+            color = Color(0xFFF0CCBD),
+            shadowElevation = 6.dp
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0xFFD7987D))
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xFFF6DACB)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+
+        RoomObjectType.TOY_BOX -> Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(enabled = clickable, onClick = onClick),
+            shape = RoundedCornerShape(22.dp),
+            color = Color(0xFFD6C8F0),
+            shadowElevation = 6.dp
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0xFFBCA8E6)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+
+        RoomObjectType.FOOD_BAG -> Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(enabled = clickable, onClick = onClick),
+            shape = RoundedCornerShape(18.dp),
+            color = Color(0xFFE7C18B),
+            shadowElevation = 4.dp
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFFD8AB65)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CharacterPlaceholder(label: String) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.primary,
+        shadowElevation = 8.dp
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = label,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FoodPlaceholder() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clip(CircleShape)
+            .background(Color(0xFF8E5B32))
+            .border(width = 2.dp, color = Color(0xFFD9A36B), shape = CircleShape)
+    )
+}
+
+@Composable
+private fun FrontOccluderPlaceholder() {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
+        color = Color(0xFFD79C85),
+        shadowElevation = 1.dp
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .drawBehind {
+                    drawRect(
+                        color = Color(0x24FFFFFF),
+                        size = Size(size.width, size.height * 0.22f)
+                    )
+                    drawRect(
+                        color = Color(0x12000000),
+                        topLeft = Offset(0f, size.height * 0.82f),
+                        size = Size(size.width, size.height * 0.18f)
+                    )
+                }
+        )
+    }
+}
+
+private fun shadowStyleFor(renderable: FloorRenderableModel): ContactShadowStyle? {
+    return when (renderable) {
+        is FloorRenderableModel.PetRenderable -> ContactShadowStyle(
+            widthMultiplier = 0.48f,
+            heightMultiplier = 0.16f,
+            baseAlpha = 0.24f
+        )
+
+        is FloorRenderableModel.FoodRenderable -> ContactShadowStyle(
+            widthMultiplier = 0.42f,
+            heightMultiplier = 0.18f,
+            baseAlpha = 0.10f
+        )
+
+        is FloorRenderableModel.SceneObjectRenderable -> when (renderable.sceneObject.type) {
+            RoomObjectType.BED -> ContactShadowStyle(
+                widthMultiplier = 0.72f,
+                heightMultiplier = 0.16f,
+                baseAlpha = 0.14f
+            )
+
+            RoomObjectType.TOY_BOX -> ContactShadowStyle(
+                widthMultiplier = 0.52f,
+                heightMultiplier = 0.15f,
+                baseAlpha = 0.14f
+            )
+
+            RoomObjectType.FOOD_BAG -> ContactShadowStyle(
+                widthMultiplier = 0.44f,
+                heightMultiplier = 0.14f,
+                baseAlpha = 0.12f
+            )
+
+            RoomObjectType.WINDOW -> null
+        }
+    }
+}

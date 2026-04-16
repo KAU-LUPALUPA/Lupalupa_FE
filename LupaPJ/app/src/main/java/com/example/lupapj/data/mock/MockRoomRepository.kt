@@ -1,17 +1,20 @@
 package com.example.lupapj.data.mock
 
 import com.example.lupapj.data.model.PetAction
-import com.example.lupapj.data.model.PetUiState
 import com.example.lupapj.data.model.RoomObjectType
-import com.example.lupapj.data.model.RoomPoint
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.model.initialRoomUiState
-import com.example.lupapj.data.model.label
 import com.example.lupapj.data.repository.RoomRepository
+import com.example.lupapj.data.model.scene.FloorAnchor
+import com.example.lupapj.data.model.scene.HouseSceneState
+import com.example.lupapj.data.model.scene.PetSceneState
+import com.example.lupapj.data.model.scene.RoomSceneRuntimeState
 import kotlinx.coroutines.delay
 
 class MockRoomRepository : RoomRepository {
-    private var roomState = initialRoomUiState()
+    private var roomState = initialRoomUiState(
+        sceneDefinition = DemoScenes.mainRoom
+    )
 
     override suspend fun getRoom(): RoomUiState {
         delay(180)
@@ -23,26 +26,24 @@ class MockRoomRepository : RoomRepository {
         roomState = when (objectType) {
             RoomObjectType.BED -> roomState.copy(
                 feedMode = false,
-                foodPosition = null,
-                pet = PetUiState(
-                    currentAction = PetAction.RESTING,
-                    position = RoomPoint(0.24f, 0.61f)
-                ),
-                statusText = PetAction.RESTING.label
+                houseSceneState = roomState.houseSceneState.updatePet(
+                    action = PetAction.RESTING,
+                    anchor = FloorAnchor(u = 0.33f, v = 0.62f)
+                ).updateCurrentSceneRuntime {
+                    it.copy(droppedFoodAnchor = null)
+                }
             )
 
             RoomObjectType.TOY_BOX -> roomState.copy(
                 feedMode = false,
-                pet = PetUiState(
-                    currentAction = PetAction.PLAYING,
-                    position = RoomPoint(0.60f, 0.61f)
-                ),
-                statusText = PetAction.PLAYING.label
+                houseSceneState = roomState.houseSceneState.updatePet(
+                    action = PetAction.PLAYING,
+                    anchor = FloorAnchor(u = 0.75f, v = 0.60f)
+                )
             )
 
             RoomObjectType.FOOD_BAG -> roomState.copy(
-                feedMode = true,
-                statusText = "먹이 줄 위치를 바닥에서 선택하세요."
+                feedMode = true
             )
 
             RoomObjectType.WINDOW -> roomState
@@ -50,27 +51,49 @@ class MockRoomRepository : RoomRepository {
         return roomState
     }
 
-    override suspend fun placeFood(position: RoomPoint): RoomUiState {
+    override suspend fun placeFood(position: FloorAnchor): RoomUiState {
         delay(220)
         if (!roomState.feedMode) return roomState
 
-        val clampedPoint = RoomPoint(
-            xFraction = position.xFraction.coerceIn(0.18f, 0.72f),
-            yFraction = position.yFraction.coerceIn(0.44f, 0.78f)
+        val clampedAnchor = FloorAnchor(
+            u = position.u.coerceIn(0.16f, 0.84f),
+            v = position.v.coerceIn(0.28f, 0.84f)
         )
 
         roomState = roomState.copy(
             feedMode = false,
-            foodPosition = clampedPoint,
-            pet = PetUiState(
-                currentAction = PetAction.EATING,
-                position = RoomPoint(
-                    xFraction = clampedPoint.xFraction,
-                    yFraction = (clampedPoint.yFraction - 0.05f).coerceAtLeast(0.38f)
+            houseSceneState = roomState.houseSceneState
+                .updateCurrentSceneRuntime {
+                    it.copy(droppedFoodAnchor = clampedAnchor)
+                }
+                .updatePet(
+                    action = PetAction.EATING,
+                    anchor = FloorAnchor(
+                        u = clampedAnchor.u,
+                        v = (clampedAnchor.v - 0.05f).coerceAtLeast(0.22f)
+                    )
                 )
-            ),
-            statusText = PetAction.EATING.label
         )
         return roomState
     }
+}
+
+private fun HouseSceneState.updatePet(
+    action: PetAction,
+    anchor: FloorAnchor
+): HouseSceneState {
+    return copy(
+        pet = PetSceneState(
+            action = action,
+            anchor = anchor
+        )
+    )
+}
+
+private fun HouseSceneState.updateCurrentSceneRuntime(
+    transform: (RoomSceneRuntimeState) -> RoomSceneRuntimeState
+): HouseSceneState {
+    return copy(
+        currentSceneRuntime = transform(currentSceneRuntime)
+    )
 }

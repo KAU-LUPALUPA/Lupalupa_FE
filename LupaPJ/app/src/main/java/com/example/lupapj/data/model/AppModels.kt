@@ -1,10 +1,26 @@
 package com.example.lupapj.data.model
 
+import com.example.lupapj.data.model.scene.FloorAnchor
+import com.example.lupapj.data.model.scene.FloorPlaneSpec
+import com.example.lupapj.data.model.scene.HouseSceneState
+import com.example.lupapj.data.model.scene.RoomSceneDefinition
+import com.example.lupapj.data.model.scene.SceneAnchor
+import com.example.lupapj.data.model.scene.SceneFractionPoint
+import com.example.lupapj.data.model.scene.SceneObjectDefinition
+import com.example.lupapj.data.model.scene.WallAnchor
+import com.example.lupapj.data.model.scene.WallFace
+import com.example.lupapj.data.model.scene.WallPlaneSpec
+import com.example.lupapj.data.model.scene.initialHouseSceneState
+
 enum class AppPhase {
     MAIN_LOADING,
     ROOM
 }
 
+/**
+ * Legacy viewport coordinate retained during migration away from direct screen fractions.
+ * New room rendering should prefer FloorAnchor / WallAnchor instead.
+ */
 data class RoomPoint(
     val xFraction: Float,
     val yFraction: Float
@@ -44,14 +60,37 @@ data class RoomObjectUi(
 )
 
 data class RoomUiState(
+    val sceneDefinition: RoomSceneDefinition,
+    val houseSceneState: HouseSceneState,
     val feedMode: Boolean = false,
     val navBarVisible: Boolean = false,
-    val inventoryVisible: Boolean = false,
-    val foodPosition: RoomPoint? = null,
-    val roomObjects: List<RoomObjectUi> = defaultRoomObjects(),
-    val pet: PetUiState = defaultPetUiState(),
-    val statusText: String = PetAction.IDLE.label
-)
+    val inventoryVisible: Boolean = false
+) {
+    val statusText: String
+        get() = if (feedMode) {
+            "먹이 줄 위치를 바닥에서 선택하세요."
+        } else {
+            houseSceneState.pet.action.label
+        }
+
+    val droppedFoodAnchor: FloorAnchor?
+        get() = houseSceneState.currentSceneRuntime.droppedFoodAnchor
+
+    // Legacy adapters kept while older preview/debug helpers still depend on RoomPoint-based types.
+    val foodPosition: RoomPoint?
+        get() = droppedFoodAnchor?.toLegacyRoomPoint(sceneDefinition)
+
+    val pet: PetUiState
+        get() = PetUiState(
+            currentAction = houseSceneState.pet.action,
+            position = houseSceneState.pet.anchor.toLegacyRoomPoint(sceneDefinition)
+        )
+
+    val roomObjects: List<RoomObjectUi>
+        get() = (sceneDefinition.fixedDecor + sceneDefinition.objects).map {
+            it.toLegacyRoomObjectUi(sceneDefinition)
+        }
+}
 
 enum class BottomNavItem {
     SHOP,
@@ -84,49 +123,77 @@ val RoomObjectType.label: String
         RoomObjectType.WINDOW -> "창문"
     }
 
-fun defaultPetUiState(): PetUiState {
-    return PetUiState(
-        currentAction = PetAction.IDLE,
-        position = RoomPoint(
-            xFraction = 0.44f,
-            yFraction = 0.68f
-        )
-    )
-}
-
-fun defaultRoomObjects(): List<RoomObjectUi> {
-    return listOf(
-        RoomObjectUi(
-            id = "bed",
-            type = RoomObjectType.BED,
-            label = RoomObjectType.BED.label,
-            position = RoomPoint(0.18f, 0.58f)
-        ),
-        RoomObjectUi(
-            id = "toy_box",
-            type = RoomObjectType.TOY_BOX,
-            label = RoomObjectType.TOY_BOX.label,
-            position = RoomPoint(0.64f, 0.58f)
-        ),
-        RoomObjectUi(
-            id = "food_bag",
-            type = RoomObjectType.FOOD_BAG,
-            label = RoomObjectType.FOOD_BAG.label,
-            position = RoomPoint(0.28f, 0.38f)
-        ),
-        RoomObjectUi(
-            id = "window",
-            type = RoomObjectType.WINDOW,
-            label = RoomObjectType.WINDOW.label,
-            position = RoomPoint(0.73f, 0.17f)
-        )
-    )
-}
-
-fun initialRoomUiState(): RoomUiState {
+fun initialRoomUiState(
+    sceneDefinition: RoomSceneDefinition,
+    houseSceneState: HouseSceneState = initialHouseSceneState(sceneDefinition.id)
+): RoomUiState {
     return RoomUiState(
-        roomObjects = defaultRoomObjects(),
-        pet = defaultPetUiState(),
-        statusText = PetAction.IDLE.label
+        sceneDefinition = sceneDefinition,
+        houseSceneState = houseSceneState
     )
+}
+
+private fun SceneObjectDefinition.toLegacyRoomObjectUi(
+    sceneDefinition: RoomSceneDefinition
+): RoomObjectUi {
+    return RoomObjectUi(
+        id = id,
+        type = type,
+        label = sprite.fallbackLabel,
+        position = anchor.toLegacyRoomPoint(sceneDefinition)
+    )
+}
+
+fun SceneAnchor.toLegacyRoomPoint(sceneDefinition: RoomSceneDefinition): RoomPoint {
+    return when (this) {
+        is FloorAnchor -> toLegacyFloorPoint(sceneDefinition.floorPlane)
+        is WallAnchor -> toLegacyWallPoint(sceneDefinition.wallPlaneFor(face))
+    }
+}
+
+private fun FloorAnchor.toLegacyFloorPoint(
+    plane: FloorPlaneSpec
+): RoomPoint {
+    val leftEdge = lerpPoint(plane.backLeftCorner, plane.frontLeftCorner, v)
+    val rightEdge = lerpPoint(plane.backRightCorner, plane.frontRightCorner, v)
+    val point = lerpPoint(leftEdge, rightEdge, u)
+    return RoomPoint(
+        xFraction = point.xFraction,
+        yFraction = point.yFraction
+    )
+}
+
+private fun WallAnchor.toLegacyWallPoint(
+    plane: WallPlaneSpec
+): RoomPoint {
+    val leftEdge = lerpPoint(plane.topLeftCorner, plane.bottomLeftCorner, v)
+    val rightEdge = lerpPoint(plane.topRightCorner, plane.bottomRightCorner, v)
+    val point = lerpPoint(leftEdge, rightEdge, u)
+    return RoomPoint(
+        xFraction = point.xFraction,
+        yFraction = point.yFraction
+    )
+}
+
+private fun lerp(start: Float, end: Float, fraction: Float): Float {
+    return start + (end - start) * fraction
+}
+
+private fun lerpPoint(
+    start: SceneFractionPoint,
+    end: SceneFractionPoint,
+    fraction: Float
+): SceneFractionPoint {
+    return SceneFractionPoint(
+        xFraction = lerp(start.xFraction, end.xFraction, fraction),
+        yFraction = lerp(start.yFraction, end.yFraction, fraction)
+    )
+}
+
+private fun RoomSceneDefinition.wallPlaneFor(face: WallFace): WallPlaneSpec {
+    return when (face) {
+        WallFace.BACK -> wallPlane
+        WallFace.LEFT,
+        WallFace.RIGHT -> sideWallPlane ?: wallPlane
+    }
 }
