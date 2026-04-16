@@ -13,6 +13,7 @@ import com.example.lupapj.data.model.scene.RoomSceneId
 import com.example.lupapj.data.model.scene.SceneCollisionRect
 import com.example.lupapj.data.model.scene.SceneNavigationSpec
 import com.example.lupapj.data.model.scene.SceneObjectDefinition
+import com.example.lupapj.data.model.scene.ScenePivot
 import com.example.lupapj.data.model.scene.SceneSpriteSpec
 import com.example.lupapj.data.model.scene.FloorTilePlacement
 import com.example.lupapj.data.model.scene.TileAnchorMode
@@ -32,9 +33,9 @@ object DemoScenes {
     private val isoProjection: IsoRoomProjectionSpec = createReferenceIsoRoomProjectionSpec()
     private val compatibilityProjection = createCompatibilityFaceProjectionSpec(isoProjection)
     private val bedPlacement = FloorTilePlacement(
-        tile = TileCoord(1, 2),
+        tile = TileCoord(0, 0),
         footprint = TileFootprint(2, 2),
-        anchorMode = TileAnchorMode.FRONT_CENTER
+        anchorMode = TileAnchorMode.CENTER
     )
     private val toyBoxPlacement = FloorTilePlacement(
         tile = TileCoord(4, 3),
@@ -42,13 +43,9 @@ object DemoScenes {
         anchorMode = TileAnchorMode.CENTER
     )
     private val foodBagPlacement = FloorTilePlacement(
-        tile = TileCoord(1, 1),
+        tile = TileCoord(1, 3),
         footprint = TileFootprint(1, 1),
         anchorMode = TileAnchorMode.CENTER
-    )
-    private val bedFrontOccluderAnchor = FloorAnchor(
-        u = bedPlacement.toFloorAnchor(isoProjection).u,
-        v = (bedPlacement.toFloorAnchor(isoProjection).v + 0.03f).coerceAtMost(1f)
     )
 
     val mainRoom = RoomSceneDefinition(
@@ -90,9 +87,9 @@ object DemoScenes {
                     widthRatio = 0.24f,
                     heightRatio = 0.56f,
                     minWidthDp = 88f,
-                    maxWidthDp = 136f,
-                    isoTileFillRatio = 0.82f,
-                    pivot = DefaultFloorPivot
+                    maxWidthDp = 148f,
+                    isoTileFillRatio = 0.94f,
+                    pivot = ScenePivot(x = 0.5f, y = 1.04f)
                 )
             ),
             SceneObjectDefinition(
@@ -128,24 +125,7 @@ object DemoScenes {
                 )
             )
         ),
-        frontOccluders = listOf(
-            SceneObjectDefinition(
-                id = "bed_front_occluder",
-                type = RoomObjectType.BED,
-                anchor = bedFrontOccluderAnchor,
-                sprite = SceneSpriteSpec(
-                    assetKey = "room/occluders/bed_front_basic",
-                    fallbackLabel = "bed_front",
-                    widthRatio = 0.24f,
-                    heightRatio = 0.16f,
-                    minWidthDp = 88f,
-                    maxWidthDp = 132f,
-                    pivot = DefaultFloorPivot
-                ),
-                clickable = false,
-                depthBias = 0.05f
-            )
-        ),
+        frontOccluders = emptyList(),
         portals = listOf(
             RoomPortal(
                 id = "to_side_room",

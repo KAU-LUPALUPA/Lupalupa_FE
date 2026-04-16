@@ -9,6 +9,7 @@ import com.example.lupapj.data.model.scene.FloorAnchor
 import com.example.lupapj.data.model.scene.HouseSceneState
 import com.example.lupapj.data.model.scene.PetSceneState
 import com.example.lupapj.data.model.scene.RoomSceneRuntimeState
+import com.example.lupapj.data.model.scene.SceneObjectDefinition
 import kotlinx.coroutines.delay
 
 class MockRoomRepository : RoomRepository {
@@ -28,7 +29,10 @@ class MockRoomRepository : RoomRepository {
                 feedMode = false,
                 houseSceneState = roomState.houseSceneState.updatePet(
                     action = PetAction.RESTING,
-                    anchor = FloorAnchor(u = 0.33f, v = 0.62f)
+                    anchor = roomState.resolveFloorObjectAnchor(
+                        objectType = RoomObjectType.BED,
+                        fallback = FloorAnchor(u = 0.33f, v = 0.62f)
+                    )
                 ).updateCurrentSceneRuntime {
                     it.copy(droppedFoodAnchor = null)
                 }
@@ -38,7 +42,10 @@ class MockRoomRepository : RoomRepository {
                 feedMode = false,
                 houseSceneState = roomState.houseSceneState.updatePet(
                     action = PetAction.PLAYING,
-                    anchor = FloorAnchor(u = 0.75f, v = 0.60f)
+                    anchor = roomState.resolveFloorObjectAnchor(
+                        objectType = RoomObjectType.TOY_BOX,
+                        fallback = FloorAnchor(u = 0.75f, v = 0.60f)
+                    )
                 )
             )
 
@@ -96,4 +103,16 @@ private fun HouseSceneState.updateCurrentSceneRuntime(
     return copy(
         currentSceneRuntime = transform(currentSceneRuntime)
     )
+}
+
+private fun RoomUiState.resolveFloorObjectAnchor(
+    objectType: RoomObjectType,
+    fallback: FloorAnchor
+): FloorAnchor {
+    val objectDefinition = sceneDefinition.objects.firstOrNull { it.type == objectType }
+    return objectDefinition.toFloorAnchorOrNull() ?: fallback
+}
+
+private fun SceneObjectDefinition?.toFloorAnchorOrNull(): FloorAnchor? {
+    return this?.anchor as? FloorAnchor
 }

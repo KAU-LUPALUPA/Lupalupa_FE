@@ -21,8 +21,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,14 +51,23 @@ import com.example.lupapj.data.model.scene.HouseSceneState
 import com.example.lupapj.data.model.scene.IsoRoomProjectionSpec
 import com.example.lupapj.data.model.scene.RoomSceneDefinition
 import com.example.lupapj.data.model.scene.SceneObjectDefinition
+import com.example.lupapj.data.model.scene.ScenePivot
 import com.example.lupapj.data.model.scene.SceneSpriteSpec
 import com.example.lupapj.data.model.scene.WallAnchor
 import com.example.lupapj.data.model.scene.WallFace
 import com.example.lupapj.data.model.scene.defaultPivotFor
 import com.example.lupapj.data.model.scene.toFloorAnchor
+import com.example.lupapj.ui.components.AnimatedCharacterSprite
+import com.example.lupapj.ui.components.BedImage
+import com.example.lupapj.ui.components.CharacterAnimation
+import com.example.lupapj.ui.components.FeedBagImage
+import com.example.lupapj.ui.components.FeedPelletImage
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
-private const val PET_MOVE_DURATION_MS = 460
+private const val PET_MOVE_DURATION_MS = 900
+private const val PET_DIRECTION_EPSILON = 0.01f
+private const val PET_HORIZONTAL_DIRECTION_RATIO = 0.7f
 
 private val PetSprite = SceneSpriteSpec(
     assetKey = "room/characters/lupa_default",
@@ -123,6 +136,19 @@ fun RoomSceneRenderer(
             u = animatedPetU,
             v = animatedPetV
         )
+        val isPetMoving =
+            abs(animatedPetU - houseSceneState.pet.anchor.u) > 0.0015f ||
+                abs(animatedPetV - houseSceneState.pet.anchor.v) > 0.0015f
+        var lockedPetAnimation by remember { mutableStateOf(CharacterAnimation.Row3) }
+        LaunchedEffect(houseSceneState.pet.anchor) {
+            lockedPetAnimation = resolveCharacterAnimationForMovement(
+                projectionSpec = sceneDefinition.projectionSpec,
+                currentAnchor = animatedPetAnchor,
+                targetAnchor = houseSceneState.pet.anchor,
+                fallbackAnimation = lockedPetAnimation
+            )
+        }
+        val petAnimation = lockedPetAnimation
 
         Box(modifier = Modifier.fillMaxSize()) {
             RoomBackground(
@@ -210,7 +236,13 @@ fun RoomSceneRenderer(
                             }
 
                             is FloorRenderableModel.PetRenderable -> {
-                                CharacterPlaceholder(label = PetSprite.fallbackLabel)
+                                AnimatedCharacterSprite(
+                                    modifier = Modifier.fillMaxSize(),
+                                    animation = petAnimation,
+                                    frameDurationMillis = 150L,
+                                    isPlaying = isPetMoving,
+                                    contentDescription = PetSprite.fallbackLabel
+                                )
                             }
 
                             is FloorRenderableModel.FoodRenderable -> {
@@ -505,36 +537,18 @@ private fun SceneObjectPlaceholder(
                 .fillMaxSize()
                 .clickable(enabled = clickable, onClick = onClick),
             shape = RoundedCornerShape(24.dp),
-            color = Color(0xFFF0CCBD),
-            shadowElevation = 6.dp
+            color = Color.Transparent,
+            shadowElevation = 0.dp
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .fillMaxSize(),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color(0xFFD7987D))
+                BedImage(
+                    modifier = Modifier.fillMaxSize(),
+                    contentDescription = label
                 )
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(horizontal = 6.dp, vertical = 4.dp)
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFFF6DACB)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
             }
         }
 
@@ -573,28 +587,19 @@ private fun SceneObjectPlaceholder(
                 .fillMaxSize()
                 .clickable(enabled = clickable, onClick = onClick),
             shape = RoundedCornerShape(18.dp),
-            color = Color(0xFFE7C18B),
-            shadowElevation = 4.dp
+            color = Color.Transparent,
+            shadowElevation = 0.dp
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                    .padding(horizontal = 10.dp, vertical = 12.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFFD8AB65)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+                FeedBagImage(
+                    modifier = Modifier.fillMaxSize(),
+                    contentDescription = label
+                )
             }
         }
     }
@@ -636,10 +641,14 @@ private fun FoodPlaceholder() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .clip(CircleShape)
-            .background(Color(0xFF8E5B32))
-            .border(width = 2.dp, color = Color(0xFFD9A36B), shape = CircleShape)
-    )
+            .padding(6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        FeedPelletImage(
+            modifier = Modifier.fillMaxSize(),
+            contentDescription = "사료 알갱이"
+        )
+    }
 }
 
 @Composable
@@ -704,4 +713,61 @@ private fun shadowStyleFor(renderable: FloorRenderableModel): ContactShadowStyle
             RoomObjectType.WINDOW -> null
         }
     }
+}
+
+private fun resolveCharacterAnimationForMovement(
+    projectionSpec: IsoRoomProjectionSpec,
+    currentAnchor: FloorAnchor,
+    targetAnchor: FloorAnchor,
+    fallbackAnimation: CharacterAnimation
+): CharacterAnimation {
+    val currentScreenPoint = projectAnchorToIsoScreen(
+        projectionSpec = projectionSpec,
+        anchor = currentAnchor
+    )
+    val targetScreenPoint = projectAnchorToIsoScreen(
+        projectionSpec = projectionSpec,
+        anchor = targetAnchor
+    )
+    val deltaX = targetScreenPoint.xPx - currentScreenPoint.xPx
+    val deltaY = targetScreenPoint.yPx - currentScreenPoint.yPx
+    val absDeltaX = abs(deltaX)
+    val absDeltaY = abs(deltaY)
+    val dominantDelta = maxOf(abs(deltaX), abs(deltaY))
+
+    if (dominantDelta < PET_DIRECTION_EPSILON) {
+        return fallbackAnimation
+    }
+
+    return when {
+        absDeltaX >= absDeltaY * PET_HORIZONTAL_DIRECTION_RATIO -> {
+            if (deltaX >= 0f) {
+                CharacterAnimation.Row0
+            } else {
+                CharacterAnimation.Row1
+            }
+        }
+
+        deltaY < 0f -> {
+            CharacterAnimation.Row2
+        }
+
+        deltaY >= 0f -> {
+            CharacterAnimation.Row3
+        }
+
+        else -> fallbackAnimation
+    }
+}
+
+private fun projectAnchorToIsoScreen(
+    projectionSpec: IsoRoomProjectionSpec,
+    anchor: FloorAnchor
+): ScreenPointPx {
+    val xTiles = anchor.u * projectionSpec.roomWidthTiles
+    val yTiles = anchor.v * projectionSpec.roomDepthTiles
+    return ScreenPointPx(
+        xPx = (xTiles - yTiles) * 0.5f,
+        yPx = (xTiles + yTiles) * projectionSpec.tileHeightRatio * 0.5f
+    )
 }

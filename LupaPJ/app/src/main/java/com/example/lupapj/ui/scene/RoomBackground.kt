@@ -47,16 +47,12 @@ import kotlin.math.roundToInt
 private const val FLOOR_HEIGHT_RATIO = 216f / 196f
 private const val WALL_HORIZONTAL_OVERLAP_FRACTION = 0.010f
 private const val WALL_VERTICAL_OVERLAP_FRACTION = 0.014f
+private const val FLOOR_TILE_OVERLAP_TILES = 0.04f
 
 data class RoomBackgroundSpec(
     val roomColumns: Int = 3,
     val wallMiddleRows: Int = 1,
     val floorRows: Int = 1
-)
-
-private data class BackgroundTileMetricsPx(
-    val tileWidthPx: Float,
-    val floorHeightPx: Float
 )
 
 private data class SurfaceQuadPx(
@@ -116,16 +112,6 @@ fun RoomBackground(
                 val sideWallPath = sideWall.toPath()
                 val floorPath = floor.toPath()
 
-                val combinedBounds = unionRect(
-                    backWallPath.getBounds(),
-                    sideWallPath.getBounds(),
-                    floorPath.getBounds()
-                )
-                val tileMetrics = resolveBackgroundTileMetrics(
-                    roomBounds = combinedBounds,
-                    spec = spec
-                )
-
                 onDrawBehind {
                     drawTiledWallPanel(
                         panel = backWall,
@@ -165,9 +151,7 @@ fun RoomBackground(
 
                     drawTiledFloor(
                         path = floorPath,
-                        bounds = floorPath.getBounds(),
-                        tileMetrics = tileMetrics,
-                        spec = spec,
+                        metrics = metrics,
                         floorTile = floorTile,
                         highlightFloor = highlightFloor
                     )
@@ -340,34 +324,28 @@ private fun DrawScope.drawTiledWallPanel(
 
 private fun DrawScope.drawTiledFloor(
     path: Path,
-    bounds: Rect,
-    tileMetrics: BackgroundTileMetricsPx,
-    spec: RoomBackgroundSpec,
+    metrics: IsoRoomMetricsPx,
     floorTile: ImageBitmap,
     highlightFloor: Boolean
 ) {
-    val columnCount = max(
-        spec.roomColumns,
-        ceil(bounds.width / tileMetrics.tileWidthPx).toInt() + 1
-    )
-    val rowCount = max(
-        spec.floorRows,
-        ceil(bounds.height / tileMetrics.floorHeightPx).toInt() + 1
-    )
+    val bounds = path.getBounds()
+    val columnCount = ceil(metrics.roomWidthTiles).toInt().coerceAtLeast(1)
+    val rowCount = ceil(metrics.roomDepthTiles).toInt().coerceAtLeast(1)
 
-    clipPath(path) {
-        repeat(rowCount) { rowIndex ->
-            val topY = bounds.top + (rowIndex * tileMetrics.floorHeightPx)
-            drawRepeatedRow(
+    repeat(rowCount) { rowIndex ->
+        repeat(columnCount) { columnIndex ->
+            drawProjectedImageQuad(
                 image = floorTile,
-                startX = bounds.left,
-                topY = topY,
-                tileWidthPx = tileMetrics.tileWidthPx,
-                tileHeightPx = tileMetrics.floorHeightPx,
-                columnCount = columnCount
+                quad = resolveFloorTileQuad(
+                    metrics = metrics,
+                    x0Tiles = columnIndex.toFloat(),
+                    y0Tiles = rowIndex.toFloat()
+                )
             )
         }
+    }
 
+    clipPath(path) {
         drawRect(
             brush = Brush.verticalGradient(
                 colors = listOf(
@@ -395,33 +373,6 @@ private fun DrawScope.drawTiledFloor(
         color = Color(0x22000000),
         style = Stroke(width = 1.5f)
     )
-}
-
-private fun DrawScope.drawRepeatedRow(
-    image: ImageBitmap,
-    startX: Float,
-    topY: Float,
-    tileWidthPx: Float,
-    tileHeightPx: Float,
-    columnCount: Int
-) {
-    val dstSize = IntSize(
-        width = tileWidthPx.coerceAtLeast(1f).roundToInt(),
-        height = tileHeightPx.coerceAtLeast(1f).roundToInt()
-    )
-
-    repeat(columnCount) { columnIndex ->
-        drawImage(
-            image = image,
-            srcOffset = IntOffset.Zero,
-            srcSize = IntSize(image.width, image.height),
-            dstOffset = IntOffset(
-                x = (startX + (columnIndex * tileWidthPx)).roundToInt(),
-                y = topY.roundToInt()
-            ),
-            dstSize = dstSize
-        )
-    }
 }
 
 private fun DrawScope.drawProjectedImageQuad(
@@ -469,6 +420,26 @@ private fun resolveWallLocalQuad(
         topEnd = resolveWallPanelPoint(panel, u1, v0),
         bottomEnd = resolveWallPanelPoint(panel, u1, v1),
         bottomStart = resolveWallPanelPoint(panel, u0, v1)
+    )
+}
+
+private fun resolveFloorTileQuad(
+    metrics: IsoRoomMetricsPx,
+    x0Tiles: Float,
+    y0Tiles: Float
+): SurfaceQuadPx {
+    val maxXTiles = metrics.roomWidthTiles
+    val maxYTiles = metrics.roomDepthTiles
+    val startX = (x0Tiles - FLOOR_TILE_OVERLAP_TILES).coerceIn(0f, maxXTiles)
+    val endX = (x0Tiles + 1f + FLOOR_TILE_OVERLAP_TILES).coerceIn(0f, maxXTiles)
+    val startY = (y0Tiles - FLOOR_TILE_OVERLAP_TILES).coerceIn(0f, maxYTiles)
+    val endY = (y0Tiles + 1f + FLOOR_TILE_OVERLAP_TILES).coerceIn(0f, maxYTiles)
+
+    return SurfaceQuadPx(
+        topStart = isoToScreen(startX, startY, metrics),
+        topEnd = isoToScreen(endX, startY, metrics),
+        bottomEnd = isoToScreen(endX, endY, metrics),
+        bottomStart = isoToScreen(startX, endY, metrics)
     )
 }
 
@@ -524,26 +495,6 @@ private fun isDecorOnWallFace(
         WallFace.LEFT,
         WallFace.RIGHT -> anchorFace != WallFace.BACK
     }
-}
-
-private fun resolveBackgroundTileMetrics(
-    roomBounds: Rect,
-    spec: RoomBackgroundSpec
-): BackgroundTileMetricsPx {
-    val roomColumns = spec.roomColumns.coerceAtLeast(1)
-    val wallMiddleRows = spec.wallMiddleRows.coerceAtLeast(1)
-    val floorRows = spec.floorRows.coerceAtLeast(1)
-    val totalRoomHeightUnits =
-        (24f + (wallMiddleRows * 222f) + 74f + (floorRows * 216f)) / 196f
-    val tileWidthPx = min(
-        roomBounds.width / roomColumns.toFloat(),
-        roomBounds.height / totalRoomHeightUnits
-    ).coerceAtLeast(1f)
-
-    return BackgroundTileMetricsPx(
-        tileWidthPx = tileWidthPx,
-        floorHeightPx = tileWidthPx * FLOOR_HEIGHT_RATIO
-    )
 }
 
 private fun resolveWallSurfaceStyle(
@@ -606,15 +557,6 @@ private fun expandEndFraction(
     } else {
         (fraction + overlap).coerceIn(0f, 1f)
     }
-}
-
-private fun unionRect(first: Rect, second: Rect, third: Rect): Rect {
-    return Rect(
-        left = min(first.left, min(second.left, third.left)),
-        top = min(first.top, min(second.top, third.top)),
-        right = max(first.right, max(second.right, third.right)),
-        bottom = max(first.bottom, max(second.bottom, third.bottom))
-    )
 }
 
 private fun SurfaceQuadPx.toPath(): Path {
