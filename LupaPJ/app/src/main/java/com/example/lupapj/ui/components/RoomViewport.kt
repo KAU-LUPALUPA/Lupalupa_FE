@@ -19,7 +19,7 @@ fun RoomViewport(
     RoomSceneRenderer(
         sceneDefinition = uiState.sceneDefinition,
         houseSceneState = uiState.houseSceneState,
-        feedMode = uiState.feedMode,
+        feedMode = uiState.feedMode || uiState.toyMode,
         onFloorTap = onFloorTap,
         onSceneObjectClick = { sceneObject ->
             if (sceneObject.clickable) {

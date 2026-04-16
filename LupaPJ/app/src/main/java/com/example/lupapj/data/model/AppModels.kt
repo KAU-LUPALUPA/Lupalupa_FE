@@ -63,18 +63,22 @@ data class RoomUiState(
     val sceneDefinition: RoomSceneDefinition,
     val houseSceneState: HouseSceneState,
     val feedMode: Boolean = false,
+    val toyMode: Boolean = false,
     val navBarVisible: Boolean = false,
     val inventoryVisible: Boolean = false
 ) {
     val statusText: String
-        get() = if (feedMode) {
-            "먹이 줄 위치를 바닥에서 선택하세요."
-        } else {
-            houseSceneState.pet.action.label
+        get() = when {
+            feedMode -> "먹이 줄 위치를 바닥에서 선택하세요."
+            toyMode -> "장난감을 놓을 위치를 바닥에서 선택하세요."
+            else -> houseSceneState.pet.action.label
         }
 
     val droppedFoodAnchor: FloorAnchor?
         get() = houseSceneState.currentSceneRuntime.droppedFoodAnchor
+
+    val droppedToyAnchor: FloorAnchor?
+        get() = houseSceneState.currentSceneRuntime.droppedToyAnchor
 
     // Legacy adapters kept while older preview/debug helpers still depend on RoomPoint-based types.
     val foodPosition: RoomPoint?

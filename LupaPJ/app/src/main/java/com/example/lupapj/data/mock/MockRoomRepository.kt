@@ -27,6 +27,7 @@ class MockRoomRepository : RoomRepository {
         roomState = when (objectType) {
             RoomObjectType.BED -> roomState.copy(
                 feedMode = false,
+                toyMode = false,
                 houseSceneState = roomState.houseSceneState.updatePet(
                     action = PetAction.RESTING,
                     anchor = roomState.resolveFloorObjectAnchor(
@@ -34,23 +35,21 @@ class MockRoomRepository : RoomRepository {
                         fallback = FloorAnchor(u = 0.33f, v = 0.62f)
                     )
                 ).updateCurrentSceneRuntime {
-                    it.copy(droppedFoodAnchor = null)
+                    it.copy(
+                        droppedFoodAnchor = null,
+                        droppedToyAnchor = null
+                    )
                 }
             )
 
             RoomObjectType.TOY_BOX -> roomState.copy(
                 feedMode = false,
-                houseSceneState = roomState.houseSceneState.updatePet(
-                    action = PetAction.PLAYING,
-                    anchor = roomState.resolveFloorObjectAnchor(
-                        objectType = RoomObjectType.TOY_BOX,
-                        fallback = FloorAnchor(u = 0.75f, v = 0.60f)
-                    )
-                )
+                toyMode = true
             )
 
             RoomObjectType.FOOD_BAG -> roomState.copy(
-                feedMode = true
+                feedMode = true,
+                toyMode = false
             )
 
             RoomObjectType.WINDOW -> roomState
@@ -69,6 +68,7 @@ class MockRoomRepository : RoomRepository {
 
         roomState = roomState.copy(
             feedMode = false,
+            toyMode = false,
             houseSceneState = roomState.houseSceneState
                 .updateCurrentSceneRuntime {
                     it.copy(droppedFoodAnchor = clampedAnchor)
@@ -78,6 +78,53 @@ class MockRoomRepository : RoomRepository {
                     anchor = FloorAnchor(
                         u = clampedAnchor.u,
                         v = (clampedAnchor.v - 0.05f).coerceAtLeast(0.22f)
+                    )
+                )
+        )
+        return roomState
+    }
+
+    override suspend fun consumeFood(): RoomUiState {
+        delay(120)
+
+        if (roomState.houseSceneState.currentSceneRuntime.droppedFoodAnchor == null) {
+            return roomState
+        }
+
+        roomState = roomState.copy(
+            houseSceneState = roomState.houseSceneState
+                .updateCurrentSceneRuntime {
+                    it.copy(droppedFoodAnchor = null)
+                }
+                .updatePetActionIf(
+                    current = PetAction.EATING,
+                    next = PetAction.IDLE
+                )
+        )
+        return roomState
+    }
+
+    override suspend fun placeToy(position: FloorAnchor): RoomUiState {
+        delay(220)
+        if (!roomState.toyMode) return roomState
+
+        val clampedAnchor = FloorAnchor(
+            u = position.u.coerceIn(0.16f, 0.84f),
+            v = position.v.coerceIn(0.28f, 0.84f)
+        )
+
+        roomState = roomState.copy(
+            feedMode = false,
+            toyMode = false,
+            houseSceneState = roomState.houseSceneState
+                .updateCurrentSceneRuntime {
+                    it.copy(droppedToyAnchor = clampedAnchor)
+                }
+                .updatePet(
+                    action = PetAction.PLAYING,
+                    anchor = FloorAnchor(
+                        u = clampedAnchor.u,
+                        v = (clampedAnchor.v - 0.04f).coerceAtLeast(0.22f)
                     )
                 )
         )
@@ -102,6 +149,16 @@ private fun HouseSceneState.updateCurrentSceneRuntime(
 ): HouseSceneState {
     return copy(
         currentSceneRuntime = transform(currentSceneRuntime)
+    )
+}
+
+private fun HouseSceneState.updatePetActionIf(
+    current: PetAction,
+    next: PetAction
+): HouseSceneState {
+    if (pet.action != current) return this
+    return copy(
+        pet = pet.copy(action = next)
     )
 }
 

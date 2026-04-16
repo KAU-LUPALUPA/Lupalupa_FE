@@ -8,4 +8,6 @@ interface RoomRepository {
     suspend fun getRoom(): RoomUiState
     suspend fun performObjectAction(objectType: RoomObjectType): RoomUiState
     suspend fun placeFood(position: FloorAnchor): RoomUiState
+    suspend fun consumeFood(): RoomUiState
+    suspend fun placeToy(position: FloorAnchor): RoomUiState
 }

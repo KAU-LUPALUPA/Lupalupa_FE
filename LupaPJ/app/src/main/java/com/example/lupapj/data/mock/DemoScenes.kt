@@ -38,7 +38,7 @@ object DemoScenes {
         anchorMode = TileAnchorMode.CENTER
     )
     private val toyBoxPlacement = FloorTilePlacement(
-        tile = TileCoord(4, 3),
+        tile = TileCoord(0, 4),
         footprint = TileFootprint(1, 1),
         anchorMode = TileAnchorMode.CENTER
     )
@@ -89,7 +89,7 @@ object DemoScenes {
                     minWidthDp = 88f,
                     maxWidthDp = 148f,
                     isoTileFillRatio = 0.94f,
-                    pivot = ScenePivot(x = 0.5f, y = 1.04f)
+                    pivot = ScenePivot(x = 0.5f, y = 0.98f)
                 )
             ),
             SceneObjectDefinition(
@@ -116,11 +116,11 @@ object DemoScenes {
                 sprite = SceneSpriteSpec(
                     assetKey = "room/objects/food_bag_basic",
                     fallbackLabel = "사료 봉투",
-                    widthRatio = 0.10f,
+                    widthRatio = 0.08f,
                     heightRatio = 1.30f,
-                    minWidthDp = 38f,
-                    maxWidthDp = 60f,
-                    isoTileFillRatio = 0.72f,
+                    minWidthDp = 30f,
+                    maxWidthDp = 48f,
+                    isoTileFillRatio = 0.60f,
                     pivot = DefaultFloorPivot
                 )
             )

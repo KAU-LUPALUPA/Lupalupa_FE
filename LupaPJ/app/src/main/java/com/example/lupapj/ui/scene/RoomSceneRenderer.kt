@@ -62,6 +62,8 @@ import com.example.lupapj.ui.components.BedImage
 import com.example.lupapj.ui.components.CharacterAnimation
 import com.example.lupapj.ui.components.FeedBagImage
 import com.example.lupapj.ui.components.FeedPelletImage
+import com.example.lupapj.ui.components.ToyBoxImage
+import com.example.lupapj.ui.components.ToyDuckImage
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -87,6 +89,16 @@ private val FoodSprite = SceneSpriteSpec(
     heightRatio = 1.0f,
     minWidthDp = 18f,
     maxWidthDp = 24f,
+    pivot = DefaultFloorPivot
+)
+
+private val ToySprite = SceneSpriteSpec(
+    assetKey = "room/objects/toy_drop",
+    fallbackLabel = "장난감",
+    widthRatio = 0.075f,
+    heightRatio = 1.0f,
+    minWidthDp = 24f,
+    maxWidthDp = 36f,
     pivot = DefaultFloorPivot
 )
 
@@ -248,6 +260,10 @@ fun RoomSceneRenderer(
                             is FloorRenderableModel.FoodRenderable -> {
                                 FoodPlaceholder()
                             }
+
+                            is FloorRenderableModel.ToyRenderable -> {
+                                ToyPlaceholder()
+                            }
                         }
                     }
                 }
@@ -297,6 +313,12 @@ private sealed interface FloorRenderableModel {
         override val node: ProjectedNode
     ) : FloorRenderableModel {
         override val key: String = "dropped_food"
+    }
+
+    data class ToyRenderable(
+        override val node: ProjectedNode
+    ) : FloorRenderableModel {
+        override val key: String = "dropped_toy"
     }
 }
 
@@ -353,6 +375,28 @@ private fun buildFloorRenderables(
             key = "dropped_food",
             sortDepth = node.sortDepth,
             value = FloorRenderableModel.FoodRenderable(node = node)
+        )
+    }
+
+    houseSceneState.currentSceneRuntime.droppedToyAnchor?.let { droppedToy ->
+        val node = projectFloorAnchor(
+            anchor = droppedToy,
+            projectionSpec = projectionSpec,
+            viewportWidthPx = viewportWidthPx,
+            viewportHeightPx = viewportHeightPx,
+            spriteSizePx = resolveSpriteSizePx(
+                viewportWidthPx = viewportWidthPx,
+                sprite = ToySprite,
+                minWidthPx = with(density) { ToySprite.minWidthDp.dp.toPx() },
+                maxWidthPx = with(density) { ToySprite.maxWidthDp.dp.toPx() }
+            ),
+            pivot = ToySprite.pivot ?: DefaultFloorPivot,
+            depthBias = -0.012f
+        )
+        renderables += DepthSortable(
+            key = "dropped_toy",
+            sortDepth = node.sortDepth,
+            value = FloorRenderableModel.ToyRenderable(node = node)
         )
     }
 
@@ -557,28 +601,18 @@ private fun SceneObjectPlaceholder(
                 .fillMaxSize()
                 .clickable(enabled = clickable, onClick = onClick),
             shape = RoundedCornerShape(22.dp),
-            color = Color(0xFFD6C8F0),
-            shadowElevation = 6.dp
+            color = Color.Transparent,
+            shadowElevation = 0.dp
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(6.dp)
+                    .fillMaxSize(),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color(0xFFBCA8E6)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+                ToyBoxImage(
+                    modifier = Modifier.fillMaxSize(),
+                    contentDescription = label
+                )
             }
         }
 
@@ -593,7 +627,7 @@ private fun SceneObjectPlaceholder(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 10.dp, vertical = 12.dp),
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
                 contentAlignment = Alignment.Center
             ) {
                 FeedBagImage(
@@ -652,6 +686,21 @@ private fun FoodPlaceholder() {
 }
 
 @Composable
+private fun ToyPlaceholder() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        ToyDuckImage(
+            modifier = Modifier.fillMaxSize(),
+            contentDescription = "오리 장난감"
+        )
+    }
+}
+
+@Composable
 private fun FrontOccluderPlaceholder() {
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -691,23 +740,28 @@ private fun shadowStyleFor(renderable: FloorRenderableModel): ContactShadowStyle
             baseAlpha = 0.10f
         )
 
+        is FloorRenderableModel.ToyRenderable -> null
+
         is FloorRenderableModel.SceneObjectRenderable -> when (renderable.sceneObject.type) {
             RoomObjectType.BED -> ContactShadowStyle(
                 widthMultiplier = 0.72f,
                 heightMultiplier = 0.16f,
-                baseAlpha = 0.14f
+                baseAlpha = 0.14f,
+                yLiftPx = -11f
             )
 
             RoomObjectType.TOY_BOX -> ContactShadowStyle(
-                widthMultiplier = 0.52f,
-                heightMultiplier = 0.15f,
-                baseAlpha = 0.14f
+                widthMultiplier = 0.54f,
+                heightMultiplier = 0.13f,
+                baseAlpha = 0.12f,
+                yLiftPx = -4f
             )
 
             RoomObjectType.FOOD_BAG -> ContactShadowStyle(
                 widthMultiplier = 0.44f,
                 heightMultiplier = 0.14f,
-                baseAlpha = 0.12f
+                baseAlpha = 0.12f,
+                yLiftPx = -9f
             )
 
             RoomObjectType.WINDOW -> null

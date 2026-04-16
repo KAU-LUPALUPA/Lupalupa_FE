@@ -11,6 +11,7 @@ import com.example.lupapj.data.repository.AuthRepository
 import com.example.lupapj.data.repository.RoomRepository
 import com.example.lupapj.data.model.label
 import com.example.lupapj.data.model.scene.FloorAnchor
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,12 +19,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+private const val FOOD_CONSUME_AFTER_TRAVEL_DELAY_MS = 900L
+private const val FOOD_CONSUME_PAUSE_MS = 650L
+
 class AppViewModel(
     private val authRepository: AuthRepository,
     private val roomRepository: RoomRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AppUiState())
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
+    private var pendingFoodConsumeJob: Job? = null
 
     init {
         runBootstrap()
@@ -77,11 +82,20 @@ class AppViewModel(
 
     fun onFloorTap(position: FloorAnchor) {
         val room = _uiState.value.room ?: return
-        if (!room.feedMode) return
+        if (!room.feedMode && !room.toyMode) return
 
         viewModelScope.launch {
-            val nextRoom = roomRepository.placeFood(position)
+            val placingFood = room.feedMode
+            val nextRoom = if (placingFood) {
+                roomRepository.placeFood(position)
+            } else {
+                roomRepository.placeToy(position)
+            }
             applyRepositoryRoom(nextRoom)
+
+            if (placingFood && nextRoom.droppedFoodAnchor != null) {
+                scheduleFoodConsumption()
+            }
         }
     }
 
@@ -118,6 +132,24 @@ class AppViewModel(
             inventoryVisible = currentRoom?.inventoryVisible ?: false
         )
         _uiState.update { it.copy(room = mergedRoom) }
+    }
+
+    private fun scheduleFoodConsumption() {
+        pendingFoodConsumeJob?.cancel()
+        pendingFoodConsumeJob = viewModelScope.launch {
+            delay(FOOD_CONSUME_AFTER_TRAVEL_DELAY_MS + FOOD_CONSUME_PAUSE_MS)
+
+            val currentRoom = _uiState.value.room ?: return@launch
+            if (currentRoom.droppedFoodAnchor == null) return@launch
+
+            val nextRoom = roomRepository.consumeFood()
+            applyRepositoryRoom(nextRoom)
+        }
+    }
+
+    override fun onCleared() {
+        pendingFoodConsumeJob?.cancel()
+        super.onCleared()
     }
 
     class Factory(

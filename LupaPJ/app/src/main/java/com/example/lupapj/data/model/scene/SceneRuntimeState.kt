@@ -10,7 +10,8 @@ data class PetSceneState(
 
 data class RoomSceneRuntimeState(
     val sceneId: RoomSceneId,
-    val droppedFoodAnchor: FloorAnchor? = null
+    val droppedFoodAnchor: FloorAnchor? = null,
+    val droppedToyAnchor: FloorAnchor? = null
     // TODO: add room-local interaction state such as moved objects or temporary blockers.
 )
 
