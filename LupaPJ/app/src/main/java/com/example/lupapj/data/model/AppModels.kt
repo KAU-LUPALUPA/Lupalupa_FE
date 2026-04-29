@@ -14,7 +14,8 @@ import com.example.lupapj.data.model.scene.initialHouseSceneState
 
 enum class AppPhase {
     MAIN_LOADING,
-    ROOM
+    ROOM,
+    GALLERY // [추가됨] 갤러리 화면 상태 추가
 }
 
 /**
@@ -65,7 +66,9 @@ data class RoomUiState(
     val feedMode: Boolean = false,
     val toyMode: Boolean = false,
     val navBarVisible: Boolean = false,
-    val inventoryVisible: Boolean = false
+    val inventoryVisible: Boolean = false,
+    val isCameraMode: Boolean = false, // [추가됨] 스크린샷 카메라 모드 활성화 여부
+    val cameraZoom: Float = 1f // [추가됨] 카메라 줌 배율 (기본 1x)
 ) {
     val statusText: String
         get() = when {
@@ -201,3 +204,11 @@ private fun RoomSceneDefinition.wallPlaneFor(face: WallFace): WallPlaneSpec {
         WallFace.RIGHT -> sideWallPlane ?: wallPlane
     }
 }
+
+// [추가됨] 갤러리 이미지 데이터 모델. 서버 연동 확장을 위해 id 필드 포함
+data class GalleryImage(
+    val id: String,
+    val filePath: String,
+    val isFavorite: Boolean = false,
+    val timestamp: Long
+)

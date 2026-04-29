@@ -8,7 +8,9 @@ import com.example.lupapj.data.model.BottomNavItem
 import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.repository.AuthRepository
+import com.example.lupapj.data.repository.GalleryRepository // [추가됨]
 import com.example.lupapj.data.repository.RoomRepository
+import android.graphics.Bitmap // [추가됨]
 import com.example.lupapj.data.model.label
 import com.example.lupapj.data.model.scene.FloorAnchor
 import kotlinx.coroutines.Job
@@ -24,7 +26,8 @@ private const val FOOD_CONSUME_PAUSE_MS = 650L
 
 class AppViewModel(
     private val authRepository: AuthRepository,
-    private val roomRepository: RoomRepository
+    private val roomRepository: RoomRepository,
+    private val galleryRepository: GalleryRepository // [추가됨]
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AppUiState())
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
@@ -32,6 +35,13 @@ class AppViewModel(
 
     init {
         runBootstrap()
+        
+        // 갤러리 이미지 상태 구독 연동
+        viewModelScope.launch {
+            galleryRepository.images.collect { images ->
+                _uiState.update { it.copy(galleryImages = images) }
+            }
+        }
     }
 
     fun onKakaoLoginClick() {
@@ -100,11 +110,48 @@ class AppViewModel(
     }
 
     fun onBottomNavItemClick(item: BottomNavItem) {
-        _uiState.update {
-            it.copy(
-                placeholderMessage = "${item.label} 기능은 이번 주 데모 범위 밖입니다."
-            )
+        when (item) {
+            BottomNavItem.SCREENSHOT -> {
+                // 스크린샷 모드 진입
+                updateRoom { it.copy(isCameraMode = true, cameraZoom = 1f) }
+            }
+            BottomNavItem.GALLERY -> {
+                // 갤러리 진입
+                _uiState.update { it.copy(phase = AppPhase.GALLERY) }
+            }
+            else -> {
+                _uiState.update {
+                    it.copy(placeholderMessage = "${item.label} 기능은 이번 주 데모 범위 밖입니다.")
+                }
+            }
         }
+    }
+
+    // [추가됨] 카메라 관련 로직
+    fun exitCameraMode() {
+        updateRoom { it.copy(isCameraMode = false, cameraZoom = 1f) }
+    }
+
+    fun setCameraZoom(zoom: Float) {
+        updateRoom { it.copy(cameraZoom = zoom.coerceIn(1f, 3f)) } // 1x ~ 3x 제한
+    }
+
+    fun captureScreen(bitmap: Bitmap) {
+        viewModelScope.launch {
+            galleryRepository.saveImage(bitmap)
+        }
+    }
+
+    fun toggleFavorite(imageId: String) {
+        galleryRepository.toggleFavorite(imageId)
+    }
+
+    fun deleteImage(imageId: String) {
+        galleryRepository.deleteImage(imageId)
+    }
+
+    fun exitGallery() {
+        _uiState.update { it.copy(phase = AppPhase.ROOM) }
     }
 
     fun onPlaceholderMessageConsumed() {
@@ -154,11 +201,12 @@ class AppViewModel(
 
     class Factory(
         private val authRepository: AuthRepository,
-        private val roomRepository: RoomRepository
+        private val roomRepository: RoomRepository,
+        private val galleryRepository: GalleryRepository // [추가됨]
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return AppViewModel(authRepository, roomRepository) as T
+            return AppViewModel(authRepository, roomRepository, galleryRepository) as T
         }
     }
 }
