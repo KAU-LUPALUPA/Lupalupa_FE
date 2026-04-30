@@ -109,7 +109,7 @@ fun AuthPopup(
                         Text(
                             text = if (isProcessingLogin) "로그인 중..." else "카카오 로그인",
                             color = KakaoBlack,
-                            fontSize = 22.sp,
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
 
