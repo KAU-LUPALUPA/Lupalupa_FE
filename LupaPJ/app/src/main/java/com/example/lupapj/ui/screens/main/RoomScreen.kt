@@ -56,10 +56,13 @@ fun RoomScreen(
     onRoomObjectClick: (RoomObjectType) -> Unit,
     onFloorTap: (FloorAnchor) -> Unit,
     onBottomNavItemClick: (BottomNavItem) -> Unit,
-    onPlaceholderMessageConsumed: () -> Unit,
+    onPlaceholderMessageConsumed: () -> Unit, // [복구됨(권)] 실수로 삭제된 파라미터 복구
     onSetCameraZoom: (Float) -> Unit, // [추가됨]
     onCaptureClick: (Bitmap) -> Unit, // [추가됨]
-    onExitCameraMode: () -> Unit // [추가됨]
+    onExitCameraMode: () -> Unit, // [추가됨]
+    currencyAmount: Int, // [추가됨(권)] 보유 중인 재화
+    purchasedShopItems: List<com.example.lupapj.data.model.ShopItem>, // [추가됨(권)] 보유 중인 치장 아이템 정보
+    onMinigameClick: () -> Unit // [추가됨(권)] 미니게임 진입 액션
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val rootView = LocalView.current
@@ -129,6 +132,7 @@ fun RoomScreen(
                 if (!room.isCameraMode) {
                     RoomTopHud(
                         petStatus = room.statusText,
+                        currencyAmount = currencyAmount, // [추가됨(권)]
                         onSettingsClick = onSettingsClick,
                         modifier = Modifier
                             .align(Alignment.TopCenter)
@@ -141,7 +145,10 @@ fun RoomScreen(
                             .align(Alignment.BottomCenter)
                             .padding(start = 16.dp, end = 16.dp, bottom = 108.dp)
                     ) {
-                        BottomNavBar(onItemClick = onBottomNavItemClick)
+                        BottomNavBar(
+                            onItemClick = onBottomNavItemClick,
+                            onMinigameClick = onMinigameClick
+                        )
                     }
 
                     BottomActionButtons(
@@ -154,7 +161,6 @@ fun RoomScreen(
                 }
             }
             
-            // [추가됨] 스크린샷 카메라 오버레이
             if (room.isCameraMode) {
                 CameraOverlay(
                     zoom = room.cameraZoom,
@@ -199,8 +205,12 @@ fun RoomScreen(
         }
     }
 
+    // [추가됨(권)] 인벤토리 바텀시트. ModalBottomSheet가 자체 애니메이션을 갖고 있으므로 if 분기만 사용.
     if (room.inventoryVisible) {
-        InventorySheet(onDismiss = onInventoryDismiss)
+        InventorySheet(
+            purchasedShopItems = purchasedShopItems, // [추가됨(권)]
+            onDismiss = onInventoryDismiss
+        )
     }
 }
 
@@ -221,7 +231,10 @@ private fun RoomScreenPreview() {
             onPlaceholderMessageConsumed = {},
             onSetCameraZoom = {},
             onCaptureClick = {},
-            onExitCameraMode = {}
+            onExitCameraMode = {},
+            currencyAmount = 100,
+            purchasedShopItems = emptyList(),
+            onMinigameClick = {}
         )
     }
 }

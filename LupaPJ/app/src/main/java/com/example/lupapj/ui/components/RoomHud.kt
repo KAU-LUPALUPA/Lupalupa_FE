@@ -34,6 +34,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun RoomTopHud(
     petStatus: String,
+    currencyAmount: Int, // [추가됨(권)] 보유 중인 재화
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -78,6 +79,19 @@ fun RoomTopHud(
         RoomStatusChip(
             text = petStatus,
             modifier = Modifier.widthIn(max = 360.dp)
+        )
+
+        // [추가됨(권)] 상태 텍스트("대기 중") 아래에 보유 재화를 오른쪽 정렬로 표시
+        Text(
+            text = "💰 $currencyAmount 원",
+            modifier = Modifier
+                .widthIn(max = 360.dp)
+                .fillMaxWidth()
+                .padding(end = 4.dp),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.End,
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }

@@ -11,7 +11,10 @@ import com.example.lupapj.data.repository.AuthRepository
 import com.example.lupapj.data.repository.FriendRepository
 import com.example.lupapj.data.repository.GalleryRepository // [추가됨]
 import com.example.lupapj.data.repository.RoomRepository
+import com.example.lupapj.data.repository.CurrencyRepository // [추가됨(권)] 재화 리포지토리 의존성
+import com.example.lupapj.data.repository.ShopRepository // [추가됨(권)] 상점 리포지토리 의존성
 import android.graphics.Bitmap // [추가됨]
+import com.example.lupapj.data.model.ShopItem // [추가됨(권)] 상점 아이템 모델 Import
 import com.example.lupapj.data.model.label
 import com.example.lupapj.data.model.friend.FRIEND_MESSAGE_MAX_LENGTH
 import com.example.lupapj.data.model.friend.FriendOperationFailure
@@ -32,7 +35,9 @@ class AppViewModel(
     private val authRepository: AuthRepository,
     private val roomRepository: RoomRepository,
     private val galleryRepository: GalleryRepository, // [추가됨]
-    private val friendRepository: FriendRepository
+    private val friendRepository: FriendRepository,
+    private val currencyRepository: CurrencyRepository, // [추가됨(권)] ViewModel 파라미터로 추가
+    private val shopRepository: ShopRepository // [추가됨(권)] ViewModel 파라미터로 추가
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AppUiState())
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
@@ -79,6 +84,23 @@ class AppViewModel(
                         )
                     }
                 }
+            }
+        }
+        
+        // [추가됨(권)] 재화 및 상점 상태 구독 블록. 리포지토리의 StateFlow 값을 구독하여 UiState에 반영합니다.
+        viewModelScope.launch {
+            currencyRepository.currencyState.collect { currency ->
+                _uiState.update { it.copy(currencyAmount = currency.amount) }
+            }
+        }
+        viewModelScope.launch {
+            shopRepository.shopItems.collect { items ->
+                _uiState.update { it.copy(shopItems = items) }
+            }
+        }
+        viewModelScope.launch {
+            shopRepository.inventory.collect { inventory ->
+                _uiState.update { it.copy(purchasedItemIds = inventory) }
             }
         }
     }
@@ -156,6 +178,13 @@ class AppViewModel(
 
     fun onBottomNavItemClick(item: BottomNavItem) {
         when (item) {
+            BottomNavItem.SHOP -> {
+                // [추가됨(권)] 상점 탭 클릭 시 상점 아이템을 서버(mock)에서 새로고침 후 진입
+                viewModelScope.launch {
+                    shopRepository.fetchShopItems()
+                }
+                _uiState.update { it.copy(phase = AppPhase.SHOP) }
+            }
             BottomNavItem.SCREENSHOT -> {
                 // 스크린샷 모드 진입
                 updateRoom { it.copy(isCameraMode = true, cameraZoom = 1f) }
@@ -384,6 +413,66 @@ class AppViewModel(
     fun onPlaceholderMessageConsumed() {
         _uiState.update { it.copy(placeholderMessage = null) }
     }
+    
+    // [추가됨(권)] 미니게임을 완료하여 재화를 획득하는 임시 로직입니다. 
+    // 실제 미니게임이 구현되지 않아 버튼 클릭을 통해 즉시 재화를 획득하도록 API 호출을 모사합니다.
+    fun earnCurrencyFromMinigame() {
+        viewModelScope.launch {
+            val success = currencyRepository.earnCurrency(50) // [추가됨(권)] 한 번에 50원을 획득하도록 설정
+            if (success) {
+                // [추가됨(권)] 획득 성공 시 스낵바에 띄울 메시지를 설정합니다. (상점 스낵바 컴포넌트를 재활용)
+                _uiState.update { it.copy(shopFeedbackMessage = "미니게임 보상으로 50원을 획득했습니다!") }
+            }
+        }
+    }
+
+    // [추가됨(권)] 상점 목록에서 특정 아이템을 클릭했을 때의 액션입니다.
+    fun selectShopItem(item: ShopItem) {
+        _uiState.update { it.copy(phase = AppPhase.SHOP_DETAIL, selectedShopItem = item) }
+    }
+
+    // [추가됨(권)] 상점 세부 화면에서 아이템 구매 버튼을 클릭했을 때의 액션입니다.
+    fun purchaseItem(itemId: String) {
+        if (_uiState.value.isPurchasing) return
+        
+        viewModelScope.launch {
+            _uiState.update { it.copy(isPurchasing = true) }
+            // [추가됨(권)] 구매 API를 호출하고 결과를 받아 처리합니다.
+            val result = shopRepository.purchaseItem(itemId)
+            _uiState.update { state ->
+                state.copy(
+                    isPurchasing = false,
+                    // [추가됨(권)] 구매 성공/실패 여부에 따라 알맞은 팝업 메시지를 노출합니다.
+                    shopFeedbackMessage = result.exceptionOrNull()?.message ?: "구매에 성공했습니다!"
+                )
+            }
+        }
+    }
+
+    // [추가됨(권)] 상점 화면을 닫고 방(로비)으로 나갑니다.
+    fun exitShop() {
+        _uiState.update { it.copy(phase = AppPhase.ROOM) }
+    }
+
+    // [추가됨(권)] 세부 화면(치장 미리보기)을 닫고 다시 상점 목록으로 돌아갑니다.
+    fun exitShopDetail() {
+        _uiState.update { it.copy(phase = AppPhase.SHOP, selectedShopItem = null) }
+    }
+
+    // [추가됨(권)] 미니게임 화면으로 진입합니다.
+    fun openMinigame() {
+        _uiState.update { it.copy(phase = AppPhase.MINIGAME) }
+    }
+
+    // [추가됨(권)] 미니게임 화면에서 방으로 나갑니다.
+    fun exitMinigame() {
+        _uiState.update { it.copy(phase = AppPhase.ROOM) }
+    }
+
+    // [추가됨(권)] 스낵바 팝업 메시지가 노출된 후 상태를 초기화합니다.
+    fun consumeShopFeedback() {
+        _uiState.update { it.copy(shopFeedbackMessage = null) }
+    }
 
     private fun runBootstrap() {
         viewModelScope.launch {
@@ -430,7 +519,9 @@ class AppViewModel(
         private val authRepository: AuthRepository,
         private val roomRepository: RoomRepository,
         private val galleryRepository: GalleryRepository, // [추가됨]
-        private val friendRepository: FriendRepository
+        private val friendRepository: FriendRepository,
+        private val currencyRepository: CurrencyRepository, // [추가됨(권)] 팩토리 파라미터 추가
+        private val shopRepository: ShopRepository // [추가됨(권)] 팩토리 파라미터 추가
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -438,7 +529,9 @@ class AppViewModel(
                 authRepository = authRepository,
                 roomRepository = roomRepository,
                 galleryRepository = galleryRepository,
-                friendRepository = friendRepository
+                friendRepository = friendRepository,
+                currencyRepository = currencyRepository,
+                shopRepository = shopRepository
             ) as T
         }
     }

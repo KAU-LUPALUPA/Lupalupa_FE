@@ -17,7 +17,10 @@ enum class AppPhase {
     ROOM,
     GALLERY, // [추가됨] 갤러리 화면 상태 추가
     FRIENDS,
-    FRIEND_ROOM
+    FRIEND_ROOM,
+    SHOP,        // [추가됨(권)] 상점 메인 화면 페이즈. 상점 하단 탭 클릭 시 진입.
+    SHOP_DETAIL, // [추가됨(권)] 상점 아이템 상세 및 치장 미리보기 화면 페이즈. 아이템 클릭 시 진입.
+    MINIGAME     // [추가됨(권)] 미니게임 플레이 화면 페이즈.
 }
 
 /**
@@ -213,4 +216,37 @@ data class GalleryImage(
     val filePath: String,
     val isFavorite: Boolean = false,
     val timestamp: Long
+)
+
+// [추가됨(권)] 재화 상태 모델. 현재는 단일 재화(amount)만 관리함.
+data class CurrencyState(
+    val amount: Int = 0
+)
+
+// [추가됨(권)] 상점 아이템의 카테고리 (치장 부위 구분을 위해 사용)
+enum class ShopCategory {
+    HAT,
+    GLASSES,
+    CLOTHING,
+    ACCESSORY
+}
+
+// [추가됨(권)] 상점 카테고리를 UI에 표시하기 위한 한국어 라벨 확장 프로퍼티
+val ShopCategory.label: String
+    get() = when (this) {
+        ShopCategory.HAT -> "모자"
+        ShopCategory.GLASSES -> "안경"
+        ShopCategory.CLOTHING -> "옷"
+        ShopCategory.ACCESSORY -> "액세서리"
+    }
+
+// [추가됨(권)] 상점 아이템 모델. 구매 시 필요한 재화(price) 및 미리보기 오버레이 리소스(previewOverlayResId) 포함.
+data class ShopItem(
+    val id: String,
+    val name: String,
+    val description: String,
+    val price: Int,
+    val category: ShopCategory,
+    val thumbnailResId: Int? = null,
+    val previewOverlayResId: Int? = null
 )
