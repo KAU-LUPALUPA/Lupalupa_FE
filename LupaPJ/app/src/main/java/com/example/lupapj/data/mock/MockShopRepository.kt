@@ -27,6 +27,7 @@ class MockShopRepository(
         ShopItem("item_hat_1", "밀짚모자", "여름에 쓰기 좋은 시원한 모자입니다.", 150, ShopCategory.HAT),
         ShopItem("item_glasses_1", "선글라스", "멋진 검은색 선글라스입니다.", 200, ShopCategory.GLASSES),
         ShopItem("item_clothes_1", "빨간 망토", "따뜻하고 예쁜 망토입니다.", 300, ShopCategory.CLOTHING),
+        ShopItem("item_blue_shoes", "파란 신발", "가볍게 뛰어다니기 좋은 파란 신발입니다.", 180, ShopCategory.SHOES),
         ShopItem("item_accessory_1", "스카프", "바람 불 때 좋은 스카프입니다.", 100, ShopCategory.ACCESSORY)
     )
 

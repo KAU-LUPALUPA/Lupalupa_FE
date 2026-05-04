@@ -49,6 +49,8 @@ import com.example.lupapj.data.model.scene.DefaultFloorPivot
 import com.example.lupapj.data.model.scene.FloorAnchor
 import com.example.lupapj.data.model.scene.HouseSceneState
 import com.example.lupapj.data.model.scene.IsoRoomProjectionSpec
+import com.example.lupapj.data.model.scene.PET_AUTONOMOUS_MOVE_DURATION_MS
+import com.example.lupapj.data.model.scene.PetMovementStyle
 import com.example.lupapj.data.model.scene.RoomSceneDefinition
 import com.example.lupapj.data.model.scene.SceneObjectDefinition
 import com.example.lupapj.data.model.scene.ScenePivot
@@ -67,7 +69,7 @@ import com.example.lupapj.ui.components.ToyDuckImage
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-private const val PET_MOVE_DURATION_MS = 900
+private val PET_MOVE_DURATION_MS = PET_AUTONOMOUS_MOVE_DURATION_MS.toInt()
 private const val PET_DIRECTION_EPSILON = 0.01f
 private const val PET_HORIZONTAL_DIRECTION_RATIO = 0.7f
 
@@ -249,11 +251,21 @@ fun RoomSceneRenderer(
 
                             is FloorRenderableModel.PetRenderable -> {
                                 AnimatedCharacterSprite(
-                                    modifier = Modifier.fillMaxSize(),
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .petMovementStyle(
+                                            style = houseSceneState.pet.movement.style,
+                                            isMoving = isPetMoving
+                                        ),
                                     animation = petAnimation,
+                                    appearance = houseSceneState.pet.appearance,
+                                    equippedItemIds = houseSceneState.pet.equippedItemIds,
+                                    isEgg = houseSceneState.pet.status.isEgg,
                                     frameDurationMillis = 150L,
                                     isPlaying = isPetMoving,
-                                    contentDescription = PetSprite.fallbackLabel
+                                    contentDescription = houseSceneState.pet.name.ifBlank {
+                                        PetSprite.fallbackLabel
+                                    }
                                 )
                             }
 
@@ -476,6 +488,19 @@ private fun projectSceneObject(
                 depthBias = sceneObject.depthBias
             )
         }
+    }
+}
+
+private fun Modifier.petMovementStyle(
+    style: PetMovementStyle,
+    isMoving: Boolean
+): Modifier {
+    if (!isMoving) return this
+
+    return when (style) {
+        PetMovementStyle.SMOOTH -> this
+        // Bounce rendering will plug in here without changing destination-picking logic.
+        PetMovementStyle.BOUNCY -> this
     }
 }
 

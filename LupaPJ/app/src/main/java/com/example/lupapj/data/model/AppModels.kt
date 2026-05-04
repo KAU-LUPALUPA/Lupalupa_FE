@@ -45,12 +45,46 @@ enum class RoomObjectType {
 
 enum class PetAction {
     IDLE,
+    WALKING,
     RESTING,
     PLAYING,
     EATING
 }
 
+enum class PetPersonality {
+    ACTIVE,
+    CALM,
+    LAZY
+}
+
+const val DEFAULT_PET_ID = "pet_local"
+const val DEFAULT_PET_OWNER_USER_ID = "user_local"
+const val DEFAULT_PET_NAME = "루파"
+const val DEFAULT_PET_CHARACTER_ASSET_KEY = "room/characters/lupa_default"
+
+data class PetAppearance(
+    val headSizeScale: Float = 1f,
+    val bodySizeScale: Float = 1f,
+    val eyeSizeScale: Float = 1f,
+    val noseSizeScale: Float = 1f,
+    val mouthSizeScale: Float = 1f
+)
+
+data class PetStatus(
+    val hunger: Int = 80,
+    val fatigue: Int = 20,
+    val isEgg: Boolean = false
+)
+
 data class PetUiState(
+    val petId: String = DEFAULT_PET_ID,
+    val ownerUserId: String = DEFAULT_PET_OWNER_USER_ID,
+    val name: String = DEFAULT_PET_NAME,
+    val characterAssetKey: String = DEFAULT_PET_CHARACTER_ASSET_KEY,
+    val appearance: PetAppearance = PetAppearance(),
+    val status: PetStatus = PetStatus(),
+    val personality: PetPersonality = PetPersonality.ACTIVE,
+    val equippedItemIds: List<String> = emptyList(),
     val currentAction: PetAction = PetAction.IDLE,
     val position: RoomPoint = RoomPoint(
         xFraction = 0.44f,
@@ -94,6 +128,14 @@ data class RoomUiState(
 
     val pet: PetUiState
         get() = PetUiState(
+            petId = houseSceneState.pet.petId,
+            ownerUserId = houseSceneState.pet.ownerUserId,
+            name = houseSceneState.pet.name,
+            characterAssetKey = houseSceneState.pet.characterAssetKey,
+            appearance = houseSceneState.pet.appearance,
+            status = houseSceneState.pet.status,
+            personality = houseSceneState.pet.personality,
+            equippedItemIds = houseSceneState.pet.equippedItemIds,
             currentAction = houseSceneState.pet.action,
             position = houseSceneState.pet.anchor.toLegacyRoomPoint(sceneDefinition)
         )
@@ -111,9 +153,18 @@ enum class BottomNavItem {
     GALLERY
 }
 
+enum class MainMenuAction {
+    SCREENSHOT,
+    GALLERY,
+    CONTACTS,
+    SHOP,
+    PLAYGROUND
+}
+
 val PetAction.label: String
     get() = when (this) {
         PetAction.IDLE -> "대기 중"
+        PetAction.WALKING -> "산책 중"
         PetAction.RESTING -> "휴식 중"
         PetAction.PLAYING -> "노는 중"
         PetAction.EATING -> "먹는 중"
@@ -125,6 +176,15 @@ val BottomNavItem.label: String
         BottomNavItem.SCREENSHOT -> "스크린샷"
         BottomNavItem.CONTACTS -> "친구"
         BottomNavItem.GALLERY -> "갤러리"
+    }
+
+val MainMenuAction.label: String
+    get() = when (this) {
+        MainMenuAction.SCREENSHOT -> "스크린샷"
+        MainMenuAction.GALLERY -> "갤러리"
+        MainMenuAction.CONTACTS -> "친구"
+        MainMenuAction.SHOP -> "상점"
+        MainMenuAction.PLAYGROUND -> "광장"
     }
 
 val RoomObjectType.label: String
@@ -228,6 +288,7 @@ enum class ShopCategory {
     HAT,
     GLASSES,
     CLOTHING,
+    SHOES,
     ACCESSORY
 }
 
@@ -237,6 +298,7 @@ val ShopCategory.label: String
         ShopCategory.HAT -> "모자"
         ShopCategory.GLASSES -> "안경"
         ShopCategory.CLOTHING -> "옷"
+        ShopCategory.SHOES -> "신발"
         ShopCategory.ACCESSORY -> "액세서리"
     }
 

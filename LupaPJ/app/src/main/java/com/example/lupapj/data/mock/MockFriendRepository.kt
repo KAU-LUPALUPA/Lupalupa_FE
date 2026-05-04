@@ -1,6 +1,9 @@
 package com.example.lupapj.data.mock
 
 import com.example.lupapj.data.model.PetAction
+import com.example.lupapj.data.model.PetAppearance
+import com.example.lupapj.data.model.PetPersonality
+import com.example.lupapj.data.model.PetStatus
 import com.example.lupapj.data.model.friend.FRIEND_MESSAGE_MAX_LENGTH
 import com.example.lupapj.data.model.friend.FriendCode
 import com.example.lupapj.data.model.friend.FriendHome
@@ -352,7 +355,20 @@ class MockFriendRepository(
             houseSceneState = initialHouseSceneState(
                 sceneId = DemoScenes.mainRoom.id,
                 petAnchor = FloorAnchor(u = 0.58f, v = 0.52f),
-                petAction = PetAction.RESTING
+                petAction = PetAction.RESTING,
+                petAppearance = PetAppearance(
+                    headSizeScale = 1.02f,
+                    bodySizeScale = 1.10f,
+                    eyeSizeScale = 0.94f,
+                    noseSizeScale = 1.05f,
+                    mouthSizeScale = 0.98f
+                ),
+                petStatus = PetStatus(
+                    hunger = 72,
+                    fatigue = 18,
+                    isEgg = false
+                ),
+                petPersonality = PetPersonality.CALM
             )
         )
 
@@ -361,7 +377,21 @@ class MockFriendRepository(
             houseSceneState = initialHouseSceneState(
                 sceneId = DemoScenes.sideRoom.id,
                 petAnchor = FloorAnchor(u = 0.42f, v = 0.68f),
-                petAction = PetAction.PLAYING
+                petAction = PetAction.PLAYING,
+                petAppearance = PetAppearance(
+                    headSizeScale = 1.12f,
+                    bodySizeScale = 0.90f,
+                    eyeSizeScale = 1.10f,
+                    noseSizeScale = 0.94f,
+                    mouthSizeScale = 1.08f
+                ),
+                petStatus = PetStatus(
+                    hunger = 88,
+                    fatigue = 34,
+                    isEgg = false
+                ),
+                petPersonality = PetPersonality.ACTIVE,
+                equippedItemIds = listOf("item_glasses_1")
             )
         )
 
@@ -370,7 +400,20 @@ class MockFriendRepository(
             houseSceneState = initialHouseSceneState(
                 sceneId = DemoScenes.mainRoom.id,
                 petAnchor = FloorAnchor(u = 0.36f, v = 0.72f),
-                petAction = PetAction.IDLE
+                petAction = PetAction.IDLE,
+                petAppearance = PetAppearance(
+                    headSizeScale = 0.94f,
+                    bodySizeScale = 1.04f,
+                    eyeSizeScale = 0.96f,
+                    noseSizeScale = 1.02f,
+                    mouthSizeScale = 0.92f
+                ),
+                petStatus = PetStatus(
+                    hunger = 60,
+                    fatigue = 42,
+                    isEgg = false
+                ),
+                petPersonality = PetPersonality.LAZY
             )
         )
     }

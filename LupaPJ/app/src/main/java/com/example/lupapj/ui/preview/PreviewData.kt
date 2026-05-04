@@ -3,6 +3,9 @@ package com.example.lupapj.ui.preview
 import com.example.lupapj.data.mock.DemoScenes
 import com.example.lupapj.data.model.AppPhase
 import com.example.lupapj.data.model.PetAction
+import com.example.lupapj.data.model.PetAppearance
+import com.example.lupapj.data.model.PetPersonality
+import com.example.lupapj.data.model.PetStatus
 import com.example.lupapj.data.model.initialRoomUiState
 import com.example.lupapj.data.model.scene.FloorAnchor
 import com.example.lupapj.data.model.scene.PetSceneState
@@ -27,7 +30,20 @@ val previewRoomUiStateWithFood = initialRoomUiState(
     ).copy(
         pet = PetSceneState(
             action = PetAction.EATING,
-            anchor = FloorAnchor(u = 0.52f, v = 0.65f)
+            anchor = FloorAnchor(u = 0.52f, v = 0.65f),
+            appearance = PetAppearance(
+                headSizeScale = 1.08f,
+                bodySizeScale = 0.96f,
+                eyeSizeScale = 1.12f,
+                noseSizeScale = 0.92f,
+                mouthSizeScale = 1.04f
+            ),
+            status = PetStatus(
+                hunger = 95,
+                fatigue = 20,
+                isEgg = false
+            ),
+            personality = PetPersonality.ACTIVE
         ),
         currentSceneRuntime = RoomSceneRuntimeState(
             sceneId = DemoScenes.mainRoom.id,

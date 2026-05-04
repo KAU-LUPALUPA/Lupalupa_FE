@@ -63,11 +63,39 @@ private const val POPUP_ASPECT_RATIO = 705f / 509f
 private val TimeTextColor = Color(0xFF5C371D)
 private val PopupButtonBorderColor = Color(0xB88B5B2E)
 private val EmptyRoomBackground = Color(0xFFFFF2D8)
+private data class PopupMenuItem(
+    val label: String,
+    val iconRes: Int,
+    val navItem: BottomNavItem? = null,
+    val opensPlayground: Boolean = false
+)
+
 private val PopupMenuItems = listOf(
-    BottomNavItem.SCREENSHOT,
-    BottomNavItem.GALLERY,
-    BottomNavItem.CONTACTS,
-    BottomNavItem.SHOP
+    PopupMenuItem(
+        label = BottomNavItem.SCREENSHOT.label,
+        iconRes = R.drawable.camera_trimmed,
+        navItem = BottomNavItem.SCREENSHOT
+    ),
+    PopupMenuItem(
+        label = BottomNavItem.GALLERY.label,
+        iconRes = R.drawable.gallery_trimmed,
+        navItem = BottomNavItem.GALLERY
+    ),
+    PopupMenuItem(
+        label = BottomNavItem.CONTACTS.label,
+        iconRes = R.drawable.friends_trimmed,
+        navItem = BottomNavItem.CONTACTS
+    ),
+    PopupMenuItem(
+        label = BottomNavItem.SHOP.label,
+        iconRes = R.drawable.shop_trimmed,
+        navItem = BottomNavItem.SHOP
+    ),
+    PopupMenuItem(
+        label = "광장",
+        iconRes = R.drawable.playground_trimmed,
+        opensPlayground = true
+    )
 )
 
 @Composable
@@ -81,6 +109,7 @@ fun LupaMainScreen(
     onInventoryClick: () -> Unit = {},
     onSettingClick: () -> Unit = {},
     onPopupMenuItemClick: (BottomNavItem) -> Unit = {},
+    onPlaygroundClick: () -> Unit = {},
     roomContent: @Composable BoxScope.() -> Unit = {
         Box(
             modifier = Modifier
@@ -120,7 +149,10 @@ fun LupaMainScreen(
             MainMenuPopup(
                 onMenuItemClick = { item ->
                     isPopupVisible = false
-                    onPopupMenuItemClick(item)
+                    when {
+                        item.opensPlayground -> onPlaygroundClick()
+                        item.navItem != null -> onPopupMenuItemClick(item.navItem)
+                    }
                 },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -359,16 +391,18 @@ fun BottomMenuButton(
                 painter = painterResource(id = it),
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.width(maxWidth * iconWidthFraction)
+                modifier = Modifier
+                    .width(maxWidth * iconWidthFraction)
+                    .offset(y = -maxHeight * 0.05f)
             )
         }
     }
 }
 
 @Composable
-fun MainMenuPopup(
+private fun MainMenuPopup(
     width: Dp,
-    onMenuItemClick: (BottomNavItem) -> Unit,
+    onMenuItemClick: (PopupMenuItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
     BoxWithConstraints(
@@ -404,13 +438,14 @@ fun MainMenuPopup(
                     horizontalArrangement = Arrangement.spacedBy(popupWidth * 0.035f),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (rowItems.size == 1) {
-                        Spacer(modifier = Modifier.weight(1f))
+                    when (rowItems.size) {
+                        1 -> Spacer(modifier = Modifier.weight(1f))
+                        2 -> Spacer(modifier = Modifier.weight(0.5f))
                     }
 
                     rowItems.forEach { item ->
                         PopupMenuButton(
-                            iconRes = item.popupMenuIconRes,
+                            iconRes = item.iconRes,
                             contentDescription = item.label,
                             onClick = { onMenuItemClick(item) },
                             modifier = Modifier.weight(1f),
@@ -418,8 +453,9 @@ fun MainMenuPopup(
                         )
                     }
 
-                    repeat(3 - rowItems.size - if (rowItems.size == 1) 1 else 0) {
-                        Spacer(modifier = Modifier.weight(1f))
+                    when (rowItems.size) {
+                        1 -> Spacer(modifier = Modifier.weight(1f))
+                        2 -> Spacer(modifier = Modifier.weight(0.5f))
                     }
                 }
             }
@@ -498,14 +534,6 @@ private fun resolveTimePanelWidth(screenWidth: Dp): Dp {
 private fun resolveSettingWidth(screenWidth: Dp): Dp {
     return (screenWidth * 0.155f).coerceIn(56.dp, 74.dp)
 }
-
-private val BottomNavItem.popupMenuIconRes: Int
-    get() = when (this) {
-        BottomNavItem.SCREENSHOT -> R.drawable.camera
-        BottomNavItem.GALLERY -> R.drawable.gallery
-        BottomNavItem.CONTACTS -> R.drawable.friends
-        BottomNavItem.SHOP -> R.drawable.playground
-    }
 
 @Preview(showBackground = true, widthDp = 360, heightDp = 800)
 @Composable

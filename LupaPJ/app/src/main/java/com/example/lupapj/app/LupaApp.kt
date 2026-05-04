@@ -55,6 +55,7 @@ fun LupaApp() {
                 onRoomObjectClick = appViewModel::onRoomObjectClick,
                 onFloorTap = appViewModel::onFloorTap,
                 onBottomNavItemClick = appViewModel::onBottomNavItemClick,
+                recentMainMenuAction = uiState.recentMainMenuAction,
                 onPlaceholderMessageConsumed = appViewModel::onPlaceholderMessageConsumed,
                 onSetCameraZoom = appViewModel::setCameraZoom, // [추가됨]
                 onCaptureClick = appViewModel::captureScreen, // [추가됨]

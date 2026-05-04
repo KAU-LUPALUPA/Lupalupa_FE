@@ -30,7 +30,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.view.drawToBitmap
+import com.example.lupapj.R
 import com.example.lupapj.data.model.BottomNavItem
+import com.example.lupapj.data.model.MainMenuAction
 import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.model.scene.FloorAnchor
@@ -50,6 +52,7 @@ fun RoomScreen(
     onRoomObjectClick: (RoomObjectType) -> Unit,
     onFloorTap: (FloorAnchor) -> Unit,
     onBottomNavItemClick: (BottomNavItem) -> Unit,
+    recentMainMenuAction: MainMenuAction?,
     onPlaceholderMessageConsumed: () -> Unit, // [복구됨(권)] 실수로 삭제된 파라미터 복구
     onSetCameraZoom: (Float) -> Unit, // [추가됨]
     onCaptureClick: (Bitmap) -> Unit, // [추가됨]
@@ -103,16 +106,12 @@ fun RoomScreen(
                 )
             } else {
                 LupaMainScreen(
+                    recentIconRes = recentMainMenuAction?.iconRes,
                     onRecentActionClick = onButtonAClick,
                     onInventoryClick = onButtonBClick,
                     onSettingClick = onSettingsClick,
-                    onPopupMenuItemClick = { item ->
-                        if (item == BottomNavItem.SHOP) {
-                            onMinigameClick()
-                        } else {
-                            onBottomNavItemClick(item)
-                        }
-                    },
+                    onPopupMenuItemClick = onBottomNavItemClick,
+                    onPlaygroundClick = onMinigameClick,
                     roomContent = {
                         RoomViewport(
                             uiState = room,
@@ -177,6 +176,15 @@ fun RoomScreen(
     }
 }
 
+private val MainMenuAction.iconRes: Int
+    get() = when (this) {
+        MainMenuAction.SCREENSHOT -> R.drawable.camera_trimmed
+        MainMenuAction.GALLERY -> R.drawable.gallery_trimmed
+        MainMenuAction.CONTACTS -> R.drawable.friends_trimmed
+        MainMenuAction.SHOP -> R.drawable.shop_trimmed
+        MainMenuAction.PLAYGROUND -> R.drawable.playground_trimmed
+    }
+
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 private fun RoomScreenPreview() {
@@ -191,6 +199,7 @@ private fun RoomScreenPreview() {
             onRoomObjectClick = {},
             onFloorTap = {},
             onBottomNavItemClick = {},
+            recentMainMenuAction = MainMenuAction.SHOP,
             onPlaceholderMessageConsumed = {},
             onSetCameraZoom = {},
             onCaptureClick = {},

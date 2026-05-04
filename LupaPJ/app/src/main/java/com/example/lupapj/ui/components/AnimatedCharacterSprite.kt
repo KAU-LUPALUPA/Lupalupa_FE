@@ -1,5 +1,6 @@
 package com.example.lupapj.ui.components
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,16 +14,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.lupapj.R
+import com.example.lupapj.data.model.PetAppearance
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlin.math.min
@@ -45,10 +54,21 @@ private data class CharacterFrameSpec(
 fun AnimatedCharacterSprite(
     modifier: Modifier = Modifier,
     animation: CharacterAnimation = CharacterAnimation.Row0,
+    appearance: PetAppearance = PetAppearance(),
+    equippedItemIds: List<String> = emptyList(),
+    isEgg: Boolean = false,
     frameDurationMillis: Long = 150L,
     isPlaying: Boolean = true,
     contentDescription: String? = "character"
 ) {
+    if (isEgg) {
+        EggCharacterPlaceholder(
+            modifier = modifier,
+            contentDescription = contentDescription
+        )
+        return
+    }
+
     val resources = LocalContext.current.resources
     val frames = remember(animation) { framesFor(animation) }
     var frameIndex by remember(animation) { mutableIntStateOf(0) }
@@ -88,17 +108,67 @@ fun AnimatedCharacterSprite(
         )
         val drawnHeightPx = bitmap.height * scale
         val translationYPx = drawnHeightPx * currentFrame.bottomInsetRatio
+        val spriteScale = ((appearance.headSizeScale + appearance.bodySizeScale) * 0.5f)
+            .coerceIn(0.88f, 1.12f)
+        val resolvedDescription = when {
+            contentDescription == null -> null
+            equippedItemIds.isEmpty() -> contentDescription
+            else -> "$contentDescription, 치장 아이템 ${equippedItemIds.size}개 착용"
+        }
 
         Image(
             bitmap = bitmap,
-            contentDescription = contentDescription,
+            contentDescription = resolvedDescription,
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
                     translationY = translationYPx
+                    scaleX = spriteScale
+                    scaleY = spriteScale
                 },
             contentScale = ContentScale.Fit,
             filterQuality = FilterQuality.None
+        )
+    }
+}
+
+@Composable
+private fun EggCharacterPlaceholder(
+    modifier: Modifier,
+    contentDescription: String?
+) {
+    val semanticModifier = if (contentDescription == null) {
+        modifier
+    } else {
+        modifier.semantics {
+            this.contentDescription = contentDescription
+        }
+    }
+
+    Canvas(modifier = semanticModifier) {
+        val eggWidth = size.width * 0.58f
+        val eggHeight = size.height * 0.76f
+        val topLeft = Offset(
+            x = (size.width - eggWidth) * 0.5f,
+            y = (size.height - eggHeight) * 0.56f
+        )
+
+        drawOval(
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFFFFF7DB),
+                    Color(0xFFFFD98A),
+                    Color(0xFFE9A94E)
+                )
+            ),
+            topLeft = topLeft,
+            size = Size(eggWidth, eggHeight)
+        )
+        drawOval(
+            color = Color(0x883E2412),
+            topLeft = topLeft,
+            size = Size(eggWidth, eggHeight),
+            style = Stroke(width = size.minDimension * 0.026f)
         )
     }
 }

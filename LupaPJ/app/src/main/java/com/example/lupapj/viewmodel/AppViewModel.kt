@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.lupapj.data.model.AppPhase
 import com.example.lupapj.data.model.BottomNavItem
+import com.example.lupapj.data.model.MainMenuAction
+import com.example.lupapj.data.model.PetAction
 import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.repository.AuthRepository
@@ -15,21 +17,27 @@ import com.example.lupapj.data.repository.CurrencyRepository // [추가됨(권)]
 import com.example.lupapj.data.repository.ShopRepository // [추가됨(권)] 상점 리포지토리 의존성
 import android.graphics.Bitmap // [추가됨]
 import com.example.lupapj.data.model.ShopItem // [추가됨(권)] 상점 아이템 모델 Import
-import com.example.lupapj.data.model.label
 import com.example.lupapj.data.model.friend.FRIEND_MESSAGE_MAX_LENGTH
 import com.example.lupapj.data.model.friend.FriendOperationFailure
 import com.example.lupapj.data.model.friend.FriendOperationResult
 import com.example.lupapj.data.model.scene.FloorAnchor
+import com.example.lupapj.data.model.scene.PET_AUTONOMOUS_MOVE_DURATION_MS
+import com.example.lupapj.data.model.scene.PetMovementState
+import com.example.lupapj.data.model.scene.autonomousMovementProfileFor
+import com.example.lupapj.data.model.scene.chooseAutonomousPetTarget
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 private const val FOOD_CONSUME_AFTER_TRAVEL_DELAY_MS = 900L
 private const val FOOD_CONSUME_PAUSE_MS = 650L
+private const val AUTONOMOUS_MOVEMENT_RETRY_DELAY_MS = 800L
 
 class AppViewModel(
     private val authRepository: AuthRepository,
@@ -42,6 +50,7 @@ class AppViewModel(
     private val _uiState = MutableStateFlow(AppUiState())
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
     private var pendingFoodConsumeJob: Job? = null
+    private var autonomousPetMovementJob: Job? = null
 
     init {
         runBootstrap()
@@ -121,12 +130,20 @@ class AppViewModel(
                     room = room
                 )
             }
+            startAutonomousPetMovement()
         }
     }
 
     fun onButtonAClick() {
-        updateRoom { room ->
-            room.copy(navBarVisible = !room.navBarVisible)
+        when (_uiState.value.recentMainMenuAction) {
+            MainMenuAction.SCREENSHOT -> onBottomNavItemClick(BottomNavItem.SCREENSHOT)
+            MainMenuAction.GALLERY -> onBottomNavItemClick(BottomNavItem.GALLERY)
+            MainMenuAction.CONTACTS -> onBottomNavItemClick(BottomNavItem.CONTACTS)
+            MainMenuAction.SHOP -> onBottomNavItemClick(BottomNavItem.SHOP)
+            MainMenuAction.PLAYGROUND -> openMinigame()
+            null -> _uiState.update {
+                it.copy(placeholderMessage = "최근 사용한 기능이 없습니다.")
+            }
         }
     }
 
@@ -177,6 +194,7 @@ class AppViewModel(
     }
 
     fun onBottomNavItemClick(item: BottomNavItem) {
+        rememberRecentMainMenuAction(item.toMainMenuAction())
         when (item) {
             BottomNavItem.SHOP -> {
                 // [추가됨(권)] 상점 탭 클릭 시 상점 아이템을 서버(mock)에서 새로고침 후 진입
@@ -195,11 +213,6 @@ class AppViewModel(
             }
             BottomNavItem.CONTACTS -> {
                 _uiState.update { it.copy(phase = AppPhase.FRIENDS) }
-            }
-            else -> {
-                _uiState.update {
-                    it.copy(placeholderMessage = "${item.label} 기능은 이번 주 데모 범위 밖입니다.")
-                }
             }
         }
     }
@@ -461,7 +474,12 @@ class AppViewModel(
 
     // [추가됨(권)] 미니게임 화면으로 진입합니다.
     fun openMinigame() {
-        _uiState.update { it.copy(phase = AppPhase.MINIGAME) }
+        _uiState.update {
+            it.copy(
+                phase = AppPhase.MINIGAME,
+                recentMainMenuAction = MainMenuAction.PLAYGROUND
+            )
+        }
     }
 
     // [추가됨(권)] 미니게임 화면에서 방으로 나갑니다.
@@ -485,6 +503,118 @@ class AppViewModel(
         _uiState.update { state ->
             val room = state.room ?: return@update state
             state.copy(room = transform(room))
+        }
+    }
+
+    private fun startAutonomousPetMovement() {
+        if (autonomousPetMovementJob?.isActive == true) return
+
+        autonomousPetMovementJob = viewModelScope.launch {
+            while (isActive) {
+                val state = _uiState.value
+                val room = state.room
+
+                if (room == null || !state.canStartAutonomousPetMovement()) {
+                    delay(AUTONOMOUS_MOVEMENT_RETRY_DELAY_MS)
+                    continue
+                }
+
+                val profile = autonomousMovementProfileFor(room.houseSceneState.pet.personality)
+                delay(profile.nextIdleDelayMillis(Random.Default))
+
+                val latestState = _uiState.value
+                val latestRoom = latestState.room
+                if (latestRoom == null || !latestState.canStartAutonomousPetMovement()) {
+                    continue
+                }
+
+                val currentPet = latestRoom.houseSceneState.pet
+                val targetAnchor = chooseAutonomousPetTarget(
+                    currentAnchor = currentPet.anchor,
+                    sceneDefinition = latestRoom.sceneDefinition,
+                    profile = profile,
+                    random = Random.Default
+                )
+
+                if (targetAnchor == null) {
+                    delay(AUTONOMOUS_MOVEMENT_RETRY_DELAY_MS)
+                    continue
+                }
+
+                movePetAutonomously(
+                    targetAnchor = targetAnchor,
+                    movementState = PetMovementState(
+                        targetAnchor = targetAnchor,
+                        isMoving = true,
+                        style = profile.style,
+                        isAutonomous = true
+                    )
+                )
+                delay(PET_AUTONOMOUS_MOVE_DURATION_MS)
+                finishAutonomousPetMovement(targetAnchor)
+            }
+        }
+    }
+
+    private fun AppUiState.canStartAutonomousPetMovement(): Boolean {
+        val room = room ?: return false
+        val pet = room.houseSceneState.pet
+
+        return phase == AppPhase.ROOM &&
+            !room.feedMode &&
+            !room.toyMode &&
+            !room.isCameraMode &&
+            !pet.status.isEgg &&
+            pet.action == PetAction.IDLE
+    }
+
+    private fun movePetAutonomously(
+        targetAnchor: FloorAnchor,
+        movementState: PetMovementState
+    ) {
+        updateRoom { room ->
+            val houseSceneState = room.houseSceneState
+            room.copy(
+                houseSceneState = houseSceneState.copy(
+                    pet = houseSceneState.pet.copy(
+                        action = PetAction.WALKING,
+                        anchor = targetAnchor,
+                        movement = movementState
+                    )
+                )
+            )
+        }
+    }
+
+    private fun finishAutonomousPetMovement(targetAnchor: FloorAnchor) {
+        updateRoom { room ->
+            val houseSceneState = room.houseSceneState
+            val pet = houseSceneState.pet
+            if (pet.action != PetAction.WALKING || pet.movement.targetAnchor != targetAnchor) {
+                return@updateRoom room
+            }
+
+            room.copy(
+                houseSceneState = houseSceneState.copy(
+                    pet = pet.copy(
+                        action = PetAction.IDLE,
+                        movement = pet.movement.copy(isMoving = false)
+                    )
+                )
+            )
+        }
+    }
+
+    private fun rememberRecentMainMenuAction(action: MainMenuAction) {
+        _uiState.update { it.copy(recentMainMenuAction = action) }
+    }
+
+    private fun BottomNavItem.toMainMenuAction(): MainMenuAction {
+        return when (this) {
+            BottomNavItem.SHOP -> MainMenuAction.SHOP
+            BottomNavItem.SCREENSHOT -> MainMenuAction.SCREENSHOT
+            BottomNavItem.CONTACTS -> MainMenuAction.CONTACTS
+            BottomNavItem.GALLERY -> MainMenuAction.GALLERY
         }
     }
 
@@ -512,6 +642,7 @@ class AppViewModel(
 
     override fun onCleared() {
         pendingFoodConsumeJob?.cancel()
+        autonomousPetMovementJob?.cancel()
         super.onCleared()
     }
 

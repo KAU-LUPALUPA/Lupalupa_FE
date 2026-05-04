@@ -2,6 +2,7 @@ package com.example.lupapj.viewmodel
 
 import com.example.lupapj.data.model.AppPhase
 import com.example.lupapj.data.model.GalleryImage // [추가됨]
+import com.example.lupapj.data.model.MainMenuAction
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.model.friend.FriendHome
 import com.example.lupapj.data.model.friend.FriendMessage
@@ -16,6 +17,7 @@ data class AppUiState(
     val authPopupVisible: Boolean = false,
     val isProcessingLogin: Boolean = false,
     val room: RoomUiState? = null,
+    val recentMainMenuAction: MainMenuAction? = null,
     val placeholderMessage: String? = null,
     val galleryImages: List<GalleryImage> = emptyList(), // [추가됨] 갤러리 상태 관리를 위한 이미지 목록
     val myFriendProfile: FriendUser? = null,

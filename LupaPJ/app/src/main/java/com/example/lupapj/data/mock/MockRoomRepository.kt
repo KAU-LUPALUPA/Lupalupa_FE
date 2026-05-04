@@ -1,20 +1,40 @@
 package com.example.lupapj.data.mock
 
 import com.example.lupapj.data.model.PetAction
+import com.example.lupapj.data.model.PetAppearance
+import com.example.lupapj.data.model.PetPersonality
+import com.example.lupapj.data.model.PetStatus
 import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.model.initialRoomUiState
 import com.example.lupapj.data.repository.RoomRepository
 import com.example.lupapj.data.model.scene.FloorAnchor
 import com.example.lupapj.data.model.scene.HouseSceneState
-import com.example.lupapj.data.model.scene.PetSceneState
 import com.example.lupapj.data.model.scene.RoomSceneRuntimeState
 import com.example.lupapj.data.model.scene.SceneObjectDefinition
+import com.example.lupapj.data.model.scene.initialHouseSceneState
 import kotlinx.coroutines.delay
 
 class MockRoomRepository : RoomRepository {
     private var roomState = initialRoomUiState(
-        sceneDefinition = DemoScenes.mainRoom
+        sceneDefinition = DemoScenes.mainRoom,
+        houseSceneState = initialHouseSceneState(
+            sceneId = DemoScenes.mainRoom.id,
+            petAppearance = PetAppearance(
+                headSizeScale = 1.08f,
+                bodySizeScale = 0.96f,
+                eyeSizeScale = 1.12f,
+                noseSizeScale = 0.92f,
+                mouthSizeScale = 1.04f
+            ),
+            petStatus = PetStatus(
+                hunger = 80,
+                fatigue = 25,
+                isEgg = false
+            ),
+            petPersonality = PetPersonality.ACTIVE,
+            equippedItemIds = emptyList()
+        )
     )
 
     override suspend fun getRoom(): RoomUiState {
@@ -137,7 +157,7 @@ private fun HouseSceneState.updatePet(
     anchor: FloorAnchor
 ): HouseSceneState {
     return copy(
-        pet = PetSceneState(
+        pet = pet.copy(
             action = action,
             anchor = anchor
         )
