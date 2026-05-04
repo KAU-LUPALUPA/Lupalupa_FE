@@ -1,0 +1,530 @@
+package com.example.lupapj.ui.screens.main
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.lupapj.R
+import com.example.lupapj.data.model.BottomNavItem
+import com.example.lupapj.data.model.label
+import com.example.lupapj.ui.theme.LupaPJTheme
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+
+private const val MAIN_BOARD_ASPECT_RATIO = 1287f / 318f
+private const val MAIN_BUTTON_ASPECT_RATIO = 620f / 552f
+private const val MAIN_TIME_ASPECT_RATIO = 628f / 273f
+private const val MAIN_SETTING_ASPECT_RATIO = 378f / 325f
+private const val POPUP_ASPECT_RATIO = 705f / 509f
+
+private val TimeTextColor = Color(0xFF5C371D)
+private val PopupButtonBorderColor = Color(0xB88B5B2E)
+private val EmptyRoomBackground = Color(0xFFFFF2D8)
+private val PopupMenuItems = listOf(
+    BottomNavItem.SCREENSHOT,
+    BottomNavItem.GALLERY,
+    BottomNavItem.CONTACTS,
+    BottomNavItem.SHOP
+)
+
+@Composable
+fun LupaMainScreen(
+    modifier: Modifier = Modifier,
+    currentTimeText: String? = null,
+    isDayTime: Boolean? = null,
+    recentIconRes: Int? = null,
+    onRecentActionClick: () -> Unit = {},
+    onMainMenuClick: () -> Unit = {},
+    onInventoryClick: () -> Unit = {},
+    onSettingClick: () -> Unit = {},
+    onPopupMenuItemClick: (BottomNavItem) -> Unit = {},
+    roomContent: @Composable BoxScope.() -> Unit = {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(EmptyRoomBackground)
+        )
+    }
+) {
+    val currentTime = rememberCurrentTime()
+    val resolvedTimeText = currentTimeText ?: currentTime.format(mainTimeFormatter)
+    val resolvedIsDayTime = isDayTime ?: currentTime.isDayTime()
+    var isPopupVisible by remember { mutableStateOf(false) }
+
+    BoxWithConstraints(
+        modifier = modifier.fillMaxSize()
+    ) {
+        val boardWidth = resolveBoardWidth(maxWidth)
+        val boardHeight = boardWidth / MAIN_BOARD_ASPECT_RATIO
+        val popupWidth = resolvePopupWidth(maxWidth)
+        val outsidePopupInteraction = remember { MutableInteractionSource() }
+
+        roomContent()
+
+        if (isPopupVisible) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.07f))
+                    .clickable(
+                        interactionSource = outsidePopupInteraction,
+                        indication = null
+                    ) {
+                        isPopupVisible = false
+                    }
+            )
+
+            MainMenuPopup(
+                onMenuItemClick = { item ->
+                    isPopupVisible = false
+                    onPopupMenuItemClick(item)
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(
+                            WindowInsetsSides.Horizontal
+                        )
+                    )
+                    .padding(bottom = boardHeight + 18.dp),
+                width = popupWidth
+            )
+        }
+
+        TopStatusLayer(
+            currentTimeText = resolvedTimeText,
+            isDayTime = resolvedIsDayTime,
+            onSettingClick = onSettingClick,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
+
+        BottomMenuLayer(
+            boardWidth = boardWidth,
+            recentIconRes = recentIconRes,
+            onRecentActionClick = onRecentActionClick,
+            onMainMenuClick = {
+                isPopupVisible = !isPopupVisible
+                onMainMenuClick()
+            },
+            onInventoryClick = onInventoryClick,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
+    }
+}
+
+@Composable
+fun TopStatusLayer(
+    currentTimeText: String,
+    isDayTime: Boolean,
+    onSettingClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxWidth()
+            .windowInsetsPadding(
+                WindowInsets.safeDrawing.only(
+                    WindowInsetsSides.Top + WindowInsetsSides.Horizontal
+                )
+            )
+            .padding(horizontal = 18.dp, vertical = 16.dp)
+    ) {
+        val timePanelWidth = resolveTimePanelWidth(maxWidth)
+        val settingWidth = resolveSettingWidth(maxWidth)
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            TimePanel(
+                currentTimeText = currentTimeText,
+                isDayTime = isDayTime,
+                modifier = Modifier
+                    .width(timePanelWidth)
+                    .aspectRatio(MAIN_TIME_ASPECT_RATIO)
+            )
+
+            Image(
+                painter = painterResource(id = R.drawable.main_setting_trimmed),
+                contentDescription = "설정",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .width(settingWidth)
+                    .aspectRatio(MAIN_SETTING_ASPECT_RATIO)
+                    .clickable(onClick = onSettingClick)
+            )
+        }
+    }
+}
+
+@Composable
+fun TimePanel(
+    currentTimeText: String,
+    isDayTime: Boolean,
+    modifier: Modifier = Modifier
+) {
+    BoxWithConstraints(
+        modifier = modifier,
+        contentAlignment = Alignment.CenterStart
+    ) {
+        val iconSize = minOf(maxHeight * 0.46f, 32.dp)
+
+        Image(
+            painter = painterResource(id = R.drawable.main_time_trimmed),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.matchParentSize()
+        )
+
+        Row(
+            modifier = Modifier
+                .matchParentSize()
+                .offset(y = -maxHeight * 0.07f)
+                .padding(start = maxWidth * 0.13f, end = maxWidth * 0.12f),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Image(
+                painter = painterResource(
+                    id = if (isDayTime) {
+                        R.drawable.time_sun_trimmed
+                    } else {
+                        R.drawable.time_moon_trimmed
+                    }
+                ),
+                contentDescription = if (isDayTime) "낮" else "밤",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(iconSize)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = currentTimeText,
+                color = TimeTextColor,
+                fontSize = 24.sp,
+                lineHeight = 24.sp,
+                fontWeight = FontWeight.ExtraBold,
+                textAlign = TextAlign.Center,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+fun BottomMenuLayer(
+    boardWidth: Dp,
+    recentIconRes: Int?,
+    onRecentActionClick: () -> Unit,
+    onMainMenuClick: () -> Unit,
+    onInventoryClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .windowInsetsPadding(
+                WindowInsets.safeDrawing.only(
+                    WindowInsetsSides.Horizontal
+                )
+            ),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        val boardHeight = boardWidth / MAIN_BOARD_ASPECT_RATIO
+
+        Box(
+            modifier = Modifier
+                .width(boardWidth)
+                .height(boardHeight)
+                .offset(y = boardHeight * 0.055f),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.main_board_trimmed),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.matchParentSize()
+            )
+
+            BoxWithConstraints(
+                modifier = Modifier
+                    .matchParentSize()
+                    .padding(horizontal = boardWidth * 0.105f),
+                contentAlignment = Alignment.Center
+            ) {
+                val sideButtonWidth = (maxWidth * 0.28f).coerceIn(72.dp, 96.dp)
+                val mainButtonWidth = (sideButtonWidth * 1.18f).coerceIn(84.dp, 116.dp)
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset(y = -boardHeight * 0.05f),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    BottomMenuButton(
+                        buttonWidth = sideButtonWidth,
+                        iconRes = recentIconRes,
+                        iconWidthFraction = 0.54f,
+                        contentDescription = "최근 사용 기능",
+                        onClick = onRecentActionClick
+                    )
+                    BottomMenuButton(
+                        buttonWidth = mainButtonWidth,
+                        iconRes = R.drawable.main_action_trimmed,
+                        iconWidthFraction = 0.58f,
+                        contentDescription = "메인 메뉴",
+                        onClick = onMainMenuClick
+                    )
+                    BottomMenuButton(
+                        buttonWidth = sideButtonWidth,
+                        iconRes = R.drawable.main_inv_trimmed,
+                        iconWidthFraction = 0.52f,
+                        contentDescription = "인벤토리",
+                        onClick = onInventoryClick
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BottomMenuButton(
+    buttonWidth: Dp,
+    iconRes: Int?,
+    iconWidthFraction: Float,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    BoxWithConstraints(
+        modifier = modifier
+            .width(buttonWidth)
+            .aspectRatio(MAIN_BUTTON_ASPECT_RATIO)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.main_button_trimmed),
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.matchParentSize()
+        )
+
+        iconRes?.let {
+            Image(
+                painter = painterResource(id = it),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.width(maxWidth * iconWidthFraction)
+            )
+        }
+    }
+}
+
+@Composable
+fun MainMenuPopup(
+    width: Dp,
+    onMenuItemClick: (BottomNavItem) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    BoxWithConstraints(
+        modifier = modifier
+            .width(width)
+            .aspectRatio(POPUP_ASPECT_RATIO),
+        contentAlignment = Alignment.Center
+    ) {
+        val popupWidth = maxWidth
+        val popupHeight = maxHeight
+
+        Image(
+            painter = painterResource(id = R.drawable.popup_trimmed),
+            contentDescription = "메인 메뉴 팝업",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.matchParentSize()
+        )
+
+        Column(
+            modifier = Modifier
+                .matchParentSize()
+                .padding(
+                    start = popupWidth * 0.10f,
+                    end = popupWidth * 0.10f,
+                    top = popupHeight * 0.17f,
+                    bottom = popupHeight * 0.17f
+                ),
+            verticalArrangement = Arrangement.spacedBy(popupHeight * 0.08f)
+        ) {
+            PopupMenuItems.chunked(3).forEach { rowItems ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(popupWidth * 0.035f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (rowItems.size == 1) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+
+                    rowItems.forEach { item ->
+                        PopupMenuButton(
+                            iconRes = item.popupMenuIconRes,
+                            contentDescription = item.label,
+                            onClick = { onMenuItemClick(item) },
+                            modifier = Modifier.weight(1f),
+                            buttonHeight = popupHeight * 0.24f
+                        )
+                    }
+
+                    repeat(3 - rowItems.size - if (rowItems.size == 1) 1 else 0) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PopupMenuButton(
+    iconRes: Int,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    buttonHeight: Dp = 44.dp
+) {
+    BoxWithConstraints(
+        modifier = modifier
+            .height(buttonHeight.coerceIn(48.dp, 64.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .width(maxWidth * 0.74f)
+                .height(maxHeight * 0.68f)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xF7FFF5DB))
+                .border(
+                    width = 1.dp,
+                    color = PopupButtonBorderColor,
+                    shape = RoundedCornerShape(8.dp)
+                )
+        )
+
+        Image(
+            painter = painterResource(id = iconRes),
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+@Composable
+private fun rememberCurrentTime(): LocalTime {
+    var time by remember { mutableStateOf(LocalTime.now()) }
+
+    LaunchedEffect(Unit) {
+        while (isActive) {
+            time = LocalTime.now()
+            delay(1_000L)
+        }
+    }
+
+    return time
+}
+
+private val mainTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+
+private fun LocalTime.isDayTime(): Boolean {
+    return hour in 6..17
+}
+
+private fun resolveBoardWidth(screenWidth: Dp): Dp {
+    return minOf(screenWidth * 0.93f, 430.dp)
+}
+
+private fun resolvePopupWidth(screenWidth: Dp): Dp {
+    return (screenWidth * 0.92f).coerceAtMost(430.dp)
+}
+
+private fun resolveTimePanelWidth(screenWidth: Dp): Dp {
+    return (screenWidth * 0.43f).coerceIn(148.dp, 190.dp)
+}
+
+private fun resolveSettingWidth(screenWidth: Dp): Dp {
+    return (screenWidth * 0.155f).coerceIn(56.dp, 74.dp)
+}
+
+private val BottomNavItem.popupMenuIconRes: Int
+    get() = when (this) {
+        BottomNavItem.SCREENSHOT -> R.drawable.camera
+        BottomNavItem.GALLERY -> R.drawable.gallery
+        BottomNavItem.CONTACTS -> R.drawable.friends
+        BottomNavItem.SHOP -> R.drawable.playground
+    }
+
+@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+@Composable
+private fun LupaMainScreenCompactPreview() {
+    LupaPJTheme {
+        LupaMainScreen(
+            currentTimeText = "12:30",
+            isDayTime = true
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 412, heightDp = 915)
+@Composable
+private fun LupaMainScreenTallPreview() {
+    LupaPJTheme {
+        LupaMainScreen(
+            currentTimeText = "21:45",
+            isDayTime = false
+        )
+    }
+}

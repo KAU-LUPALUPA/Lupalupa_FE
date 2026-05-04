@@ -1,6 +1,6 @@
 package com.example.lupapj.ui.screens.main
 
-import androidx.compose.animation.AnimatedVisibility
+import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -18,9 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -36,12 +34,8 @@ import com.example.lupapj.data.model.BottomNavItem
 import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.model.scene.FloorAnchor
-import com.example.lupapj.ui.components.BottomActionButtons
-import com.example.lupapj.ui.components.BottomNavBar
 import com.example.lupapj.ui.components.InventorySheet
-import com.example.lupapj.ui.components.RoomTopHud
 import com.example.lupapj.ui.components.RoomViewport
-import com.example.lupapj.ui.components.WoodScreenFrame
 import com.example.lupapj.ui.preview.previewRoomUiState
 import com.example.lupapj.ui.theme.LupaPJTheme
 
@@ -91,67 +85,34 @@ fun RoomScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            RoomViewport(
-                uiState = room,
-                onRoomObjectClick = onRoomObjectClick,
-                onFloorTap = onFloorTap,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(
-                        if (room.isCameraMode) {
-                            Modifier.graphicsLayer {
-                                scaleX = room.cameraZoom
-                                scaleY = room.cameraZoom
-                                transformOrigin = TransformOrigin.Center
-                            }
-                        } else {
-                            Modifier
+            if (room.isCameraMode) {
+                RoomViewport(
+                    uiState = room,
+                    onRoomObjectClick = onRoomObjectClick,
+                    onFloorTap = onFloorTap,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = room.cameraZoom
+                            scaleY = room.cameraZoom
+                            transformOrigin = TransformOrigin.Center
                         }
-                    )
-            )
-
-            if (!room.isCameraMode) {
-                WoodScreenFrame(
-                    modifier = Modifier.fillMaxSize(),
-                    thickness = 16.dp
                 )
-            }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .windowInsetsPadding(
-                        WindowInsets.safeDrawing.only(
-                            WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
+            } else {
+                LupaMainScreen(
+                    onRecentActionClick = onButtonAClick,
+                    onInventoryClick = onButtonBClick,
+                    onSettingClick = onSettingsClick,
+                    onPopupMenuItemClick = onBottomNavItemClick,
+                    roomContent = {
+                        RoomViewport(
+                            uiState = room,
+                            onRoomObjectClick = onRoomObjectClick,
+                            onFloorTap = onFloorTap,
+                            modifier = Modifier.fillMaxSize()
                         )
-                    )
-            ) {
-                if (!room.isCameraMode) {
-                    RoomTopHud(
-                        petStatus = room.statusText,
-                        onSettingsClick = onSettingsClick,
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = 8.dp)
-                    )
-
-                    AnimatedVisibility(
-                        visible = room.navBarVisible,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(start = 16.dp, end = 16.dp, bottom = 108.dp)
-                    ) {
-                        BottomNavBar(onItemClick = onBottomNavItemClick)
                     }
-
-                    BottomActionButtons(
-                        onMenuClick = onButtonAClick,
-                        onBagClick = onButtonBClick,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(start = 16.dp, end = 16.dp, bottom = 20.dp)
-                    )
-                }
+                )
             }
             
             // [추가됨] 스크린샷 카메라 오버레이
