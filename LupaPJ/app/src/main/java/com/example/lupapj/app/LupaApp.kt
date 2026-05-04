@@ -10,6 +10,8 @@ import com.example.lupapj.data.model.AppPhase
 import com.example.lupapj.ui.screens.main.MainLoadingScreen
 import com.example.lupapj.ui.screens.main.RoomScreen
 import com.example.lupapj.ui.screens.gallery.GalleryScreen // [추가됨]
+import com.example.lupapj.ui.screens.friends.FriendRoomScreen
+import com.example.lupapj.ui.screens.friends.FriendScreen
 import com.example.lupapj.viewmodel.AppViewModel
 
 @Composable
@@ -20,7 +22,8 @@ fun LupaApp() {
         factory = AppViewModel.Factory(
             authRepository = container.authRepository,
             roomRepository = container.roomRepository,
-            galleryRepository = container.galleryRepository // [추가됨] 갤러리 리포지토리 주입
+            galleryRepository = container.galleryRepository, // [추가됨] 갤러리 리포지토리 주입
+            friendRepository = container.friendRepository
         )
     )
     val uiState by appViewModel.uiState.collectAsStateWithLifecycle()
@@ -43,6 +46,7 @@ fun LupaApp() {
                 onButtonAClick = appViewModel::onButtonAClick,
                 onButtonBClick = appViewModel::onButtonBClick,
                 onInventoryDismiss = appViewModel::onInventoryDismiss,
+                onSettingsClick = appViewModel::onSettingsClick,
                 onRoomObjectClick = appViewModel::onRoomObjectClick,
                 onFloorTap = appViewModel::onFloorTap,
                 onBottomNavItemClick = appViewModel::onBottomNavItemClick,
@@ -59,6 +63,41 @@ fun LupaApp() {
                 onBackClick = appViewModel::exitGallery,
                 onFavoriteToggle = appViewModel::toggleFavorite,
                 onDeleteClick = appViewModel::deleteImage // [추가됨]
+            )
+        }
+
+        AppPhase.FRIENDS -> {
+            FriendScreen(
+                myProfile = uiState.myFriendProfile,
+                friends = uiState.friends,
+                receivedRequests = uiState.receivedFriendRequests,
+                sentRequests = uiState.sentFriendRequests,
+                friendCodeInput = uiState.friendCodeInput,
+                isSendingFriendRequest = uiState.isSendingFriendRequest,
+                feedbackMessage = uiState.friendFeedbackMessage,
+                onFriendCodeChange = appViewModel::onFriendCodeChange,
+                onSendFriendRequest = appViewModel::sendFriendRequest,
+                onAcceptRequest = appViewModel::acceptFriendRequest,
+                onRejectRequest = appViewModel::rejectFriendRequest,
+                onCancelRequest = appViewModel::cancelFriendRequest,
+                onVisitFriend = appViewModel::visitFriendHome,
+                onRemoveFriend = appViewModel::removeFriend,
+                onBackClick = appViewModel::exitFriends,
+                onFeedbackConsumed = appViewModel::onFriendFeedbackConsumed
+            )
+        }
+
+        AppPhase.FRIEND_ROOM -> {
+            FriendRoomScreen(
+                friendHome = uiState.visitingFriendHome,
+                isLoading = uiState.isLoadingFriendHome,
+                messages = uiState.friendRoomMessages,
+                messageInput = uiState.friendMessageInput,
+                isSendingMessage = uiState.isSendingFriendMessage,
+                onMessageInputChange = appViewModel::onFriendMessageChange,
+                onSendMessage = appViewModel::sendFriendMessage,
+                onBackToFriendsClick = appViewModel::backToFriendsFromFriendRoom,
+                onReturnHomeClick = appViewModel::returnHomeFromFriendRoom
             )
         }
     }

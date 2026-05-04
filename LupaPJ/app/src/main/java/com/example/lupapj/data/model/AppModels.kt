@@ -15,7 +15,9 @@ import com.example.lupapj.data.model.scene.initialHouseSceneState
 enum class AppPhase {
     MAIN_LOADING,
     ROOM,
-    GALLERY // [추가됨] 갤러리 화면 상태 추가
+    GALLERY, // [추가됨] 갤러리 화면 상태 추가
+    FRIENDS,
+    FRIEND_ROOM
 }
 
 /**
@@ -118,7 +120,7 @@ val BottomNavItem.label: String
     get() = when (this) {
         BottomNavItem.SHOP -> "상점"
         BottomNavItem.SCREENSHOT -> "스크린샷"
-        BottomNavItem.CONTACTS -> "연락처"
+        BottomNavItem.CONTACTS -> "친구"
         BottomNavItem.GALLERY -> "갤러리"
     }
 

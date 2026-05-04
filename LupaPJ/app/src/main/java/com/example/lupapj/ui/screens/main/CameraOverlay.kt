@@ -33,6 +33,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
+internal const val CAMERA_FRAME_WIDTH_FRACTION = 0.85f
+internal const val CAMERA_FRAME_HEIGHT_FRACTION = 0.65f
+
 @Composable
 fun CameraOverlay(
     zoom: Float,
@@ -55,8 +58,8 @@ fun CameraOverlay(
                 compositingStrategy = CompositingStrategy.Offscreen
             }
             .drawBehind {
-                val frameWidth = size.width * 0.85f
-                val frameHeight = size.height * 0.65f
+                val frameWidth = size.width * CAMERA_FRAME_WIDTH_FRACTION
+                val frameHeight = size.height * CAMERA_FRAME_HEIGHT_FRACTION
                 val topLeftX = (size.width - frameWidth) / 2
                 val topLeftY = (size.height - frameHeight) / 2
                 

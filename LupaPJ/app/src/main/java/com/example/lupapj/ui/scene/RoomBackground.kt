@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -99,6 +100,12 @@ fun RoomBackground(
             .fillMaxSize()
             .background(Color(0xFFF5ECDD))
             .drawWithCache {
+                val textureDots = buildBackdropDots(
+                    widthPx = size.width,
+                    heightPx = size.height,
+                    xStepPx = 34.dp.toPx(),
+                    yStepPx = 30.dp.toPx()
+                )
                 val metrics = resolveIsoRoomMetrics(
                     viewportWidthPx = size.width,
                     viewportHeightPx = size.height,
@@ -111,8 +118,20 @@ fun RoomBackground(
                 val backWallPath = backWall.toPath()
                 val sideWallPath = sideWall.toPath()
                 val floorPath = floor.toPath()
+                val floorBounds = floorPath.getBounds()
+                val roomBounds = unionBounds(
+                    backWallPath.getBounds(),
+                    sideWallPath.getBounds(),
+                    floorBounds
+                )
 
                 onDrawBehind {
+                    drawInnerRoomBackdrop(
+                        roomBounds = roomBounds,
+                        floorBounds = floorBounds,
+                        textureDots = textureDots
+                    )
+
                     drawTiledWallPanel(
                         panel = backWall,
                         spec = spec,
@@ -157,6 +176,139 @@ fun RoomBackground(
                     )
                 }
             }
+    )
+}
+
+private fun DrawScope.drawInnerRoomBackdrop(
+    roomBounds: Rect,
+    floorBounds: Rect,
+    textureDots: List<Offset>
+) {
+    val roomCenter = Offset(
+        x = (roomBounds.left + roomBounds.right) * 0.5f,
+        y = (roomBounds.top + roomBounds.bottom) * 0.5f
+    )
+    val floorCenter = Offset(
+        x = (floorBounds.left + floorBounds.right) * 0.5f,
+        y = (floorBounds.top + floorBounds.bottom) * 0.5f
+    )
+    val roomGlowRadius = max(size.width, size.height) * 0.44f
+    val vignetteRadius = max(size.width, size.height) * 0.72f
+
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(
+                Color(0xFFFFF3D2),
+                Color(0xFFF8E7BE),
+                Color(0xFFE7D49B),
+                Color(0xFFD5B97A)
+            ),
+            startY = 0f,
+            endY = size.height
+        )
+    )
+
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(
+                Color(0x78FFFDF0),
+                Color(0x22FFF4C8),
+                Color.Transparent
+            ),
+            center = Offset(size.width * 0.30f, size.height * 0.13f),
+            radius = size.width * 0.56f
+        ),
+        radius = size.width * 0.56f,
+        center = Offset(size.width * 0.30f, size.height * 0.13f)
+    )
+
+    drawOval(
+        brush = Brush.radialGradient(
+            colors = listOf(
+                Color(0x4CFFF7D7),
+                Color(0x1CEED59B),
+                Color.Transparent
+            ),
+            center = roomCenter,
+            radius = roomGlowRadius
+        ),
+        topLeft = Offset(
+            x = roomBounds.left - roomBounds.width * 0.26f,
+            y = roomBounds.top - roomBounds.height * 0.18f
+        ),
+        size = Size(
+            width = roomBounds.width * 1.52f,
+            height = roomBounds.height * 1.28f
+        )
+    )
+
+    val bandTop = (floorBounds.top + floorBounds.height * 0.12f).coerceIn(0f, size.height)
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(
+                Color.Transparent,
+                Color(0x1E8A6C3D),
+                Color(0x2E65482B)
+            ),
+            startY = bandTop,
+            endY = size.height
+        ),
+        topLeft = Offset(0f, bandTop),
+        size = Size(size.width, size.height - bandTop)
+    )
+
+    drawOval(
+        brush = Brush.radialGradient(
+            colors = listOf(
+                Color(0x26000000),
+                Color(0x0F000000),
+                Color.Transparent
+            ),
+            center = floorCenter,
+            radius = max(floorBounds.width, floorBounds.height) * 0.68f
+        ),
+        topLeft = Offset(
+            x = floorBounds.left - floorBounds.width * 0.18f,
+            y = floorBounds.top + floorBounds.height * 0.18f
+        ),
+        size = Size(
+            width = floorBounds.width * 1.36f,
+            height = floorBounds.height * 0.72f
+        )
+    )
+
+    textureDots.forEachIndexed { index, offset ->
+        val alphaColor = if (index % 4 == 0) Color(0x12765737) else Color(0x0DFFFFFF)
+        drawCircle(
+            color = alphaColor,
+            radius = if (index % 5 == 0) 1.15.dp.toPx() else 0.85.dp.toPx(),
+            center = offset
+        )
+    }
+
+    var stripeStartX = -size.height
+    val stripeSpacing = 72.dp.toPx()
+    val stripeLean = size.height * 0.42f
+    while (stripeStartX < size.width + stripeLean) {
+        drawLine(
+            color = Color(0x08FFFFFF),
+            start = Offset(stripeStartX, 0f),
+            end = Offset(stripeStartX + stripeLean, size.height),
+            strokeWidth = 1.dp.toPx()
+        )
+        stripeStartX += stripeSpacing
+    }
+
+    drawRect(
+        brush = Brush.radialGradient(
+            colors = listOf(
+                Color.Transparent,
+                Color(0x0D000000),
+                Color(0x2A3F2B1B)
+            ),
+            center = Offset(size.width * 0.5f, size.height * 0.45f),
+            radius = vignetteRadius
+        )
     )
 }
 
@@ -557,6 +709,47 @@ private fun expandEndFraction(
     } else {
         (fraction + overlap).coerceIn(0f, 1f)
     }
+}
+
+private fun buildBackdropDots(
+    widthPx: Float,
+    heightPx: Float,
+    xStepPx: Float,
+    yStepPx: Float
+): List<Offset> {
+    val dots = mutableListOf<Offset>()
+    var row = 0
+    var y = yStepPx * 0.45f
+    while (y < heightPx) {
+        var column = 0
+        var x = if (row % 2 == 0) xStepPx * 0.38f else xStepPx * 0.82f
+        while (x < widthPx) {
+            val jitterX = (((column * 37 + row * 17) % 9) - 4) * 0.75f
+            val jitterY = (((column * 11 + row * 29) % 7) - 3) * 0.65f
+            dots += Offset(
+                x = (x + jitterX).coerceIn(0f, widthPx),
+                y = (y + jitterY).coerceIn(0f, heightPx)
+            )
+            x += xStepPx
+            column += 1
+        }
+        y += yStepPx
+        row += 1
+    }
+    return dots
+}
+
+private fun unionBounds(
+    first: Rect,
+    second: Rect,
+    third: Rect
+): Rect {
+    return Rect(
+        left = min(min(first.left, second.left), third.left),
+        top = min(min(first.top, second.top), third.top),
+        right = max(max(first.right, second.right), third.right),
+        bottom = max(max(first.bottom, second.bottom), third.bottom)
+    )
 }
 
 private fun SurfaceQuadPx.toPath(): Path {
