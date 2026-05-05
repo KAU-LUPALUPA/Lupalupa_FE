@@ -53,6 +53,10 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.datastore.preferences) // [추가됨(권)] 재화/인벤토리 로컬 캐시용 DataStore
+    implementation(libs.retrofit.core) // [추가됨] Retrofit HTTP 클라이언트
+    implementation(libs.retrofit.converter.gson) // [추가됨] Retrofit Gson 변환기
+    implementation(libs.okhttp.core) // [추가됨] OkHttp HTTP 엔진
+    implementation(libs.okhttp.logging) // [추가됨] OkHttp 로깅 인터셉터 (디버깅용)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

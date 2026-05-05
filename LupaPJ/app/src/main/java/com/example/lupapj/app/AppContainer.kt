@@ -8,11 +8,12 @@ import com.example.lupapj.data.repository.AuthRepository
 import com.example.lupapj.data.repository.FriendRepository
 import com.example.lupapj.data.repository.GalleryRepository // [추가됨]
 import com.example.lupapj.data.repository.RoomRepository
-import com.example.lupapj.data.mock.MockCurrencyRepository
 import com.example.lupapj.data.mock.MockShopRepository
+import com.example.lupapj.data.remote.RemoteCurrencyRepository // [수정됨] 실제 서버 통신 구현체로 변경
 import com.example.lupapj.data.repository.CurrencyRepository
 import com.example.lupapj.data.repository.ShopRepository
 import com.example.lupapj.data.local.ShopLocalCache // [추가됨(권)] 로컬 캐시 임포트
+import com.example.lupapj.data.network.RetrofitClient // [추가됨] Retrofit 클라이언트 임포트
 
 class AppContainer(context: Context) { // [수정됨] Context 주입받도록 변경
     private val appContext = context.applicationContext
@@ -25,6 +26,12 @@ class AppContainer(context: Context) { // [수정됨] Context 주입받도록 �
     // [추가됨(권)] 로컬 캐시 인스턴스. 서버 응답 성공 후에만 기록되는 읽기 캐시 역할.
     private val shopLocalCache = ShopLocalCache(appContext)
     
-    val currencyRepository: CurrencyRepository = MockCurrencyRepository(shopLocalCache) // [수정됨(권)] 로컬 캐시 주입
+    // [수정됨] MockCurrencyRepository → RemoteCurrencyRepository로 변경.
+    // 재화 획득 시 POST /currency/earn API를 호출하여 서버와 동기화합니다.
+    val currencyRepository: CurrencyRepository = RemoteCurrencyRepository(
+        apiService = RetrofitClient.currencyApiService,
+        localCache = shopLocalCache
+    )
     val shopRepository: ShopRepository = MockShopRepository(currencyRepository, shopLocalCache) // [수정됨(권)] 로컬 캐시 주입
 }
+
