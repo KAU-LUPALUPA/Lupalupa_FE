@@ -352,7 +352,7 @@ fun BottomMenuLayer(
                         iconWidthFraction = 0.58f,
                         contentDescription = "메인 메뉴",
                         onClick = {
-                            onKakaoLoginClick()
+                            onMainMenuClick
                         }
                     )
                     BottomMenuButton(
