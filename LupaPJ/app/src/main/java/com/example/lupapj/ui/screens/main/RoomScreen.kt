@@ -2,6 +2,8 @@ package com.example.lupapj.ui.screens.main
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,15 +11,18 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.TransformOrigin
@@ -40,7 +45,9 @@ import com.example.lupapj.ui.components.InventorySheet
 import com.example.lupapj.ui.components.RoomViewport
 import com.example.lupapj.ui.preview.previewRoomUiState
 import com.example.lupapj.ui.theme.LupaPJTheme
-
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.ui.graphics.Color
 @Composable
 fun RoomScreen(
     uiState: RoomUiState?,
@@ -50,16 +57,22 @@ fun RoomScreen(
     onInventoryDismiss: () -> Unit,
     onSettingsClick: () -> Unit,
     onRoomObjectClick: (RoomObjectType) -> Unit,
+    onRearrangeClick: () -> Unit,
+    onRearrangeMoveUp: () -> Unit,
+    onRearrangeMoveDown: () -> Unit,
+    onRearrangeMoveLeft: () -> Unit,
+    onRearrangeMoveRight: () -> Unit,
+    onRearrangeConfirm: () -> Unit,
     onFloorTap: (FloorAnchor) -> Unit,
     onBottomNavItemClick: (BottomNavItem) -> Unit,
     recentMainMenuAction: MainMenuAction?,
-    onPlaceholderMessageConsumed: () -> Unit, // [복구됨(권)] 실수로 삭제된 파라미터 복구
-    onSetCameraZoom: (Float) -> Unit, // [추가됨]
-    onCaptureClick: (Bitmap) -> Unit, // [추가됨]
-    onExitCameraMode: () -> Unit, // [추가됨]
-    currencyAmount: Int, // [추가됨(권)] 보유 중인 재화
-    purchasedShopItems: List<com.example.lupapj.data.model.ShopItem>, // [추가됨(권)] 보유 중인 치장 아이템 정보
-    onMinigameClick: () -> Unit // [추가됨(권)] 미니게임 진입 액션
+    onPlaceholderMessageConsumed: () -> Unit,
+    onSetCameraZoom: (Float) -> Unit,
+    onCaptureClick: (Bitmap) -> Unit,
+    onExitCameraMode: () -> Unit,
+    currencyAmount: Int,
+    purchasedShopItems: List<com.example.lupapj.data.model.ShopItem>,
+    onMinigameClick: () -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val rootView = LocalView.current
@@ -122,7 +135,97 @@ fun RoomScreen(
                     }
                 )
             }
-            
+
+            if (!room.rearrangeMode) {
+
+                Surface(
+                    onClick = onRearrangeClick,
+                    shape = RoundedCornerShape(18.dp),
+                    color = Color(0xFFEADFD3),
+                    shadowElevation = 6.dp,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 130.dp, end = 16.dp)
+                ) {
+
+                    Text(
+                        text = "재배치",
+                        color = Color(0xFF5C4033),
+                        modifier = Modifier.padding(
+                            horizontal = 18.dp,
+                            vertical = 10.dp
+                        )
+                    )
+                }
+            }
+
+            if (room.rearrangeMode && room.selectedRearrangeObjectType != null) {
+
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 85.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+
+                    RearrangeCircleButton(
+                        onClick = onRearrangeMoveUp
+                    ) {
+                        Text(
+                            text = "↑",
+                            color = Color.White
+                        )
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+
+                        RearrangeCircleButton(
+                            onClick = onRearrangeMoveLeft
+                        ) {
+                            Text(
+                                text = "←",
+                                color = Color.White
+                            )
+                        }
+
+                        Surface(
+                            onClick = onRearrangeConfirm,
+                            shape = RoundedCornerShape(50),
+                            color = Color(0xFFB08968),
+                            shadowElevation = 6.dp,
+                            modifier = Modifier.padding(horizontal = 6.dp)
+                        ) {
+
+                            Text(
+                                text = "✓",
+                                color = Color.White,
+                                modifier = Modifier.padding(16.dp)
+                            )
+                        }
+
+                        RearrangeCircleButton(
+                            onClick = onRearrangeMoveRight
+                        ) {
+                            Text(
+                                text = "→",
+                                color = Color.White
+                            )
+                        }
+                    }
+
+                    RearrangeCircleButton(
+                        onClick = onRearrangeMoveDown
+                    ) {
+                        Text(
+                            text = "↓",
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+
             if (room.isCameraMode) {
                 CameraOverlay(
                     zoom = room.cameraZoom,
@@ -167,10 +270,9 @@ fun RoomScreen(
         }
     }
 
-    // [추가됨(권)] 인벤토리 바텀시트. ModalBottomSheet가 자체 애니메이션을 갖고 있으므로 if 분기만 사용.
     if (room.inventoryVisible) {
         InventorySheet(
-            purchasedShopItems = purchasedShopItems, // [추가됨(권)]
+            purchasedShopItems = purchasedShopItems,
             onDismiss = onInventoryDismiss
         )
     }
@@ -197,6 +299,12 @@ private fun RoomScreenPreview() {
             onInventoryDismiss = {},
             onSettingsClick = {},
             onRoomObjectClick = {},
+            onRearrangeClick = {},
+            onRearrangeMoveUp = {},
+            onRearrangeMoveDown = {},
+            onRearrangeMoveLeft = {},
+            onRearrangeMoveRight = {},
+            onRearrangeConfirm = {},
             onFloorTap = {},
             onBottomNavItemClick = {},
             recentMainMenuAction = MainMenuAction.SHOP,
@@ -208,5 +316,27 @@ private fun RoomScreenPreview() {
             purchasedShopItems = emptyList(),
             onMinigameClick = {}
         )
+    }
+}
+@Composable
+private fun RearrangeCircleButton(
+    onClick: () -> Unit,
+    content: @Composable () -> Unit
+) {
+
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = Color(0xFF7F5539),
+        shadowElevation = 6.dp,
+        modifier = Modifier.padding(3.dp)
+    ) {
+
+        Box(
+            modifier = Modifier.padding(8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            content()
+        }
     }
 }

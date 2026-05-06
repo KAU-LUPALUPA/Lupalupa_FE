@@ -23,6 +23,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
 
 private val KakaoYellow = Color(0xFFFEE500)
 private val KakaoBlack = Color(0xFF191919)
@@ -32,6 +35,7 @@ fun AuthPopup(
     isProcessingLogin: Boolean,
     onKakaoLoginClick: () -> Unit
 ) {
+    val context = LocalContext.current
     Dialog(onDismissRequest = {}) {
         Surface(
             modifier = Modifier
@@ -68,7 +72,13 @@ fun AuthPopup(
                 Spacer(modifier = Modifier.height(46.dp))
 
                 ElevatedButton(
-                    onClick = onKakaoLoginClick,
+                    onClick = {
+                        val intent = Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("http://54.180.145.58:8080/oauth2/authorization/kakao")
+                        )
+                        context.startActivity(intent)
+                    },
                     enabled = !isProcessingLogin,
                     modifier = Modifier
                         .fillMaxWidth()

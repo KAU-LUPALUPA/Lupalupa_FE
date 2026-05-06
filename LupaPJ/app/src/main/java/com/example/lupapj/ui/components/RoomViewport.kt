@@ -14,18 +14,21 @@ fun RoomViewport(
     onFloorTap: (FloorAnchor) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Migration adapter: external callers still depend on RoomViewport while the actual
-    // drawing logic now lives in RoomSceneRenderer.
+
     RoomSceneRenderer(
         sceneDefinition = uiState.sceneDefinition,
         houseSceneState = uiState.houseSceneState,
         feedMode = uiState.feedMode || uiState.toyMode,
+
         onFloorTap = onFloorTap,
+
         onSceneObjectClick = { sceneObject ->
-            if (sceneObject.clickable) {
+
+            if (sceneObject.clickable || uiState.rearrangeMode) {
                 onRoomObjectClick(sceneObject.type)
             }
         },
+
         modifier = modifier
     )
 }

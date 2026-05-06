@@ -119,19 +119,46 @@ class AppViewModel(
     fun onKakaoLoginClick() {
         if (_uiState.value.isProcessingLogin) return
 
+        _uiState.update {
+            it.copy(isProcessingLogin = true)
+        }
+    }
+
+    fun onKakaoLoginSuccess(
+        accessToken: String,
+        nickname: String?
+    ) {
+        if (accessToken.isBlank()) {
+            _uiState.update {
+                it.copy(
+                    isProcessingLogin = false,
+                    placeholderMessage = "로그인 토큰을 받지 못했습니다."
+                )
+            }
+            return
+        }
+
+        // 실제 네트워크 통신을 위해 TokenManager에 저장
+        com.example.lupapj.data.local.TokenManager.accessToken = accessToken
+
         viewModelScope.launch {
-            _uiState.update { it.copy(isProcessingLogin = true) }
-            // TODO: Replace mock token with real Kakao SDK access token and POST /auth/kakao.
-            authRepository.loginWithKakao(kakaoAccessToken = "mock-kakao-access-token")
+            _uiState.update {
+                it.copy(isProcessingLogin = true)
+            }
+
             val room = roomRepository.getRoom()
+            val displayName = nickname ?: "사용자"
+
             _uiState.update {
                 it.copy(
                     phase = AppPhase.ROOM,
                     authPopupVisible = false,
                     isProcessingLogin = false,
-                    room = room
+                    room = room,
+                    placeholderMessage = "${displayName}님 환영합니다!"
                 )
             }
+
             startAutonomousPetMovement()
         }
     }
@@ -168,11 +195,64 @@ class AppViewModel(
     }
 
     fun onRoomObjectClick(objectType: RoomObjectType) {
+        val room = _uiState.value.room ?: return
+
+        if (room.rearrangeMode) {
+            updateRoom {
+                com.example.lupapj.ui.screens.main.RearrangeController.selectObject(it, objectType)
+            }
+            return
+        }
+
         if (objectType == RoomObjectType.WINDOW) return
 
         viewModelScope.launch {
             val nextRoom = roomRepository.performObjectAction(objectType)
             applyRepositoryRoom(nextRoom)
+        }
+    }
+
+    fun onRearrangeClick() {
+        updateRoom { room ->
+            com.example.lupapj.ui.screens.main.RearrangeController.toggle(room)
+        }
+    }
+
+    fun onRearrangeMoveUp() {
+        updateRoom { room ->
+            com.example.lupapj.ui.screens.main.RearrangeController.moveUp(room)
+        }
+    }
+
+    fun onRearrangeMoveDown() {
+        updateRoom { room ->
+            com.example.lupapj.ui.screens.main.RearrangeController.moveDown(room)
+        }
+    }
+
+    fun onRearrangeMoveLeft() {
+        updateRoom { room ->
+            com.example.lupapj.ui.screens.main.RearrangeController.moveLeft(room)
+        }
+    }
+
+    fun onRearrangeMoveRight() {
+        updateRoom { room ->
+            com.example.lupapj.ui.screens.main.RearrangeController.moveRight(room)
+        }
+    }
+
+    fun onRearrangeConfirm() {
+        val room = _uiState.value.room ?: return
+
+        viewModelScope.launch {
+            val confirmedRoom = com.example.lupapj.ui.screens.main.RearrangeController.confirm(room)
+
+            val savedRoom = roomRepository.saveRoomLayout(
+                confirmedRoom
+            )
+
+            applyRepositoryRoom(savedRoom)
         }
     }
 
