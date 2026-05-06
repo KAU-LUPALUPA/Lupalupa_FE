@@ -278,9 +278,9 @@ data class GalleryImage(
     val timestamp: Long
 )
 
-// [추가됨(권)] 재화 상태 모델. 현재는 단일 재화(amount)만 관리함.
+// [추가됨(권)] 재화 상태 모델. 서버 스펙(Long)에 맞춰 타입을 변경했습니다.
 data class CurrencyState(
-    val amount: Int = 0
+    val amount: Long = 0L
 )
 
 // [추가됨(권)] 상점 아이템의 카테고리 (치장 부위 구분을 위해 사용)

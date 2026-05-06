@@ -63,8 +63,8 @@ class MockShopRepository(
         }
 
         // [추가됨(권)] 재화 소모 검증 (서버에서 차감을 시도하는 흐름을 모사)
-        val isSuccess = currencyRepository.spendCurrency(item.price)
-        return if (isSuccess) {
+        val spendResult = currencyRepository.spendCurrency(item.price.toLong())
+        return if (spendResult is com.example.lupapj.data.model.CurrencyUpdateResult.Success) {
             // [추가됨(권)] 재화 차감 성공 시 내 인벤토리에 추가
             val newInventory = _inventory.value + itemId
             _inventory.value = newInventory
@@ -73,7 +73,8 @@ class MockShopRepository(
             Result.success(Unit)
         } else {
             // [추가됨(권)] 재화 차감 실패(재화 부족) 처리
-            Result.failure(Exception("재화가 부족합니다."))
+            val errorMessage = if (spendResult is com.example.lupapj.data.model.CurrencyUpdateResult.ValidationError) spendResult.message else "재화가 부족합니다."
+            Result.failure(Exception(errorMessage))
         }
     }
 }

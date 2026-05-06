@@ -470,10 +470,21 @@ class AppViewModel(
     // 실제 미니게임이 구현되지 않아 버튼 클릭을 통해 즉시 재화를 획득하도록 API 호출을 모사합니다.
     fun earnCurrencyFromMinigame() {
         viewModelScope.launch {
-            val success = currencyRepository.earnCurrency(50) // [추가됨(권)] 한 번에 50원을 획득하도록 설정
-            if (success) {
-                // [추가됨(권)] 획득 성공 시 스낵바에 띄울 메시지를 설정합니다. (상점 스낵바 컴포넌트를 재활용)
-                _uiState.update { it.copy(shopFeedbackMessage = "미니게임 보상으로 50원을 획득했습니다!") }
+            val result = currencyRepository.earnCurrency(50L, "MINIGAME") // [추가됨(권)] 한 번에 50원을 획득하도록 설정
+            when (result) {
+                is com.example.lupapj.data.model.CurrencyUpdateResult.Success -> {
+                    // [추가됨(권)] 획득 성공 시 스낵바에 띄울 메시지를 설정합니다.
+                    _uiState.update { it.copy(shopFeedbackMessage = "미니게임 보상으로 50원을 획득했습니다!") }
+                }
+                is com.example.lupapj.data.model.CurrencyUpdateResult.ValidationError -> {
+                    _uiState.update { it.copy(shopFeedbackMessage = result.message) }
+                }
+                is com.example.lupapj.data.model.CurrencyUpdateResult.NetworkError -> {
+                    _uiState.update { it.copy(shopFeedbackMessage = "네트워크 오류가 발생했습니다.") }
+                }
+                is com.example.lupapj.data.model.CurrencyUpdateResult.AuthError -> {
+                    _uiState.update { it.copy(shopFeedbackMessage = "로그인이 만료되었습니다.") }
+                }
             }
         }
     }

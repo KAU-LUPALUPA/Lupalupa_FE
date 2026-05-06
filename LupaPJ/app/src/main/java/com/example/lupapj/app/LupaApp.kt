@@ -60,7 +60,7 @@ fun LupaApp() {
                 onSetCameraZoom = appViewModel::setCameraZoom, // [추가됨]
                 onCaptureClick = appViewModel::captureScreen, // [추가됨]
                 onExitCameraMode = appViewModel::exitCameraMode, // [추가됨]
-                currencyAmount = uiState.currencyAmount, // [추가됨(권)]
+                currencyAmount = uiState.currencyAmount.toInt(), // [추가됨(권)]
                 purchasedShopItems = uiState.shopItems.filter { uiState.purchasedItemIds.contains(it.id) }, // [추가됨(권)] 인벤토리용 아이템 목록
                 onMinigameClick = appViewModel::openMinigame // [추가됨(권)] 미니게임 화면 진입으로 변경
             )
@@ -112,7 +112,7 @@ fun LupaApp() {
         
         AppPhase.SHOP -> { // [추가됨(권)] 상점 목록 화면 페이즈 라우팅
             ShopScreen(
-                currencyAmount = uiState.currencyAmount,
+                currencyAmount = uiState.currencyAmount.toInt(),
                 shopItems = uiState.shopItems,
                 purchasedItemIds = uiState.purchasedItemIds,
                 onItemClick = appViewModel::selectShopItem,
@@ -125,7 +125,7 @@ fun LupaApp() {
             if (selectedItem != null) {
                 ShopDetailScreen(
                     item = selectedItem,
-                    currencyAmount = uiState.currencyAmount,
+                    currencyAmount = uiState.currencyAmount.toInt(),
                     isPurchased = uiState.purchasedItemIds.contains(selectedItem.id),
                     isPurchasing = uiState.isPurchasing,
                     feedbackMessage = uiState.shopFeedbackMessage,
@@ -140,7 +140,7 @@ fun LupaApp() {
         
         AppPhase.MINIGAME -> { // [추가됨(권)] 미니게임 화면 라우팅 분기
             MinigameScreen(
-                currencyAmount = uiState.currencyAmount,
+                currencyAmount = uiState.currencyAmount.toInt(),
                 feedbackMessage = uiState.shopFeedbackMessage,
                 onEarnCurrencyClick = appViewModel::earnCurrencyFromMinigame,
                 onBackClick = appViewModel::exitMinigame,
