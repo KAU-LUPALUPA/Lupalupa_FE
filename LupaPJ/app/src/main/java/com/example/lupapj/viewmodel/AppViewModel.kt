@@ -701,18 +701,19 @@ class AppViewModel(
     }
 
     private fun applyRepositoryRoom(repositoryRoom: RoomUiState) {
+
         val currentRoom = _uiState.value.room
 
         val mergedRoom = repositoryRoom.copy(
             navBarVisible = currentRoom?.navBarVisible ?: false,
             inventoryVisible = currentRoom?.inventoryVisible ?: false,
             isCameraMode = currentRoom?.isCameraMode ?: false,
-            cameraZoom = currentRoom?.cameraZoom ?: 1f,
-            rearrangeMode = currentRoom?.rearrangeMode ?: false,
-            selectedRearrangeObjectType = currentRoom?.selectedRearrangeObjectType
+            cameraZoom = currentRoom?.cameraZoom ?: 1f
         )
 
-        _uiState.update { it.copy(room = mergedRoom) }
+        _uiState.update {
+            it.copy(room = mergedRoom)
+        }
     }
 
     private fun scheduleFoodConsumption() {
