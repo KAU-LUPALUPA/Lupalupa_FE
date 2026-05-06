@@ -46,13 +46,6 @@ import com.example.lupapj.ui.components.RoomViewport
 import com.example.lupapj.ui.preview.previewRoomUiState
 import com.example.lupapj.ui.theme.LupaPJTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.ui.graphics.Color
 @Composable
@@ -178,10 +171,9 @@ fun RoomScreen(
                     RearrangeCircleButton(
                         onClick = onRearrangeMoveUp
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.KeyboardArrowUp,
-                            contentDescription = null,
-                            tint = Color.White
+                        Text(
+                            text = "↑",
+                            color = Color.White
                         )
                     }
 
@@ -192,10 +184,9 @@ fun RoomScreen(
                         RearrangeCircleButton(
                             onClick = onRearrangeMoveLeft
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowLeft,
-                                contentDescription = null,
-                                tint = Color.White
+                            Text(
+                                text = "←",
+                                color = Color.White
                             )
                         }
 
@@ -207,10 +198,9 @@ fun RoomScreen(
                             modifier = Modifier.padding(horizontal = 12.dp)
                         ) {
 
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = null,
-                                tint = Color.White,
+                            Text(
+                                text = "✓",
+                                color = Color.White,
                                 modifier = Modifier.padding(16.dp)
                             )
                         }
@@ -218,10 +208,9 @@ fun RoomScreen(
                         RearrangeCircleButton(
                             onClick = onRearrangeMoveRight
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowRight,
-                                contentDescription = null,
-                                tint = Color.White
+                            Text(
+                                text = "→",
+                                color = Color.White
                             )
                         }
                     }
@@ -229,10 +218,9 @@ fun RoomScreen(
                     RearrangeCircleButton(
                         onClick = onRearrangeMoveDown
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.KeyboardArrowDown,
-                            contentDescription = null,
-                            tint = Color.White
+                        Text(
+                            text = "↓",
+                            color = Color.White
                         )
                     }
                 }
