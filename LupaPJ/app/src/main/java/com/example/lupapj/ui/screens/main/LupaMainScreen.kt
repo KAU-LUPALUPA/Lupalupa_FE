@@ -183,6 +183,7 @@ fun LupaMainScreen(
                 onMainMenuClick()
             },
             onInventoryClick = onInventoryClick,
+            onKakaoLoginClick = onKakaoLoginClick,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
