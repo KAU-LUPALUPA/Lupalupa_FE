@@ -45,7 +45,16 @@ import com.example.lupapj.ui.components.InventorySheet
 import com.example.lupapj.ui.components.RoomViewport
 import com.example.lupapj.ui.preview.previewRoomUiState
 import com.example.lupapj.ui.theme.LupaPJTheme
-
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
+import androidx.compose.ui.graphics.Color
 @Composable
 fun RoomScreen(
     uiState: RoomUiState?,
@@ -136,44 +145,95 @@ fun RoomScreen(
 
             if (!room.rearrangeMode) {
 
-                Button(
+                Surface(
                     onClick = onRearrangeClick,
+                    shape = RoundedCornerShape(18.dp),
+                    color = Color(0xFFEADFD3),
+                    shadowElevation = 6.dp,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(16.dp)
+                        .padding(top = 88.dp, end = 16.dp)
                 ) {
 
-                    Text("재배치")
+                    Text(
+                        text = "재배치",
+                        color = Color(0xFF5C4033),
+                        modifier = Modifier.padding(
+                            horizontal = 18.dp,
+                            vertical = 10.dp
+                        )
+                    )
                 }
             }
 
             if (room.rearrangeMode && room.selectedRearrangeObjectType != null) {
+
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 32.dp),
+                        .padding(bottom = 28.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Button(onClick = onRearrangeMoveUp) {
-                        Text("↑")
+
+                    RearrangeCircleButton(
+                        onClick = onRearrangeMoveUp
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowUp,
+                            contentDescription = null,
+                            tint = Color.White
+                        )
                     }
 
-                    Row {
-                        Button(onClick = onRearrangeMoveLeft) {
-                            Text("←")
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+
+                        RearrangeCircleButton(
+                            onClick = onRearrangeMoveLeft
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowLeft,
+                                contentDescription = null,
+                                tint = Color.White
+                            )
                         }
 
-                        Button(onClick = onRearrangeConfirm) {
-                            Text("완료")
+                        Surface(
+                            onClick = onRearrangeConfirm,
+                            shape = RoundedCornerShape(50),
+                            color = Color(0xFFB08968),
+                            shadowElevation = 6.dp,
+                            modifier = Modifier.padding(horizontal = 12.dp)
+                        ) {
+
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.padding(16.dp)
+                            )
                         }
 
-                        Button(onClick = onRearrangeMoveRight) {
-                            Text("→")
+                        RearrangeCircleButton(
+                            onClick = onRearrangeMoveRight
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = Color.White
+                            )
                         }
                     }
 
-                    Button(onClick = onRearrangeMoveDown) {
-                        Text("↓")
+                    RearrangeCircleButton(
+                        onClick = onRearrangeMoveDown
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = null,
+                            tint = Color.White
+                        )
                     }
                 }
             }
@@ -268,5 +328,27 @@ private fun RoomScreenPreview() {
             purchasedShopItems = emptyList(),
             onMinigameClick = {}
         )
+    }
+}
+@Composable
+private fun RearrangeCircleButton(
+    onClick: () -> Unit,
+    content: @Composable () -> Unit
+) {
+
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = Color(0xFF7F5539),
+        shadowElevation = 6.dp,
+        modifier = Modifier.padding(6.dp)
+    ) {
+
+        Box(
+            modifier = Modifier.padding(14.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            content()
+        }
     }
 }
