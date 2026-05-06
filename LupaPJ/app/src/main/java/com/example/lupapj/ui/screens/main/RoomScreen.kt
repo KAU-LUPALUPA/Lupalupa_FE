@@ -40,6 +40,9 @@ import com.example.lupapj.ui.components.InventorySheet
 import com.example.lupapj.ui.components.RoomViewport
 import com.example.lupapj.ui.preview.previewRoomUiState
 import com.example.lupapj.ui.theme.LupaPJTheme
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
 
 @Composable
 fun RoomScreen(
@@ -50,6 +53,7 @@ fun RoomScreen(
     onInventoryDismiss: () -> Unit,
     onSettingsClick: () -> Unit,
     onRoomObjectClick: (RoomObjectType) -> Unit,
+    onRearrangeClick: () -> Unit,
     onFloorTap: (FloorAnchor) -> Unit,
     onBottomNavItemClick: (BottomNavItem) -> Unit,
     recentMainMenuAction: MainMenuAction?,
@@ -122,7 +126,16 @@ fun RoomScreen(
                     }
                 )
             }
-            
+            Button(
+                onClick = onRearrangeClick,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = if (room.rearrangeMode) "재배치 종료" else "재배치"
+                )
+            }
             if (room.isCameraMode) {
                 CameraOverlay(
                     zoom = room.cameraZoom,
@@ -203,6 +216,7 @@ private fun RoomScreenPreview() {
             onPlaceholderMessageConsumed = {},
             onSetCameraZoom = {},
             onCaptureClick = {},
+            onRearrangeClick = {},
             onExitCameraMode = {},
             currencyAmount = 100,
             purchasedShopItems = emptyList(),
