@@ -107,6 +107,7 @@ fun LupaMainScreen(
     onRecentActionClick: () -> Unit = {},
     onMainMenuClick: () -> Unit = {},
     onInventoryClick: () -> Unit = {},
+    onKakaoLoginClick: () -> Unit = {},
     onSettingClick: () -> Unit = {},
     onPopupMenuItemClick: (BottomNavItem) -> Unit = {},
     onPlaygroundClick: () -> Unit = {},
@@ -182,7 +183,8 @@ fun LupaMainScreen(
                 onMainMenuClick()
             },
             onInventoryClick = onInventoryClick,
-            modifier = Modifier.align(Alignment.BottomCenter)
+            onKakaoLoginClick = onKakaoLoginClick,
+            modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
 }
@@ -292,6 +294,7 @@ fun BottomMenuLayer(
     onRecentActionClick: () -> Unit,
     onMainMenuClick: () -> Unit,
     onInventoryClick: () -> Unit,
+    onKakaoLoginClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -349,6 +352,7 @@ fun BottomMenuLayer(
                         iconWidthFraction = 0.58f,
                         contentDescription = "메인 메뉴",
                         onClick = onMainMenuClick
+
                     )
                     BottomMenuButton(
                         buttonWidth = sideButtonWidth,

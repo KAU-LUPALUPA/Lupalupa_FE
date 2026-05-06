@@ -7,15 +7,16 @@ import com.example.lupapj.data.model.PetStatus
 import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.model.initialRoomUiState
-import com.example.lupapj.data.repository.RoomRepository
 import com.example.lupapj.data.model.scene.FloorAnchor
 import com.example.lupapj.data.model.scene.HouseSceneState
 import com.example.lupapj.data.model.scene.RoomSceneRuntimeState
 import com.example.lupapj.data.model.scene.SceneObjectDefinition
 import com.example.lupapj.data.model.scene.initialHouseSceneState
+import com.example.lupapj.data.repository.RoomRepository
 import kotlinx.coroutines.delay
 
 class MockRoomRepository : RoomRepository {
+
     private var roomState = initialRoomUiState(
         sceneDefinition = DemoScenes.mainRoom,
         houseSceneState = initialHouseSceneState(
@@ -44,6 +45,7 @@ class MockRoomRepository : RoomRepository {
 
     override suspend fun performObjectAction(objectType: RoomObjectType): RoomUiState {
         delay(220)
+
         roomState = when (objectType) {
             RoomObjectType.BED -> roomState.copy(
                 feedMode = false,
@@ -74,11 +76,13 @@ class MockRoomRepository : RoomRepository {
 
             RoomObjectType.WINDOW -> roomState
         }
+
         return roomState
     }
 
     override suspend fun placeFood(position: FloorAnchor): RoomUiState {
         delay(220)
+
         if (!roomState.feedMode) return roomState
 
         val clampedAnchor = FloorAnchor(
@@ -101,6 +105,7 @@ class MockRoomRepository : RoomRepository {
                     )
                 )
         )
+
         return roomState
     }
 
@@ -121,11 +126,13 @@ class MockRoomRepository : RoomRepository {
                     next = PetAction.IDLE
                 )
         )
+
         return roomState
     }
 
     override suspend fun placeToy(position: FloorAnchor): RoomUiState {
         delay(220)
+
         if (!roomState.toyMode) return roomState
 
         val clampedAnchor = FloorAnchor(
@@ -148,6 +155,17 @@ class MockRoomRepository : RoomRepository {
                     )
                 )
         )
+
+        return roomState
+    }
+
+    override suspend fun saveRoomLayout(
+        room: RoomUiState
+    ): RoomUiState {
+        delay(120)
+
+        roomState = room
+
         return roomState
     }
 }
@@ -177,6 +195,7 @@ private fun HouseSceneState.updatePetActionIf(
     next: PetAction
 ): HouseSceneState {
     if (pet.action != current) return this
+
     return copy(
         pet = pet.copy(action = next)
     )
@@ -186,7 +205,10 @@ private fun RoomUiState.resolveFloorObjectAnchor(
     objectType: RoomObjectType,
     fallback: FloorAnchor
 ): FloorAnchor {
-    val objectDefinition = sceneDefinition.objects.firstOrNull { it.type == objectType }
+    val objectDefinition = sceneDefinition.objects.firstOrNull {
+        it.type == objectType
+    }
+
     return objectDefinition.toFloorAnchorOrNull() ?: fallback
 }
 

@@ -10,4 +10,5 @@ interface RoomRepository {
     suspend fun placeFood(position: FloorAnchor): RoomUiState
     suspend fun consumeFood(): RoomUiState
     suspend fun placeToy(position: FloorAnchor): RoomUiState
+    suspend fun saveRoomLayout(room: RoomUiState): RoomUiState
 }

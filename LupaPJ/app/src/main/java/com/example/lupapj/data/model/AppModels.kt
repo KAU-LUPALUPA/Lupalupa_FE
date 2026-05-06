@@ -107,7 +107,11 @@ data class RoomUiState(
     val navBarVisible: Boolean = false,
     val inventoryVisible: Boolean = false,
     val isCameraMode: Boolean = false, // [추가됨] 스크린샷 카메라 모드 활성화 여부
-    val cameraZoom: Float = 1f // [추가됨] 카메라 줌 배율 (기본 1x)
+    val cameraZoom: Float = 1f, // [추가됨] 카메라 줌 배율 (기본 1x)
+
+    val rearrangeMode: Boolean = false,
+
+    val selectedRearrangeObjectType: RoomObjectType? = null
 ) {
     val statusText: String
         get() = when {
