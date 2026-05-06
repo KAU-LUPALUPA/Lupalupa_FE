@@ -183,7 +183,6 @@ fun LupaMainScreen(
                 onMainMenuClick()
             },
             onInventoryClick = onInventoryClick,
-            onKakaoLoginClick = onKakaoLoginClick,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
     }
@@ -351,9 +350,8 @@ fun BottomMenuLayer(
                         iconRes = R.drawable.main_action_trimmed,
                         iconWidthFraction = 0.58f,
                         contentDescription = "메인 메뉴",
-                        onClick = {
-                            onMainMenuClick
-                        }
+                        onClick = onMainMenuClick
+
                     )
                     BottomMenuButton(
                         buttonWidth = sideButtonWidth,
