@@ -289,6 +289,7 @@ private fun FriendRoomScreenPreview() {
                 FriendMessage(
                     id = "preview-1",
                     friendUserId = DemoFriendUsers.alreadyFriend.userId,
+                    senderUserId = DemoFriendUsers.alreadyFriend.userId,
                     sender = FriendMessageSender.FRIEND,
                     text = "어서 와! 우리 집 구경해.",
                     sentAtMillis = 1_000L
@@ -296,6 +297,7 @@ private fun FriendRoomScreenPreview() {
                 FriendMessage(
                     id = "preview-2",
                     friendUserId = DemoFriendUsers.alreadyFriend.userId,
+                    senderUserId = DemoFriendUsers.me.userId,
                     sender = FriendMessageSender.ME,
                     text = "인테리어 귀엽다.",
                     sentAtMillis = 1_100L

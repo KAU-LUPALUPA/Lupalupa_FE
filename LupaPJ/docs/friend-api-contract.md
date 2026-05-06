@@ -31,7 +31,7 @@
 | 친구 삭제 | 친구 목록 | 로그인 사용자 | DELETE | `/friends/{friendUserId}` | Path: `friendUserId` | 친구 관계를 삭제한다. | `204 No Content` | 에러: `FRIEND_NOT_FOUND`, `NOT_FRIENDS` |
 | 친구 집 방문 정보 조회 | 친구 집 | 친구 관계 사용자 | GET | `/friends/{friendUserId}/home` | Path: `friendUserId` | 친구의 집 화면을 열 때 필요한 유저, 방, 펫 정보를 조회한다. | `owner`, `room`, `visitedAt` | 친구가 아닌 유저는 `NOT_FRIENDS`. 방 좌표계는 내 방 API와 동일하게 사용. |
 | 친구 메시지 목록 조회 | 친구 메시지 | 친구 관계 사용자 | GET | `/friends/{friendUserId}/messages` | Path: `friendUserId`<br>Query: `limit`, `before` | 친구와 주고받은 짧은 메시지 목록을 조회한다. | `messages[]`, `nextCursor` | MVP에서는 REST 폴링 방식 가능. 기본 `limit=30` 권장. |
-| 친구 메시지 보내기 | 친구 메시지 | 친구 관계 사용자 | POST | `/friends/{friendUserId}/messages` | Path: `friendUserId`<br>Body: `text` | 친구에게 짧은 메시지를 보낸다. | `message{id, friendUserId, sender, text, sentAt}` | `text` 최대 120자. 에러: `EMPTY_MESSAGE`, `MESSAGE_TOO_LONG`, `NOT_FRIENDS` |
+| 친구 메시지 보내기 | 친구 메시지 | 친구 관계 사용자 | POST | `/friends/{friendUserId}/messages` | Path: `friendUserId`<br>Body: `text` | 친구에게 짧은 메시지를 보낸다. | `message{id, friendUserId, senderUserId, text, sentAt}` | `text` 최대 120자. 프론트에서 `senderUserId == 내 userId`이면 내 메시지로 표시한다. |
 
 ## Request / Response 예시
 
@@ -189,7 +189,7 @@ Content-Type: application/json
   "message": {
     "id": "friend_message_001",
     "friendUserId": "user_friend",
-    "sender": "ME",
+    "senderUserId": "user_me",
     "text": "안녕! 놀러왔어",
     "sentAt": "2026-05-04T18:30:00+09:00"
   }
@@ -234,7 +234,7 @@ Content-Type: application/json
 |---|---|---|
 | `id` | `String` | 메시지 ID |
 | `friendUserId` | `String` | 대화 상대 유저 ID |
-| `sender` | `FriendMessageSender` | `ME`, `FRIEND` |
+| `senderUserId` | `String` | 메시지를 보낸 유저 ID |
 | `text` | `String` | 메시지 내용. 최대 120자 |
 | `sentAt` | `String` | 발송 시각 |
 
@@ -244,7 +244,7 @@ Content-Type: application/json
 |---|---|---|
 | 친구 요청 상태 | `PENDING`, `ACCEPTED`, `REJECTED`, `CANCELED` | 친구 신청 처리 상태 |
 | 친구 관계 상태 | `NONE`, `PENDING_SENT`, `PENDING_RECEIVED`, `ACCEPTED`, `REJECTED`, `CANCELED`, `BLOCKED` | 두 유저 간 관계 상태 |
-| 메시지 발신자 | `ME`, `FRIEND` | 내 메시지인지 친구 메시지인지 구분 |
+| 메시지 표시 구분 | `ME`, `FRIEND` | API 응답의 `senderUserId`를 현재 로그인 유저 ID와 비교해 프론트에서 계산 |
 
 ## 에러 코드
 

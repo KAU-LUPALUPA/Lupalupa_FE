@@ -98,6 +98,7 @@ enum class FriendMessageSender {
 data class FriendMessage(
     val id: String,
     val friendUserId: String,
+    val senderUserId: String,
     val sender: FriendMessageSender,
     val text: String,
     val sentAtMillis: Long

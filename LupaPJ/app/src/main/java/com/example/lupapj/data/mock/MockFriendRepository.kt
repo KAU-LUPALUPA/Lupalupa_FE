@@ -103,6 +103,11 @@ class MockFriendRepository(
     override val friendMessages: StateFlow<Map<String, List<FriendMessage>>> =
         _friendMessages.asStateFlow()
 
+    override suspend fun refreshFriendOverview(): FriendOperationResult<Unit> {
+        simulateLatency()
+        return FriendOperationResult.Success(Unit)
+    }
+
     override suspend fun findUserByFriendCode(friendCodeInput: String): FriendUser? {
         simulateLatency()
         val code = FriendCode.fromInput(friendCodeInput) ?: return null
@@ -334,9 +339,15 @@ class MockFriendRepository(
         sender: FriendMessageSender,
         text: String
     ): FriendMessage {
+        val senderUserId = when (sender) {
+            FriendMessageSender.ME -> myProfile.value.userId
+            FriendMessageSender.FRIEND -> friendUserId
+        }
+
         return FriendMessage(
             id = "friend-message-${nextMessageSequence++}",
             friendUserId = friendUserId,
+            senderUserId = senderUserId,
             sender = sender,
             text = text,
             sentAtMillis = nowProvider()

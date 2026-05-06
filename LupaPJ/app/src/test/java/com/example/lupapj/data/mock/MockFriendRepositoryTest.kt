@@ -102,10 +102,12 @@ class MockFriendRepositoryTest {
         assertTrue(result is FriendOperationResult.Success)
         val sentMessage = (result as FriendOperationResult.Success).value
         assertEquals(FriendMessageSender.ME, sentMessage.sender)
+        assertEquals(DemoFriendUsers.me.userId, sentMessage.senderUserId)
         assertEquals("다음에 또 올게", sentMessage.text)
         val messages = repository.friendMessages.value[DemoFriendUsers.alreadyFriend.userId].orEmpty()
         assertEquals(initialCount + 2, messages.size)
         assertEquals(FriendMessageSender.FRIEND, messages.last().sender)
+        assertEquals(DemoFriendUsers.alreadyFriend.userId, messages.last().senderUserId)
     }
 
     @Test

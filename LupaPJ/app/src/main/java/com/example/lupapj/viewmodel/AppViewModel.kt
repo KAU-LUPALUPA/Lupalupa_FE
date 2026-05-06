@@ -38,6 +38,7 @@ import kotlin.random.Random
 private const val FOOD_CONSUME_AFTER_TRAVEL_DELAY_MS = 900L
 private const val FOOD_CONSUME_PAUSE_MS = 650L
 private const val AUTONOMOUS_MOVEMENT_RETRY_DELAY_MS = 800L
+private const val FRIEND_MESSAGE_POLL_INTERVAL_MS = 3_000L
 
 class AppViewModel(
     private val authRepository: AuthRepository,
@@ -51,6 +52,7 @@ class AppViewModel(
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
     private var pendingFoodConsumeJob: Job? = null
     private var autonomousPetMovementJob: Job? = null
+    private var friendMessagePollingJob: Job? = null
 
     init {
         runBootstrap()
@@ -213,6 +215,7 @@ class AppViewModel(
             }
             BottomNavItem.CONTACTS -> {
                 _uiState.update { it.copy(phase = AppPhase.FRIENDS) }
+                refreshFriendOverview()
             }
         }
     }
@@ -248,7 +251,19 @@ class AppViewModel(
         _uiState.update { it.copy(phase = AppPhase.ROOM) }
     }
 
+    private fun refreshFriendOverview() {
+        viewModelScope.launch {
+            val result = friendRepository.refreshFriendOverview()
+            if (result is FriendOperationResult.Failure) {
+                _uiState.update {
+                    it.copy(friendFeedbackMessage = result.reason.message)
+                }
+            }
+        }
+    }
+
     fun backToFriendsFromFriendRoom() {
+        stopFriendMessagePolling()
         _uiState.update {
             it.copy(
                 phase = AppPhase.FRIENDS,
@@ -258,6 +273,7 @@ class AppViewModel(
     }
 
     fun returnHomeFromFriendRoom() {
+        stopFriendMessagePolling()
         _uiState.update {
             it.copy(
                 phase = AppPhase.ROOM,
@@ -308,7 +324,30 @@ class AppViewModel(
                     )
                 }
             }
+            if (result is FriendOperationResult.Success) {
+                startFriendMessagePolling(result.value.owner.userId)
+            }
         }
+    }
+
+    private fun startFriendMessagePolling(friendUserId: String) {
+        friendMessagePollingJob?.cancel()
+        friendMessagePollingJob = viewModelScope.launch {
+            while (isActive) {
+                delay(FRIEND_MESSAGE_POLL_INTERVAL_MS)
+                val state = _uiState.value
+                val activeFriendUserId = state.visitingFriendHome?.owner?.userId
+                if (state.phase != AppPhase.FRIEND_ROOM || activeFriendUserId != friendUserId) {
+                    break
+                }
+                friendRepository.getFriendMessages(friendUserId)
+            }
+        }
+    }
+
+    private fun stopFriendMessagePolling() {
+        friendMessagePollingJob?.cancel()
+        friendMessagePollingJob = null
     }
 
     fun onFriendMessageChange(input: String) {
@@ -643,6 +682,7 @@ class AppViewModel(
     override fun onCleared() {
         pendingFoodConsumeJob?.cancel()
         autonomousPetMovementJob?.cancel()
+        friendMessagePollingJob?.cancel()
         super.onCleared()
     }
 
