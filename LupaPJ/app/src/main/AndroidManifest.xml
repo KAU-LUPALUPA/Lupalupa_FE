@@ -22,6 +22,14 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="ruparupa"
+                    android:host="auth" />
+            </intent-filter>
         </activity>
 
         <!-- [추가됨] 갤러리 이미지 공유를 위한 FileProvider -->

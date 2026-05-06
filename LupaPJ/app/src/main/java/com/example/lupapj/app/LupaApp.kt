@@ -16,9 +16,11 @@ import com.example.lupapj.ui.screens.minigame.MinigameScreen
 import com.example.lupapj.ui.screens.shop.ShopDetailScreen
 import com.example.lupapj.ui.screens.shop.ShopScreen
 import com.example.lupapj.viewmodel.AppViewModel
+import android.net.Uri
+import androidx.compose.runtime.LaunchedEffect
 
 @Composable
-fun LupaApp() {
+fun LupaApp(deepLink: Uri? = null) {
     val context = LocalContext.current
     val container = remember { AppContainer(context) }
 
@@ -34,6 +36,18 @@ fun LupaApp() {
     )
 
     val uiState by appViewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(deepLink) {
+        val token = deepLink?.getQueryParameter("accessToken")
+        val nickname = deepLink?.getQueryParameter("nickname")
+
+        if (!token.isNullOrBlank()) {
+            appViewModel.onKakaoLoginSuccess(
+                accessToken = token,
+                nickname = nickname
+            )
+        }
+    }
 
     when (uiState.phase) {
         AppPhase.MAIN_LOADING -> {

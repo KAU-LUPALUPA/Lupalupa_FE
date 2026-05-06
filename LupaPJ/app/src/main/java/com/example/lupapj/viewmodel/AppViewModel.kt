@@ -125,25 +125,46 @@ class AppViewModel(
     fun onKakaoLoginClick() {
         if (_uiState.value.isProcessingLogin) return
 
-        viewModelScope.launch {
-            _uiState.update { it.copy(isProcessingLogin = true) }
+        _uiState.update {
+            it.copy(isProcessingLogin = true)
+        }
+    }
 
-            authRepository.loginWithKakao(kakaoAccessToken = "mock-kakao-access-token")
+    fun onKakaoLoginSuccess(
+        accessToken: String,
+        nickname: String?
+    ) {
+        if (accessToken.isBlank()) {
+            _uiState.update {
+                it.copy(
+                    isProcessingLogin = false,
+                    placeholderMessage = "로그인 토큰을 받지 못했습니다."
+                )
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(isProcessingLogin = true)
+            }
+
             val room = roomRepository.getRoom()
+            val displayName = nickname ?: "사용자"
 
             _uiState.update {
                 it.copy(
                     phase = AppPhase.ROOM,
                     authPopupVisible = false,
                     isProcessingLogin = false,
-                    room = room
+                    room = room,
+                    placeholderMessage = "${displayName}님 환영합니다!"
                 )
             }
 
             startAutonomousPetMovement()
         }
     }
-
     fun onButtonAClick() {
         when (_uiState.value.recentMainMenuAction) {
             MainMenuAction.SCREENSHOT -> onBottomNavItemClick(BottomNavItem.SCREENSHOT)
