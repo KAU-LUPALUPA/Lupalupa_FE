@@ -34,7 +34,7 @@ data class AppUiState(
     val friendFeedbackMessage: String? = null,
     
     // [추가됨(권)] 상점 및 재화 관련 상태
-    val currencyAmount: Int = 0, // [추가됨(권)] 현재 보유한 재화 양
+    val currencyAmount: Long = 0L, // [추가됨(권)] 현재 보유한 재화 양
     val shopItems: List<ShopItem> = emptyList(), // [추가됨(권)] 상점 진열대에 표시할 아이템 목록
     val purchasedItemIds: List<String> = emptyList(), // [추가됨(권)] 보유 중인 상점 아이템 ID 목록
     val selectedShopItem: ShopItem? = null, // [추가됨(권)] 상세 화면에서 보고 있는 선택된 아이템

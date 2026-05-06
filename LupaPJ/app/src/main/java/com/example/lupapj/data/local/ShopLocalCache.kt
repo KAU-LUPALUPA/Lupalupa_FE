@@ -20,13 +20,13 @@ class ShopLocalCache(context: Context) {
 
     // [추가됨(권)] DataStore 키 정의
     private object Keys {
-        val CURRENCY_AMOUNT = intPreferencesKey("currency_amount")
+        val CURRENCY_AMOUNT = longPreferencesKey("currency_amount_v2")
         val PURCHASED_ITEM_IDS = stringPreferencesKey("purchased_item_ids") // 콤마 구분 문자열로 저장
     }
 
     // [추가됨(권)] 저장된 재화를 Flow로 관찰
-    val currencyAmountFlow: Flow<Int> = dataStore.data.map { prefs ->
-        prefs[Keys.CURRENCY_AMOUNT] ?: 100 // 초기 지급값 100
+    val currencyAmountFlow: Flow<Long> = dataStore.data.map { prefs ->
+        prefs[Keys.CURRENCY_AMOUNT] ?: 100L // 초기 지급값 100
     }
 
     // [추가됨(권)] 저장된 인벤토리(구매 아이템 ID 목록)를 Flow로 관찰
@@ -36,7 +36,7 @@ class ShopLocalCache(context: Context) {
     }
 
     // [추가됨(권)] 서버 응답 성공 후 재화를 캐시에 저장
-    suspend fun saveCurrencyAmount(amount: Int) {
+    suspend fun saveCurrencyAmount(amount: Long) {
         dataStore.edit { prefs ->
             prefs[Keys.CURRENCY_AMOUNT] = amount
         }
