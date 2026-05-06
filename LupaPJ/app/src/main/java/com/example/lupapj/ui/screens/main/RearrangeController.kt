@@ -3,6 +3,7 @@ package com.example.lupapj.ui.screens.main
 import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.model.scene.FloorAnchor
+import com.example.lupapj.data.model.scene.SceneObjectDefinition
 import com.example.lupapj.data.model.scene.WallAnchor
 
 object RearrangeController {
@@ -52,45 +53,51 @@ object RearrangeController {
         dx: Float,
         dy: Float
     ): RoomUiState {
-
-        val selectedType = room.selectedRearrangeObjectType
-            ?: return room
+        val selectedType = room.selectedRearrangeObjectType ?: return room
 
         val updatedObjects = room.sceneDefinition.objects.map { obj ->
+            moveObjectIfSelected(obj, selectedType, dx, dy)
+        }
 
-            if (obj.type != selectedType) {
-                obj
-            } else {
-
-                val updatedAnchor = when (val anchor = obj.anchor) {
-
-                    is FloorAnchor -> {
-                        anchor.copy(
-                            u = (anchor.u + dx).coerceIn(0f, 1f),
-                            v = (anchor.v + dy).coerceIn(0f, 1f)
-                        )
-                    }
-
-                    is WallAnchor -> {
-                        anchor.copy(
-                            u = (anchor.u + dx).coerceIn(0f, 1f),
-                            v = (anchor.v + dy).coerceIn(0f, 1f)
-                        )
-                    }
-
-                    else -> anchor
-                }
-
-                obj.copy(
-                    anchor = updatedAnchor
-                )
-            }
+        val updatedFixedDecor = room.sceneDefinition.fixedDecor.map { obj ->
+            moveObjectIfSelected(obj, selectedType, dx, dy)
         }
 
         return room.copy(
             sceneDefinition = room.sceneDefinition.copy(
-                objects = updatedObjects
+                objects = updatedObjects,
+                fixedDecor = updatedFixedDecor
             )
+        )
+    }
+
+    private fun moveObjectIfSelected(
+        obj: SceneObjectDefinition,
+        selectedType: RoomObjectType,
+        dx: Float,
+        dy: Float
+    ): SceneObjectDefinition {
+        if (obj.type != selectedType) return obj
+
+        val updatedAnchor = when (val anchor = obj.anchor) {
+            is FloorAnchor -> {
+                anchor.copy(
+                    u = (anchor.u + dx).coerceIn(0f, 1f),
+                    v = (anchor.v + dy).coerceIn(0f, 1f)
+                )
+            }
+
+            is WallAnchor -> {
+                anchor.copy(
+                    u = (anchor.u + dx).coerceIn(0f, 1f),
+                    v = (anchor.v + dy).coerceIn(0f, 1f)
+                )
+            }
+        }
+
+        return obj.copy(
+            anchor = updatedAnchor,
+            tilePlacement = null
         )
     }
 }
