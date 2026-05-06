@@ -329,11 +329,11 @@ private fun RearrangeCircleButton(
         shape = RoundedCornerShape(50),
         color = Color(0xFF7F5539),
         shadowElevation = 6.dp,
-        modifier = Modifier.padding(6.dp)
+        modifier = Modifier.padding(3.dp)
     ) {
 
         Box(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(8.dp),
             contentAlignment = Alignment.Center
         ) {
             content()
