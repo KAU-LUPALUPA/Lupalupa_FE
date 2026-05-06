@@ -183,7 +183,7 @@ fun LupaMainScreen(
                 onMainMenuClick()
             },
             onInventoryClick = onInventoryClick,
-            modifier = Modifier.align(Alignment.BottomCenter)
+            modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
 }
