@@ -1,8 +1,9 @@
 package com.example.lupapj.ui.screens.main
 
-
 import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.RoomUiState
+import com.example.lupapj.data.model.scene.FloorAnchor
+import com.example.lupapj.data.model.scene.WallAnchor
 
 object RearrangeController {
 
@@ -60,11 +61,28 @@ object RearrangeController {
             if (obj.type != selectedType) {
                 obj
             } else {
+
+                val updatedAnchor = when (val anchor = obj.anchor) {
+
+                    is FloorAnchor -> {
+                        anchor.copy(
+                            u = (anchor.u + dx).coerceIn(0f, 1f),
+                            v = (anchor.v + dy).coerceIn(0f, 1f)
+                        )
+                    }
+
+                    is WallAnchor -> {
+                        anchor.copy(
+                            u = (anchor.u + dx).coerceIn(0f, 1f),
+                            v = (anchor.v + dy).coerceIn(0f, 1f)
+                        )
+                    }
+
+                    else -> anchor
+                }
+
                 obj.copy(
-                    position = obj.position.copy(
-                        x = (obj.position.x + dx).coerceIn(0f, 1f),
-                        y = (obj.position.y + dy).coerceIn(0f, 1f)
-                    )
+                    anchor = updatedAnchor
                 )
             }
         }
