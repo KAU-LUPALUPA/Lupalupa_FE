@@ -145,7 +145,7 @@ fun RoomScreen(
                     shadowElevation = 6.dp,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 88.dp, end = 16.dp)
+                        .padding(top = 130.dp, end = 16.dp)
                 ) {
 
                     Text(
@@ -164,7 +164,7 @@ fun RoomScreen(
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 28.dp),
+                        .padding(bottom = 120.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
 
