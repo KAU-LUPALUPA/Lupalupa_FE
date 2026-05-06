@@ -44,6 +44,7 @@ object RearrangeController {
 
     fun confirm(room: RoomUiState): RoomUiState {
         return room.copy(
+            rearrangeMode = false,
             selectedRearrangeObjectType = null
         )
     }

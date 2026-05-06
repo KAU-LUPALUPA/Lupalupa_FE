@@ -134,15 +134,17 @@ fun RoomScreen(
                 )
             }
 
-            Button(
-                onClick = onRearrangeClick,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(16.dp)
-            ) {
-                Text(
-                    text = if (room.rearrangeMode) "재배치 종료" else "재배치"
-                )
+            if (!room.rearrangeMode) {
+
+                Button(
+                    onClick = onRearrangeClick,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                ) {
+
+                    Text("재배치")
+                }
             }
 
             if (room.rearrangeMode && room.selectedRearrangeObjectType != null) {
@@ -162,7 +164,7 @@ fun RoomScreen(
                         }
 
                         Button(onClick = onRearrangeConfirm) {
-                            Text("체크")
+                            Text("완료")
                         }
 
                         Button(onClick = onRearrangeMoveRight) {
