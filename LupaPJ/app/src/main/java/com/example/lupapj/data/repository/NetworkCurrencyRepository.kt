@@ -42,11 +42,19 @@ class NetworkCurrencyRepository(
         // 2. 서버에 검증 및 반영 요청
         val result = remoteDataSource.earn(amount, expectedTotal, source)
 
-        // 3. 서버 검증 성공 시에만 로컬 캐시에 저장
-        if (result is CurrencyUpdateResult.Success) {
-            localCache.saveCurrencyAmount(result.finalBalance)
-            // (참고) 여기서 _currencyState를 직접 갱신하지 않아도,
-            // init 블록의 collect가 DataStore 변경을 감지하고 알아서 UI를 갱신합니다.
+        // 3. 서버 응답 처리
+        when (result) {
+            is CurrencyUpdateResult.Success -> {
+                // 검증 성공: 서버와 클라이언트의 계산이 일치함
+                localCache.saveCurrencyAmount(result.finalBalance)
+            }
+            is CurrencyUpdateResult.ValidationError -> {
+                // [추가됨] 검증 실패했더라도 서버가 올바른 잔액을 보내줬다면 강제로 동기화
+                result.correctBalance?.let {
+                    localCache.saveCurrencyAmount(it)
+                }
+            }
+            else -> { /* 네트워크 에러 등은 로컬 캐시를 건드리지 않음 */ }
         }
 
         return result

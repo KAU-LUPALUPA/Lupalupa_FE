@@ -6,7 +6,7 @@ package com.example.lupapj.data.model
  */
 sealed class CurrencyUpdateResult {
     data class Success(val finalBalance: Long) : CurrencyUpdateResult()
-    data class ValidationError(val message: String) : CurrencyUpdateResult()
+    data class ValidationError(val message: String, val correctBalance: Long? = null) : CurrencyUpdateResult()
     data class NetworkError(val exception: Throwable) : CurrencyUpdateResult()
     object AuthError : CurrencyUpdateResult()
 }

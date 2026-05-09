@@ -26,7 +26,7 @@ class ShopLocalCache(context: Context) {
 
     // [추가됨(권)] 저장된 재화를 Flow로 관찰
     val currencyAmountFlow: Flow<Long> = dataStore.data.map { prefs ->
-        prefs[Keys.CURRENCY_AMOUNT] ?: 100L // 초기 지급값 100
+        prefs[Keys.CURRENCY_AMOUNT] ?: 0L // 초기 지급값 0
     }
 
     // [추가됨(권)] 저장된 인벤토리(구매 아이템 ID 목록)를 Flow로 관찰
