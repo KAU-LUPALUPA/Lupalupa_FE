@@ -288,22 +288,25 @@ data class CurrencyState(
 )
 
 // [추가됨(권)] 상점 아이템의 카테고리 (치장 부위 구분을 위해 사용)
-enum class ShopCategory {
-    HAT,
-    GLASSES,
-    CLOTHING,
-    SHOES,
-    ACCESSORY
+// 대분류 10(치장) 하위의 중분류(부위) 코드와 매칭됩니다.
+enum class ShopCategory(val code: String) {
+    HAT("01"),
+    FACE_DECOR("02"),
+    TOP("03"),
+    BOTTOM("04"),
+    FULL_BODY("05"),
+    SHOES("06")
 }
 
 // [추가됨(권)] 상점 카테고리를 UI에 표시하기 위한 한국어 라벨 확장 프로퍼티
 val ShopCategory.label: String
     get() = when (this) {
         ShopCategory.HAT -> "모자"
-        ShopCategory.GLASSES -> "안경"
-        ShopCategory.CLOTHING -> "옷"
+        ShopCategory.FACE_DECOR -> "얼굴 치장"
+        ShopCategory.TOP -> "상의"
+        ShopCategory.BOTTOM -> "하의"
+        ShopCategory.FULL_BODY -> "전신 옷"
         ShopCategory.SHOES -> "신발"
-        ShopCategory.ACCESSORY -> "액세서리"
     }
 
 // [추가됨(권)] 상점 아이템 모델. 구매 시 필요한 재화(price) 및 미리보기 오버레이 리소스(previewOverlayResId) 포함.
@@ -315,4 +318,40 @@ data class ShopItem(
     val category: ShopCategory,
     val thumbnailResId: Int? = null,
     val previewOverlayResId: Int? = null
+)
+
+/**
+ * [추가됨(권)] 인벤토리 아이템 모델.
+ * 서버에서 발급한 고유 인스턴스 ID와 마스터 데이터 ID를 연결하며, 수량(count) 정보를 포함합니다.
+ */
+data class InventoryItem(
+    val instanceId: String, // uuid + 랜덤숫자 10자리
+    val masterId: String,   // Master Data ID (8-digit)
+    val count: Int = 1      // [추가됨] 아이템 보유 수량
+)
+
+// [추가됨(권)] 앱 내에 내장된 상점 마스터 데이터 (로컬 기본값)
+val DefaultShopItems = listOf(
+    // 모자 (01)
+    ShopItem("10010001", "밀짚모자", "여름에 쓰기 좋은 시원한 모자입니다.", 100, ShopCategory.HAT),
+    ShopItem("10010002", "캡모자", "활동적인 느낌의 깔끔한 캡모자입니다.", 200, ShopCategory.HAT),
+    
+    // 얼굴 치장 (02)
+    ShopItem("10020001", "선글라스", "멋진 검은색 선글라스입니다.", 300, ShopCategory.FACE_DECOR),
+    
+    // 상의 (03)
+    ShopItem("10030001", "무지 반팔 티셔츠", "어디에나 잘 어울리는 기본 티셔츠입니다.", 400, ShopCategory.TOP),
+    ShopItem("10030002", "파자마 셔츠", "편안한 잠을 위한 파자마 상의입니다.", 500, ShopCategory.TOP),
+    
+    // 하의 (04)
+    ShopItem("10040001", "기본 면바지", "깔끔한 핏의 기본 면바지입니다.", 600, ShopCategory.BOTTOM),
+    ShopItem("10040002", "파자마 바지", "편안한 잠을 위한 파자마 하의입니다.", 700, ShopCategory.BOTTOM),
+    
+    // 전신 옷 (05)
+    ShopItem("10050001", "공룡 잠옷(전신)", "귀여운 공룡 모양의 전신 잠옷입니다.", 800, ShopCategory.FULL_BODY),
+    ShopItem("10050002", "원피스", "화사한 느낌의 예쁜 원피스입니다.", 900, ShopCategory.FULL_BODY),
+    
+    // 신발 (06)
+    ShopItem("10060001", "파란 신발", "가볍게 뛰어다니기 좋은 파란 신발입니다.", 1000, ShopCategory.SHOES),
+    ShopItem("10060002", "빨간 신발", "열정적인 빨간색이 돋보이는 신발입니다.", 1100, ShopCategory.SHOES)
 )

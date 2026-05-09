@@ -70,4 +70,9 @@ class NetworkCurrencyRepository(
         }
         return CurrencyUpdateResult.ValidationError("잔액이 부족합니다.")
     }
+
+    override suspend fun syncCurrency(amount: Long) {
+        // [추가됨(권)] 서버에서 내려준 확정 잔액으로 로컬 캐시 동기화
+        localCache.saveCurrencyAmount(amount)
+    }
 }

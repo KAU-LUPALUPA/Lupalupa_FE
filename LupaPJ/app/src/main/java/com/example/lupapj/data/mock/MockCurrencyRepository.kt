@@ -55,4 +55,10 @@ class MockCurrencyRepository(
         }
         return CurrencyUpdateResult.ValidationError("잔액이 부족합니다.") // [추가됨(권)] 잔액 부족
     }
+
+    override suspend fun syncCurrency(amount: Long) {
+        // [추가됨(권)] 서버에서 강제로 내려준 잔액으로 동기화
+        localCache.saveCurrencyAmount(amount)
+        _currencyState.update { it.copy(amount = amount) }
+    }
 }

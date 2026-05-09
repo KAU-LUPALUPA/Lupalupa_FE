@@ -20,4 +20,9 @@ interface CurrencyRepository {
      * [추가됨(권)] 재화 소모를 요청하고 검증합니다 (백엔드 연동)
      */
     suspend fun spendCurrency(amount: Long): CurrencyUpdateResult
+
+    /**
+     * [추가됨(권)] 서버에서 내려준 정확한 잔액으로 로컬 상태를 강제 동기화합니다.
+     */
+    suspend fun syncCurrency(amount: Long)
 }

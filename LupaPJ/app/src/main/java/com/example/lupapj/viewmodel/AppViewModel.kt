@@ -111,7 +111,7 @@ class AppViewModel(
         }
         viewModelScope.launch {
             shopRepository.inventory.collect { inventory ->
-                _uiState.update { it.copy(purchasedItemIds = inventory) }
+                _uiState.update { it.copy(purchasedItems = inventory) }
             }
         }
     }

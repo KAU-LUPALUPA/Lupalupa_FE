@@ -9,6 +9,7 @@ import com.example.lupapj.data.model.friend.FriendMessage
 import com.example.lupapj.data.model.friend.FriendRequest
 import com.example.lupapj.data.model.friend.FriendSummary
 import com.example.lupapj.data.model.friend.FriendUser
+import com.example.lupapj.data.model.InventoryItem // [추가됨]
 import com.example.lupapj.data.model.ShopItem // [추가됨(권)] 상점 아이템 데이터 모델 Import
 
 data class AppUiState(
@@ -36,7 +37,7 @@ data class AppUiState(
     // [추가됨(권)] 상점 및 재화 관련 상태
     val currencyAmount: Long = 0L, // [추가됨(권)] 현재 보유한 재화 양
     val shopItems: List<ShopItem> = emptyList(), // [추가됨(권)] 상점 진열대에 표시할 아이템 목록
-    val purchasedItemIds: List<String> = emptyList(), // [추가됨(권)] 보유 중인 상점 아이템 ID 목록
+    val purchasedItems: List<InventoryItem> = emptyList(), // [변경됨(권)] 보유 중인 상점 아이템 (인스턴스 정보 포함)
     val selectedShopItem: ShopItem? = null, // [추가됨(권)] 상세 화면에서 보고 있는 선택된 아이템
     val isPurchasing: Boolean = false, // [추가됨(권)] 구매 진행 중 로딩 상태 표시
     val shopFeedbackMessage: String? = null // [추가됨(권)] 상점 구매 성공/실패 메시지 팝업용

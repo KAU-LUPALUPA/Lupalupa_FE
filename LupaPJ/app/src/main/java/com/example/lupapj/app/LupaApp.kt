@@ -87,8 +87,8 @@ fun LupaApp(deepLink: Uri? = null) {
                 onCaptureClick = appViewModel::captureScreen,
                 onExitCameraMode = appViewModel::exitCameraMode,
                 currencyAmount = uiState.currencyAmount.toInt(), // Long -> Int 변환
-                purchasedShopItems = uiState.shopItems.filter {
-                    uiState.purchasedItemIds.contains(it.id)
+                purchasedShopItems = uiState.shopItems.filter { item ->
+                    uiState.purchasedItems.any { it.masterId == item.id }
                 },
                 onMinigameClick = appViewModel::openMinigame
             )
@@ -142,7 +142,7 @@ fun LupaApp(deepLink: Uri? = null) {
             ShopScreen(
                 currencyAmount = uiState.currencyAmount.toInt(), // Long -> Int 변환
                 shopItems = uiState.shopItems,
-                purchasedItemIds = uiState.purchasedItemIds,
+                purchasedItemIds = uiState.purchasedItems.map { it.masterId },
                 onItemClick = appViewModel::selectShopItem,
                 onBackClick = appViewModel::exitShop
             )
@@ -155,7 +155,7 @@ fun LupaApp(deepLink: Uri? = null) {
                 ShopDetailScreen(
                     item = selectedItem,
                     currencyAmount = uiState.currencyAmount.toInt(), // Long -> Int 변환
-                    isPurchased = uiState.purchasedItemIds.contains(selectedItem.id),
+                    isPurchased = uiState.purchasedItems.any { it.masterId == selectedItem.id },
                     isPurchasing = uiState.isPurchasing,
                     feedbackMessage = uiState.shopFeedbackMessage,
                     onPurchaseClick = { appViewModel.purchaseItem(selectedItem.id) },

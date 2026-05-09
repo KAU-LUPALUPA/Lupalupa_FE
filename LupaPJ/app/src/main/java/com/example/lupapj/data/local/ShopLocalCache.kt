@@ -21,7 +21,7 @@ class ShopLocalCache(context: Context) {
     // [추가됨(권)] DataStore 키 정의
     private object Keys {
         val CURRENCY_AMOUNT = longPreferencesKey("currency_amount_v2")
-        val PURCHASED_ITEM_IDS = stringPreferencesKey("purchased_item_ids") // 콤마 구분 문자열로 저장
+        val PURCHASED_ITEMS = stringPreferencesKey("purchased_items_v2") // instanceId:masterId 콤마 구분 문자열로 저장
     }
 
     // [추가됨(권)] 저장된 재화를 Flow로 관찰
@@ -29,10 +29,19 @@ class ShopLocalCache(context: Context) {
         prefs[Keys.CURRENCY_AMOUNT] ?: 0L // 초기 지급값 0
     }
 
-    // [추가됨(권)] 저장된 인벤토리(구매 아이템 ID 목록)를 Flow로 관찰
-    val purchasedItemIdsFlow: Flow<List<String>> = dataStore.data.map { prefs ->
-        val raw = prefs[Keys.PURCHASED_ITEM_IDS] ?: ""
-        if (raw.isEmpty()) emptyList() else raw.split(",")
+    // [추가됨(권)] 저장된 인벤토리(구매 아이템 목록)를 Flow로 관찰
+    val purchasedItemsFlow: Flow<List<com.example.lupapj.data.model.InventoryItem>> = dataStore.data.map { prefs ->
+        val raw = prefs[Keys.PURCHASED_ITEMS] ?: ""
+        if (raw.isEmpty()) emptyList() else raw.split(",").mapNotNull {
+            val parts = it.split(":")
+            if (parts.size >= 2) {
+                com.example.lupapj.data.model.InventoryItem(
+                    instanceId = parts[0],
+                    masterId = parts[1],
+                    count = parts.getOrNull(2)?.toIntOrNull() ?: 1
+                )
+            } else null
+        }
     }
 
     // [추가됨(권)] 서버 응답 성공 후 재화를 캐시에 저장
@@ -43,9 +52,9 @@ class ShopLocalCache(context: Context) {
     }
 
     // [추가됨(권)] 서버 응답 성공 후 인벤토리를 캐시에 저장
-    suspend fun savePurchasedItemIds(ids: List<String>) {
+    suspend fun savePurchasedItems(items: List<com.example.lupapj.data.model.InventoryItem>) {
         dataStore.edit { prefs ->
-            prefs[Keys.PURCHASED_ITEM_IDS] = ids.joinToString(",")
+            prefs[Keys.PURCHASED_ITEMS] = items.joinToString(",") { "${it.instanceId}:${it.masterId}:${it.count}" }
         }
     }
 }
