@@ -5,6 +5,7 @@ import com.example.lupapj.data.model.GalleryImage // [추가됨]
 import com.example.lupapj.data.model.MainMenuAction
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.model.friend.FriendHome
+import com.example.lupapj.data.model.friend.FriendHomeInvitation
 import com.example.lupapj.data.model.friend.FriendMessage
 import com.example.lupapj.data.model.friend.FriendRequest
 import com.example.lupapj.data.model.friend.FriendSummary
@@ -24,6 +25,7 @@ data class AppUiState(
     val friends: List<FriendSummary> = emptyList(),
     val receivedFriendRequests: List<FriendRequest> = emptyList(),
     val sentFriendRequests: List<FriendRequest> = emptyList(),
+    val receivedHomeInvitations: List<FriendHomeInvitation> = emptyList(),
     val friendCodeInput: String = "",
     val isSendingFriendRequest: Boolean = false,
     val isLoadingFriendHome: Boolean = false,
@@ -32,6 +34,7 @@ data class AppUiState(
     val friendMessageInput: String = "",
     val isSendingFriendMessage: Boolean = false,
     val friendFeedbackMessage: String? = null,
+    val mailboxVisible: Boolean = false,
     
     // [추가됨(권)] 상점 및 재화 관련 상태
     val currencyAmount: Long = 0L, // [추가됨(권)] 현재 보유한 재화 양

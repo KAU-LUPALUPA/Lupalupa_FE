@@ -2,7 +2,7 @@
 
 버전: `0.1`  
 상태: MVP 백엔드 연동용 초안  
-범위: 친구 코드, 친구 신청/수락/거절/취소, 친구 목록, 친구 집 방문, 친구 메시지
+범위: 친구 코드, 친구 신청/수락/거절/취소, 친구 목록, 친구 메시지
 
 ## 공통 규칙
 
@@ -24,14 +24,22 @@
 | 친구 신청 보내기 | 친구 요청 | 로그인 사용자 | POST | `/friends/requests` | Body: `friendCode` | 상대방 친구 코드를 입력해 친구 신청을 보낸다. | `request{id, fromUser, toUser, status, createdAt, respondedAt}` | 에러: `EMPTY_CODE`, `SELF_CODE`, `USER_NOT_FOUND`, `ALREADY_FRIENDS`, `REQUEST_ALREADY_SENT`, `REQUEST_ALREADY_RECEIVED`, `BLOCKED` |
 | 받은 친구 신청 목록 | 친구 요청 | 로그인 사용자 | GET | `/friends/requests/received` | 없음 | 나에게 온 친구 신청 목록을 조회한다. | `requests[]` | 친구요청목록 탭에서 사용한다. |
 | 보낸 친구 신청 목록 | 친구 요청 | 로그인 사용자 | GET | `/friends/requests/sent` | 없음 | 내가 보낸 친구 신청 목록을 조회한다. | `requests[]` | 보낸 요청 탭에서 사용한다. |
-| 친구 신청 수락 | 친구 요청 | 요청 수신자 | POST | `/friends/requests/{requestId}/accept` | Path: `requestId` | 받은 친구 신청을 수락하고 양방향 친구 관계를 생성한다. | `request{id, status, respondedAt}`, `friendship{friendshipId, friend, status, friendsSince}` | 에러: `REQUEST_NOT_FOUND`, `REQUEST_NOT_PENDING`, `BLOCKED` |
-| 친구 신청 거절 | 친구 요청 | 요청 수신자 | POST | `/friends/requests/{requestId}/reject` | Path: `requestId` | 받은 친구 신청을 거절한다. | `request{id, status, respondedAt}` | 거절 후 재신청 허용 여부는 서버 정책으로 결정. MVP는 재신청 허용 권장. |
-| 보낸 친구 신청 취소 | 친구 요청 | 요청 발신자 | POST | `/friends/requests/{requestId}/cancel` | Path: `requestId` | 내가 보낸 친구 신청을 취소한다. | `request{id, status, respondedAt}` | 에러: `REQUEST_NOT_FOUND`, `REQUEST_NOT_PENDING` |
+| 친구 신청 수락 | 친구 요청 | 요청 수신자 | POST | `/friends/requests/{requestId}/accept` | Path: `requestId` | 받은 친구 신청을 수락하고 양방향 친구 관계를 생성한다. | `request`, `friendship{friendshipId, friend, status, friendsSince}` | `request`는 full `FriendRequest` 형태. 에러: `REQUEST_NOT_FOUND`, `REQUEST_NOT_PENDING`, `BLOCKED` |
+| 친구 신청 거절 | 친구 요청 | 요청 수신자 | POST | `/friends/requests/{requestId}/reject` | Path: `requestId` | 받은 친구 신청을 거절한다. | `request` | `request`는 full `FriendRequest` 형태. 거절 후 재신청 허용 여부는 서버 정책으로 결정. |
+| 보낸 친구 신청 취소 | 친구 요청 | 요청 발신자 | POST | `/friends/requests/{requestId}/cancel` | Path: `requestId` | 내가 보낸 친구 신청을 취소한다. | `request` | `request`는 full `FriendRequest` 형태. 에러: `REQUEST_NOT_FOUND`, `REQUEST_NOT_PENDING`, `BLOCKED` |
 | 친구 목록 조회 | 친구 목록 | 로그인 사용자 | GET | `/friends` | 없음 | 수락된 친구 목록을 조회한다. | `friends[]` | 친구 탭 기본 데이터. |
 | 친구 삭제 | 친구 목록 | 로그인 사용자 | DELETE | `/friends/{friendUserId}` | Path: `friendUserId` | 친구 관계를 삭제한다. | `204 No Content` | 에러: `FRIEND_NOT_FOUND`, `NOT_FRIENDS` |
-| 친구 집 방문 정보 조회 | 친구 집 | 친구 관계 사용자 | GET | `/friends/{friendUserId}/home` | Path: `friendUserId` | 친구의 집 화면을 열 때 필요한 유저, 방, 펫 정보를 조회한다. | `owner`, `room`, `visitedAt` | 친구가 아닌 유저는 `NOT_FRIENDS`. 방 좌표계는 내 방 API와 동일하게 사용. |
 | 친구 메시지 목록 조회 | 친구 메시지 | 친구 관계 사용자 | GET | `/friends/{friendUserId}/messages` | Path: `friendUserId`<br>Query: `limit`, `before` | 친구와 주고받은 짧은 메시지 목록을 조회한다. | `messages[]`, `nextCursor` | MVP에서는 REST 폴링 방식 가능. 기본 `limit=30` 권장. |
 | 친구 메시지 보내기 | 친구 메시지 | 친구 관계 사용자 | POST | `/friends/{friendUserId}/messages` | Path: `friendUserId`<br>Body: `text` | 친구에게 짧은 메시지를 보낸다. | `message{id, friendUserId, senderUserId, text, sentAt}` | `text` 최대 120자. 프론트에서 `senderUserId == 내 userId`이면 내 메시지로 표시한다. |
+
+## 정리된 정책
+
+| 항목 | 정책 |
+|---|---|
+| 친구 요청 처리 응답 | `accept`, `reject`, `cancel` 모두 full `FriendRequest`를 반환한다. Android DTO가 `fromUser`, `toUser`, `createdAt`을 필수로 사용하기 때문이다. |
+| 친구 집 초대 조회 | 친구 목록/친구 신청 조회와 장애를 분리한다. 집 초대 API가 실패해도 기존 친구 목록은 표시되어야 한다. |
+| 친구 메시지 페이징 | 응답의 `nextCursor`는 추후 더보기/무한 스크롤용 예약 필드다. MVP 화면이 첫 페이지/폴링만 쓰더라도 백엔드는 유지한다. |
+| 친구 코드 유저 조회 | `relationshipStatus`는 사전 안내용 필드다. MVP에서 바로 친구 신청을 보내더라도 응답에는 유지한다. |
 
 ## Request / Response 예시
 
@@ -100,76 +108,6 @@ Authorization: Bearer {accessToken}
 }
 ```
 
-### 친구 집 방문 정보 조회
-
-```http
-GET /friends/{friendUserId}/home
-Authorization: Bearer {accessToken}
-```
-
-```json
-{
-  "owner": {
-    "userId": "user_friend",
-    "nickname": "친구루파",
-    "friendCode": "LUPA5B0RI",
-    "displayFriendCode": "LUPA-5B0RI",
-    "avatarAssetKey": null
-  },
-  "room": {
-    "sceneId": "main_room",
-    "wallAssetKey": "room/walls/main_wall",
-    "floorAssetKey": "room/floors/main_floor",
-    "placedItems": [
-      {
-        "placedItemId": "placed_bed_001",
-        "itemId": "bed_basic",
-        "objectType": "BED",
-        "anchorType": "FLOOR",
-        "anchor": {
-          "u": 0.25,
-          "v": 0.25
-        },
-        "tile": {
-          "x": 0,
-          "y": 0,
-          "widthTiles": 2,
-          "depthTiles": 2,
-          "anchorMode": "CENTER"
-        }
-      }
-    ],
-    "layoutRevision": 12,
-    "updatedAt": "2026-05-04T18:30:00+09:00"
-  },
-  "pet": {
-    "petId": "pet_friend",
-    "ownerUserId": "user_friend",
-    "name": "루파",
-    "characterAssetKey": "room/characters/lupa_default",
-    "appearance": {
-      "headSizeScale": 1.08,
-      "bodySizeScale": 0.96,
-      "eyeSizeScale": 1.12,
-      "noseSizeScale": 0.92,
-      "mouthSizeScale": 1.04
-    },
-    "status": {
-      "hunger": 80,
-      "fatigue": 25,
-      "isEgg": false
-    },
-    "personality": "ACTIVE",
-    "equippedItemIds": [],
-    "anchor": {
-      "u": 0.44,
-      "v": 0.64
-    }
-  },
-  "visitedAt": "2026-05-04T18:30:00+09:00"
-}
-```
-
 ### 친구 메시지 보내기
 
 ```http
@@ -219,6 +157,8 @@ Content-Type: application/json
 | `createdAt` | `String` | 요청 생성 시각 |
 | `respondedAt` | `String?` | 수락/거절/취소 시각 |
 
+친구 신청 보내기, 수락, 거절, 취소 응답의 `request`는 모두 위 전체 필드를 포함한다.
+
 ### FriendSummary
 
 | 필드 | 타입 | 설명 |
@@ -237,6 +177,20 @@ Content-Type: application/json
 | `senderUserId` | `String` | 메시지를 보낸 유저 ID |
 | `text` | `String` | 메시지 내용. 최대 120자 |
 | `sentAt` | `String` | 발송 시각 |
+
+### FriendMessagesResponse
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `messages` | `FriendMessage[]` | 메시지 목록 |
+| `nextCursor` | `String?` | 다음 페이지 조회용 커서. 더 불러올 메시지가 없으면 `null` |
+
+### FriendUserLookupResponse
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `user` | `FriendUser?` | 친구 코드에 해당하는 유저. 없으면 `null` |
+| `relationshipStatus` | `FriendshipStatus?` | 현재 로그인 유저와 대상 유저의 관계 상태 |
 
 ## 상태값
 
@@ -264,6 +218,7 @@ Content-Type: application/json
 | `EMPTY_MESSAGE` | `400` | 메시지가 비어 있음 |
 | `MESSAGE_TOO_LONG` | `400` | 메시지가 최대 길이를 초과함 |
 | `BLOCKED` | `403` | 차단 또는 정책상 요청 불가 |
+| `UNKNOWN` | `500` | 분류되지 않은 친구 API 오류 |
 
 ## 백엔드와 합의할 사항
 
@@ -274,6 +229,6 @@ Content-Type: application/json
 | 친구 요청 중복 정책 | 두 유저 사이에 `PENDING` 요청은 한 개만 유지 |
 | 거절 후 재신청 | MVP에서는 허용 권장 |
 | 친구 삭제 후 재신청 | MVP에서는 허용 권장 |
-| 친구 집 접근 | 친구 관계가 아니면 `403 NOT_FRIENDS` |
+| 친구 집 방문 | 친구 집 초대 수락 API의 `homeSnapshot`으로 진입 |
 | 메시지 방식 | MVP는 REST 조회/전송, 추후 WebSocket 확장 가능 |
 | 메시지 최대 길이 | 현재 앱 코드 기준 120자 |

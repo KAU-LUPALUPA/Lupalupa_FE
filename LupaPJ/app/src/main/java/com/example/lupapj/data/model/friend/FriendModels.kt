@@ -59,6 +59,14 @@ enum class FriendRequestStatus {
     CANCELED
 }
 
+enum class FriendHomeInvitationStatus {
+    PENDING,
+    ACCEPTED,
+    REJECTED,
+    CANCELED,
+    EXPIRED
+}
+
 enum class FriendshipStatus {
     NONE,
     PENDING_SENT,
@@ -84,10 +92,22 @@ data class FriendSummary(
     val friendsSinceMillis: Long
 )
 
+data class FriendHomeInvitation(
+    val id: String,
+    val fromUser: FriendUser,
+    val toUser: FriendUser,
+    val status: FriendHomeInvitationStatus = FriendHomeInvitationStatus.PENDING,
+    val message: String? = null,
+    val createdAtMillis: Long,
+    val respondedAtMillis: Long? = null,
+    val expiresAtMillis: Long? = null
+)
+
 data class FriendHome(
     val owner: FriendUser,
     val room: RoomUiState,
-    val visitedAtMillis: Long
+    val visitedAtMillis: Long,
+    val snapshotAtMillis: Long? = null
 )
 
 enum class FriendMessageSender {
@@ -117,8 +137,14 @@ enum class FriendOperationFailure {
     REQUEST_NOT_PENDING,
     FRIEND_NOT_FOUND,
     NOT_FRIENDS,
+    HOME_INVITATION_ALREADY_SENT,
+    HOME_INVITATION_NOT_FOUND,
+    HOME_INVITATION_NOT_PENDING,
+    NOT_HOME_INVITATION_RECEIVER,
+    NOT_HOME_INVITATION_SENDER,
     FRIEND_HOME_UNAVAILABLE,
-    BLOCKED
+    BLOCKED,
+    UNKNOWN
 }
 
 sealed interface FriendOperationResult<out T> {

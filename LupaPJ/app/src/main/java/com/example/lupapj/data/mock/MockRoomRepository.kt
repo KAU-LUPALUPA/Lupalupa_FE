@@ -29,8 +29,8 @@ class MockRoomRepository : RoomRepository {
                 mouthSizeScale = 1.04f
             ),
             petStatus = PetStatus(
-                hunger = 80,
-                fatigue = 25,
+                satiety = 80,
+                vitality = 75,
                 isEgg = false
             ),
             petPersonality = PetPersonality.ACTIVE,

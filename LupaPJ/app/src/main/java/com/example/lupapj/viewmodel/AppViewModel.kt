@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.lupapj.data.model.AppPhase
 import com.example.lupapj.data.model.BottomNavItem
+import com.example.lupapj.data.model.DemoPetConditionPolicy
 import com.example.lupapj.data.model.MainMenuAction
 import com.example.lupapj.data.model.PetAction
+import com.example.lupapj.data.model.PetConditionTickRemainder
 import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.repository.AuthRepository
@@ -23,6 +25,8 @@ import com.example.lupapj.data.model.friend.FriendOperationResult
 import com.example.lupapj.data.model.scene.FloorAnchor
 import com.example.lupapj.data.model.scene.PET_AUTONOMOUS_MOVE_DURATION_MS
 import com.example.lupapj.data.model.scene.PetMovementState
+import com.example.lupapj.data.model.advancePetCondition
+import com.example.lupapj.data.model.applyFeedRecovery
 import com.example.lupapj.data.model.scene.autonomousMovementProfileFor
 import com.example.lupapj.data.model.scene.chooseAutonomousPetTarget
 import kotlinx.coroutines.Job
@@ -39,6 +43,7 @@ private const val FOOD_CONSUME_AFTER_TRAVEL_DELAY_MS = 900L
 private const val FOOD_CONSUME_PAUSE_MS = 650L
 private const val AUTONOMOUS_MOVEMENT_RETRY_DELAY_MS = 800L
 private const val FRIEND_MESSAGE_POLL_INTERVAL_MS = 3_000L
+private const val PET_CONDITION_TICK_INTERVAL_MS = 1_000L
 
 class AppViewModel(
     private val authRepository: AuthRepository,
@@ -53,6 +58,8 @@ class AppViewModel(
     private var pendingFoodConsumeJob: Job? = null
     private var autonomousPetMovementJob: Job? = null
     private var friendMessagePollingJob: Job? = null
+    private var petConditionJob: Job? = null
+    private var petConditionRemainder = PetConditionTickRemainder()
 
     init {
         runBootstrap()
@@ -81,6 +88,11 @@ class AppViewModel(
         viewModelScope.launch {
             friendRepository.sentRequests.collect { requests ->
                 _uiState.update { it.copy(sentFriendRequests = requests) }
+            }
+        }
+        viewModelScope.launch {
+            friendRepository.receivedHomeInvitations.collect { invitations ->
+                _uiState.update { it.copy(receivedHomeInvitations = invitations) }
             }
         }
         viewModelScope.launch {
@@ -160,6 +172,7 @@ class AppViewModel(
             }
 
             startAutonomousPetMovement()
+            startPetConditionTicker()
         }
     }
 
@@ -331,6 +344,14 @@ class AppViewModel(
         _uiState.update { it.copy(phase = AppPhase.ROOM) }
     }
 
+    fun openMailbox() {
+        _uiState.update { it.copy(mailboxVisible = true) }
+    }
+
+    fun closeMailbox() {
+        _uiState.update { it.copy(mailboxVisible = false) }
+    }
+
     private fun refreshFriendOverview() {
         viewModelScope.launch {
             val result = friendRepository.refreshFriendOverview()
@@ -366,7 +387,8 @@ class AppViewModel(
         }
     }
 
-    fun visitFriendHome(friendUserId: String) {
+    fun acceptHomeInvitation(invitationId: String) {
+        val returnPhase = _uiState.value.phase
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
@@ -379,9 +401,9 @@ class AppViewModel(
                 )
             }
 
-            val result = friendRepository.getFriendHome(friendUserId)
+            val result = friendRepository.acceptHomeInvitation(invitationId)
             val messagesResult = if (result is FriendOperationResult.Success) {
-                friendRepository.getFriendMessages(friendUserId)
+                friendRepository.getFriendMessages(result.value.owner.userId)
             } else {
                 null
             }
@@ -389,6 +411,7 @@ class AppViewModel(
                 when (result) {
                     is FriendOperationResult.Success -> it.copy(
                         isLoadingFriendHome = false,
+                        mailboxVisible = false,
                         visitingFriendHome = result.value,
                         friendRoomMessages = when (messagesResult) {
                             is FriendOperationResult.Success -> messagesResult.value
@@ -397,15 +420,47 @@ class AppViewModel(
                     )
 
                     is FriendOperationResult.Failure -> it.copy(
-                        phase = AppPhase.FRIENDS,
+                        phase = returnPhase,
                         isLoadingFriendHome = false,
                         visitingFriendHome = null,
-                        friendFeedbackMessage = result.reason.message
+                        friendFeedbackMessage = if (returnPhase == AppPhase.ROOM) {
+                            it.friendFeedbackMessage
+                        } else {
+                            result.reason.message
+                        },
+                        placeholderMessage = if (returnPhase == AppPhase.ROOM) {
+                            result.reason.message
+                        } else {
+                            it.placeholderMessage
+                        }
                     )
                 }
             }
             if (result is FriendOperationResult.Success) {
                 startFriendMessagePolling(result.value.owner.userId)
+            }
+        }
+    }
+
+    fun rejectHomeInvitation(invitationId: String) {
+        viewModelScope.launch {
+            val result = friendRepository.rejectHomeInvitation(invitationId)
+            _uiState.update {
+                val message = result.feedbackMessage(
+                    successMessage = "초대를 거절했어요."
+                )
+                it.copy(
+                    friendFeedbackMessage = if (it.phase == AppPhase.ROOM) {
+                        it.friendFeedbackMessage
+                    } else {
+                        message
+                    },
+                    placeholderMessage = if (it.phase == AppPhase.ROOM) {
+                        message
+                    } else {
+                        it.placeholderMessage
+                    }
+                )
             }
         }
     }
@@ -490,10 +545,20 @@ class AppViewModel(
         viewModelScope.launch {
             val result = friendRepository.acceptFriendRequest(requestId)
             _uiState.update {
+                val message = result.feedbackMessage(
+                    successMessage = "친구 요청을 수락했어요."
+                )
                 it.copy(
-                    friendFeedbackMessage = result.feedbackMessage(
-                        successMessage = "친구 요청을 수락했어요."
-                    )
+                    friendFeedbackMessage = if (it.phase == AppPhase.ROOM) {
+                        it.friendFeedbackMessage
+                    } else {
+                        message
+                    },
+                    placeholderMessage = if (it.phase == AppPhase.ROOM) {
+                        message
+                    } else {
+                        it.placeholderMessage
+                    }
                 )
             }
         }
@@ -503,10 +568,20 @@ class AppViewModel(
         viewModelScope.launch {
             val result = friendRepository.rejectFriendRequest(requestId)
             _uiState.update {
+                val message = result.feedbackMessage(
+                    successMessage = "친구 요청을 거절했어요."
+                )
                 it.copy(
-                    friendFeedbackMessage = result.feedbackMessage(
-                        successMessage = "친구 요청을 거절했어요."
-                    )
+                    friendFeedbackMessage = if (it.phase == AppPhase.ROOM) {
+                        it.friendFeedbackMessage
+                    } else {
+                        message
+                    },
+                    placeholderMessage = if (it.phase == AppPhase.ROOM) {
+                        message
+                    } else {
+                        it.placeholderMessage
+                    }
                 )
             }
         }
@@ -686,6 +761,48 @@ class AppViewModel(
         }
     }
 
+    private fun startPetConditionTicker() {
+        if (petConditionJob?.isActive == true) return
+
+        petConditionJob = viewModelScope.launch {
+            while (isActive) {
+                delay(PET_CONDITION_TICK_INTERVAL_MS)
+                advanceCurrentPetCondition(elapsedSeconds = 1L)
+            }
+        }
+    }
+
+    private fun advanceCurrentPetCondition(elapsedSeconds: Long) {
+        _uiState.update { state ->
+            val room = state.room ?: return@update state
+            val houseSceneState = room.houseSceneState
+            val pet = houseSceneState.pet
+            val result = advancePetCondition(
+                status = pet.status,
+                action = pet.action,
+                elapsedSeconds = elapsedSeconds,
+                remainder = petConditionRemainder,
+                policy = DemoPetConditionPolicy
+            )
+            petConditionRemainder = result.remainder
+
+            state.copy(
+                room = room.copy(
+                    houseSceneState = houseSceneState.copy(
+                        pet = pet.copy(
+                            status = result.status,
+                            action = if (result.shouldStopResting) {
+                                PetAction.IDLE
+                            } else {
+                                pet.action
+                            }
+                        )
+                    )
+                )
+            )
+        }
+    }
+
     private fun AppUiState.canStartAutonomousPetMovement(): Boolean {
         val room = room ?: return false
         val pet = room.houseSceneState.pet
@@ -750,11 +867,41 @@ class AppViewModel(
 
     private fun applyRepositoryRoom(repositoryRoom: RoomUiState) {
         val currentRoom = _uiState.value.room
+        val currentPetStatus = currentRoom?.houseSceneState?.pet?.status
+        val mergedHouseSceneState = if (currentPetStatus == null) {
+            repositoryRoom.houseSceneState
+        } else {
+            val repositoryPet = repositoryRoom.houseSceneState.pet
+            repositoryRoom.houseSceneState.copy(
+                pet = repositoryPet.copy(status = currentPetStatus)
+            )
+        }
         val mergedRoom = repositoryRoom.copy(
+            houseSceneState = mergedHouseSceneState,
             navBarVisible = currentRoom?.navBarVisible ?: false,
             inventoryVisible = currentRoom?.inventoryVisible ?: false
         )
         _uiState.update { it.copy(room = mergedRoom) }
+    }
+
+    private fun recoverPetSatietyFromFood() {
+        petConditionRemainder = petConditionRemainder.copy(
+            satietyDecaySeconds = 0L
+        )
+        updateRoom { room ->
+            val houseSceneState = room.houseSceneState
+            val pet = houseSceneState.pet
+            room.copy(
+                houseSceneState = houseSceneState.copy(
+                    pet = pet.copy(
+                        status = applyFeedRecovery(
+                            status = pet.status,
+                            policy = DemoPetConditionPolicy
+                        )
+                    )
+                )
+            )
+        }
     }
 
     private fun scheduleFoodConsumption() {
@@ -767,6 +914,7 @@ class AppViewModel(
 
             val nextRoom = roomRepository.consumeFood()
             applyRepositoryRoom(nextRoom)
+            recoverPetSatietyFromFood()
         }
     }
 
@@ -774,6 +922,7 @@ class AppViewModel(
         pendingFoodConsumeJob?.cancel()
         autonomousPetMovementJob?.cancel()
         friendMessagePollingJob?.cancel()
+        petConditionJob?.cancel()
         super.onCleared()
     }
 
@@ -822,6 +971,12 @@ private val FriendOperationFailure.message: String
         FriendOperationFailure.REQUEST_NOT_PENDING -> "이미 처리된 요청이에요."
         FriendOperationFailure.FRIEND_NOT_FOUND -> "친구를 찾을 수 없어요."
         FriendOperationFailure.NOT_FRIENDS -> "친구 집은 친구만 방문할 수 있어요."
+        FriendOperationFailure.HOME_INVITATION_ALREADY_SENT -> "이미 보낸 집 초대가 있어요."
+        FriendOperationFailure.HOME_INVITATION_NOT_FOUND -> "집 초대를 찾을 수 없어요."
+        FriendOperationFailure.HOME_INVITATION_NOT_PENDING -> "이미 처리된 집 초대예요."
+        FriendOperationFailure.NOT_HOME_INVITATION_RECEIVER -> "내가 받은 집 초대만 수락할 수 있어요."
+        FriendOperationFailure.NOT_HOME_INVITATION_SENDER -> "내가 보낸 집 초대만 취소할 수 있어요."
         FriendOperationFailure.FRIEND_HOME_UNAVAILABLE -> "친구 집을 불러올 수 없어요."
-        FriendOperationFailure.BLOCKED -> "친구 요청을 보낼 수 없어요."
+        FriendOperationFailure.BLOCKED -> "초대를 수락해야 친구 집에 방문할 수 있어요."
+        FriendOperationFailure.UNKNOWN -> "친구 기능을 잠시 사용할 수 없어요."
     }

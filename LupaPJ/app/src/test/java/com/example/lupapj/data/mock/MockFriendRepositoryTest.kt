@@ -66,15 +66,40 @@ class MockFriendRepositoryTest {
     }
 
     @Test
-    fun getFriendHome_returnsRoomOnlyForAcceptedFriends() = runBlocking {
+    fun getFriendHome_rejectsDirectVisitsEvenForAcceptedFriends() = runBlocking {
         val repository = createRepository()
 
         val result = repository.getFriendHome(DemoFriendUsers.alreadyFriend.userId)
+
+        assertFailure(
+            expected = FriendOperationFailure.BLOCKED,
+            result = result
+        )
+    }
+
+    @Test
+    fun acceptHomeInvitation_returnsFriendRoomAndClearsInvitation() = runBlocking {
+        val repository = createRepository()
+        val invitation = repository.receivedHomeInvitations.value.single()
+
+        val result = repository.acceptHomeInvitation(invitation.id)
 
         assertTrue(result is FriendOperationResult.Success)
         val home = (result as FriendOperationResult.Success).value
         assertEquals(DemoFriendUsers.alreadyFriend.userId, home.owner.userId)
         assertEquals(DemoScenes.mainRoom.id, home.room.sceneDefinition.id)
+        assertTrue(repository.receivedHomeInvitations.value.isEmpty())
+    }
+
+    @Test
+    fun rejectHomeInvitation_clearsPendingInvitation() = runBlocking {
+        val repository = createRepository()
+        val invitation = repository.receivedHomeInvitations.value.single()
+
+        val result = repository.rejectHomeInvitation(invitation.id)
+
+        assertTrue(result is FriendOperationResult.Success)
+        assertTrue(repository.receivedHomeInvitations.value.isEmpty())
     }
 
     @Test
@@ -146,6 +171,7 @@ class MockFriendRepositoryTest {
         return MockFriendRepository(
             initialFriends = initialFriends,
             initialReceivedRequestUsers = initialReceivedRequestUsers,
+            initialHomeInvitationUsers = initialFriends,
             nowProvider = { 1_000L },
             simulatedDelayMillis = 0L
         )

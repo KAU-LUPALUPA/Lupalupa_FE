@@ -27,6 +27,16 @@ interface FriendApiClient {
 
     suspend fun deleteFriend(friendUserId: String)
 
+    suspend fun getReceivedHomeInvitations(): FriendHomeInvitationsResponseDto
+
+    suspend fun acceptHomeInvitation(invitationId: String): AcceptHomeInvitationResponseDto
+
+    suspend fun rejectHomeInvitation(invitationId: String): FriendHomeInvitationResponseDto
+
+    @Deprecated(
+        message = "Direct friend home visits are blocked by policy. Use home invitation accept flow.",
+        replaceWith = ReplaceWith("acceptHomeInvitation(invitationId)")
+    )
     suspend fun getFriendHome(friendUserId: String): FriendHomeResponseDto
 
     suspend fun getFriendMessages(

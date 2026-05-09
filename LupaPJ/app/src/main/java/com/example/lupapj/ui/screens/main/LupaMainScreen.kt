@@ -1,5 +1,7 @@
 package com.example.lupapj.ui.screens.main
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -61,6 +63,14 @@ private const val MAIN_SETTING_ASPECT_RATIO = 378f / 325f
 private const val POPUP_ASPECT_RATIO = 705f / 509f
 
 private val TimeTextColor = Color(0xFF5C371D)
+private val ConditionPanelBackground = Color(0xF8FFF4DF)
+private val ConditionPanelBorder = Color(0xB8875E32)
+private val ConditionTextColor = Color(0xFF5C371D)
+private val ConditionTrackColor = Color(0xFFE7D3B7)
+private val SatietyFillColor = Color(0xFFFFA24A)
+private val VitalityFillColor = Color(0xFF63BA76)
+private val ConditionLowFillColor = Color(0xFFE15A4F)
+private val ConditionMidFillColor = Color(0xFFE3B348)
 private val PopupButtonBorderColor = Color(0xB88B5B2E)
 private val EmptyRoomBackground = Color(0xFFFFF2D8)
 private data class PopupMenuItem(
@@ -103,6 +113,8 @@ fun LupaMainScreen(
     modifier: Modifier = Modifier,
     currentTimeText: String? = null,
     isDayTime: Boolean? = null,
+    petSatiety: Int = 80,
+    petVitality: Int = 80,
     recentIconRes: Int? = null,
     onRecentActionClick: () -> Unit = {},
     onMainMenuClick: () -> Unit = {},
@@ -170,6 +182,8 @@ fun LupaMainScreen(
         TopStatusLayer(
             currentTimeText = resolvedTimeText,
             isDayTime = resolvedIsDayTime,
+            petSatiety = petSatiety,
+            petVitality = petVitality,
             onSettingClick = onSettingClick,
             modifier = Modifier.align(Alignment.TopCenter)
         )
@@ -193,6 +207,8 @@ fun LupaMainScreen(
 fun TopStatusLayer(
     currentTimeText: String,
     isDayTime: Boolean,
+    petSatiety: Int,
+    petVitality: Int,
     onSettingClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -214,13 +230,26 @@ fun TopStatusLayer(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top
         ) {
-            TimePanel(
-                currentTimeText = currentTimeText,
-                isDayTime = isDayTime,
+            Column(
                 modifier = Modifier
-                    .width(timePanelWidth)
-                    .aspectRatio(MAIN_TIME_ASPECT_RATIO)
-            )
+                    .width(timePanelWidth),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                TimePanel(
+                    currentTimeText = currentTimeText,
+                    isDayTime = isDayTime,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(MAIN_TIME_ASPECT_RATIO)
+                )
+
+                PetConditionFloatingTab(
+                    satiety = petSatiety,
+                    vitality = petVitality,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             Image(
                 painter = painterResource(id = R.drawable.main_setting_trimmed),
@@ -232,6 +261,96 @@ fun TopStatusLayer(
                     .clickable(onClick = onSettingClick)
             )
         }
+    }
+}
+
+@Composable
+private fun PetConditionFloatingTab(
+    satiety: Int,
+    vitality: Int,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(10.dp)
+
+    Column(
+        modifier = modifier
+            .clip(shape)
+            .background(ConditionPanelBackground)
+            .border(1.dp, ConditionPanelBorder, shape)
+            .padding(horizontal = 8.dp, vertical = 7.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        PetConditionBar(
+            label = "포만감",
+            value = satiety,
+            fillColor = SatietyFillColor
+        )
+        PetConditionBar(
+            label = "활력",
+            value = vitality,
+            fillColor = VitalityFillColor
+        )
+    }
+}
+
+@Composable
+private fun PetConditionBar(
+    label: String,
+    value: Int,
+    fillColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val safeValue = value.coerceIn(0, 100)
+    val progress by animateFloatAsState(
+        targetValue = safeValue / 100f,
+        animationSpec = tween(durationMillis = 280),
+        label = "$label progress"
+    )
+    val resolvedFillColor = conditionFillColor(
+        value = safeValue,
+        normalColor = fillColor
+    )
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            color = ConditionTextColor,
+            fontSize = 10.sp,
+            lineHeight = 10.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            modifier = Modifier.width(38.dp)
+        )
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(8.dp)
+                .clip(RoundedCornerShape(50))
+                .background(ConditionTrackColor)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(progress)
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(resolvedFillColor)
+            )
+        }
+
+        Text(
+            text = safeValue.toString(),
+            color = ConditionTextColor,
+            fontSize = 10.sp,
+            lineHeight = 10.sp,
+            fontWeight = FontWeight.ExtraBold,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+            modifier = Modifier.width(24.dp)
+        )
     }
 }
 
@@ -537,6 +656,17 @@ private fun resolveTimePanelWidth(screenWidth: Dp): Dp {
 
 private fun resolveSettingWidth(screenWidth: Dp): Dp {
     return (screenWidth * 0.155f).coerceIn(56.dp, 74.dp)
+}
+
+private fun conditionFillColor(
+    value: Int,
+    normalColor: Color
+): Color {
+    return when {
+        value <= 20 -> ConditionLowFillColor
+        value <= 45 -> ConditionMidFillColor
+        else -> normalColor
+    }
 }
 
 @Preview(showBackground = true, widthDp = 360, heightDp = 800)

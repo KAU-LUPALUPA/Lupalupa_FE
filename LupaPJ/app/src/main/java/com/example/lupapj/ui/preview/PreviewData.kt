@@ -39,8 +39,8 @@ val previewRoomUiStateWithFood = initialRoomUiState(
                 mouthSizeScale = 1.04f
             ),
             status = PetStatus(
-                hunger = 95,
-                fatigue = 20,
+                satiety = 95,
+                vitality = 80,
                 isEgg = false
             ),
             personality = PetPersonality.ACTIVE

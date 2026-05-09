@@ -2,7 +2,7 @@
 
 버전: `0.1`  
 상태: MVP 백엔드 연동용 초안  
-최종 수정일: 2026-05-04
+최종 수정일: 2026-05-09
 
 ## 1. 문서 목적
 
@@ -16,7 +16,7 @@
 - 펫 외형, 상태, 성격, 치장 정보
 - 친구 신청, 수락, 거절, 취소
 - 친구 목록
-- 친구 집 방문
+- 친구 집 초대 기반 방문
 - 친구 간 간단한 메시지
 - 내 방 레이아웃 검증 및 저장
 - 재화, 상점, 인벤토리
@@ -245,8 +245,8 @@ Response:
       "mouthSizeScale": 1.04
     },
     "status": {
-      "hunger": 80,
-      "fatigue": 25,
+      "satiety": 80,
+      "vitality": 75,
       "isEgg": false,
       "action": "IDLE",
       "anchor": {
@@ -286,8 +286,8 @@ Response:
 
 | 필드 | 설명 |
 |---|---|
-| `hunger` | 배고픔 수치. `0`부터 `100`까지 |
-| `fatigue` | 피로도 수치. `0`부터 `100`까지 |
+| `satiety` | 포만감 수치. `0`부터 `100`까지. 높을수록 배부른 상태 |
+| `vitality` | 활력 수치. `0`부터 `100`까지. 높을수록 활기찬 상태 |
 | `isEgg` | 알 상태 여부 |
 | `action` | 현재 행동 상태 |
 | `anchor` | 방 바닥 위 현재 위치 |
@@ -331,8 +331,8 @@ Request:
 
 ```json
 {
-  "hunger": 75,
-  "fatigue": 30,
+  "satiety": 75,
+  "vitality": 70,
   "isEgg": false,
   "action": "PLAYING",
   "anchor": {
@@ -359,8 +359,8 @@ Response:
       "mouthSizeScale": 1.04
     },
     "status": {
-      "hunger": 75,
-      "fatigue": 30,
+      "satiety": 75,
+      "vitality": 70,
       "isEgg": false,
       "action": "PLAYING",
       "anchor": {
@@ -382,15 +382,15 @@ Response:
 
 ```text
 PET_NOT_FOUND
-INVALID_HUNGER
-INVALID_FATIGUE
+INVALID_SATIETY
+INVALID_VITALITY
 INVALID_ACTION
 INVALID_ANCHOR
 ```
 
 비고:
 
-- `hunger`와 `fatigue`는 서버에서 `0`부터 `100` 사이로 검증한다.
+- `satiety`와 `vitality`는 서버에서 `0`부터 `100` 사이로 검증한다.
 - 운영 단계에서는 클라이언트가 임의로 수치를 보내는 방식보다 서버가 행동 결과에 따라 수치를 계산하는 방식이 더 안전하다.
 - MVP에서는 클라이언트 요청 값을 서버가 검증 후 반영하는 방식으로 시작할 수 있다.
 
@@ -453,6 +453,7 @@ EQUIPMENT_SLOT_CONFLICT
   "userId": "user_456",
   "nickname": "친구루파",
   "friendCode": "LUPA9912",
+  "displayFriendCode": "LUPA-9912",
   "avatarAssetKey": null
 }
 ```
@@ -467,6 +468,12 @@ PENDING | ACCEPTED | REJECTED | CANCELED
 
 ```text
 NONE | PENDING_SENT | PENDING_RECEIVED | ACCEPTED | REJECTED | CANCELED | BLOCKED
+```
+
+친구 집 초대 상태:
+
+```text
+PENDING | ACCEPTED | REJECTED | CANCELED | EXPIRED
 ```
 
 ### 5.2 친구 신청 보내기
@@ -495,12 +502,14 @@ Response:
       "userId": "user_123",
       "nickname": "나",
       "friendCode": "LUPA1234",
+      "displayFriendCode": "LUPA-1234",
       "avatarAssetKey": null
     },
     "toUser": {
       "userId": "user_456",
       "nickname": "친구루파",
       "friendCode": "LUPA4821",
+      "displayFriendCode": "LUPA-4821",
       "avatarAssetKey": null
     },
     "status": "PENDING",
@@ -539,12 +548,14 @@ Response:
         "userId": "user_456",
         "nickname": "친구루파",
         "friendCode": "LUPA4821",
+        "displayFriendCode": "LUPA-4821",
         "avatarAssetKey": null
       },
       "toUser": {
         "userId": "user_123",
         "nickname": "나",
         "friendCode": "LUPA1234",
+        "displayFriendCode": "LUPA-1234",
         "avatarAssetKey": null
       },
       "status": "PENDING",
@@ -572,12 +583,14 @@ Response:
         "userId": "user_123",
         "nickname": "나",
         "friendCode": "LUPA1234",
+        "displayFriendCode": "LUPA-1234",
         "avatarAssetKey": null
       },
       "toUser": {
         "userId": "user_456",
         "nickname": "친구루파",
         "friendCode": "LUPA4821",
+        "displayFriendCode": "LUPA-4821",
         "avatarAssetKey": null
       },
       "status": "PENDING",
@@ -600,18 +613,35 @@ Response:
 {
   "request": {
     "id": "friend_request_001",
+    "fromUser": {
+      "userId": "user_456",
+      "nickname": "친구루파",
+      "friendCode": "LUPA4821",
+      "displayFriendCode": "LUPA-4821",
+      "avatarAssetKey": null
+    },
+    "toUser": {
+      "userId": "user_123",
+      "nickname": "나",
+      "friendCode": "LUPA1234",
+      "displayFriendCode": "LUPA-1234",
+      "avatarAssetKey": null
+    },
     "status": "ACCEPTED",
+    "createdAt": "2026-05-04T18:30:00+09:00",
     "respondedAt": "2026-05-04T18:35:00+09:00"
   },
   "friendship": {
-    "id": "friendship_001",
+    "friendshipId": "friendship_001",
     "friend": {
       "userId": "user_456",
       "nickname": "친구루파",
       "friendCode": "LUPA4821",
+      "displayFriendCode": "LUPA-4821",
       "avatarAssetKey": null
     },
-    "createdAt": "2026-05-04T18:35:00+09:00"
+    "status": "ACCEPTED",
+    "friendsSince": "2026-05-04T18:35:00+09:00"
   }
 }
 ```
@@ -620,9 +650,14 @@ Response:
 
 ```text
 REQUEST_NOT_FOUND
-REQUEST_ALREADY_RESPONDED
-NOT_REQUEST_RECEIVER
+REQUEST_NOT_PENDING
+BLOCKED
 ```
+
+비고:
+
+- `request`는 `id`, `fromUser`, `toUser`, `status`, `createdAt`, `respondedAt`을 모두 포함하는 full `FriendRequest` 형태로 반환한다.
+- 이미 처리된 요청은 `REQUEST_NOT_PENDING`으로 통일한다.
 
 ### 5.6 친구 신청 거절
 
@@ -636,10 +671,33 @@ Response:
 {
   "request": {
     "id": "friend_request_001",
+    "fromUser": {
+      "userId": "user_456",
+      "nickname": "친구루파",
+      "friendCode": "LUPA4821",
+      "displayFriendCode": "LUPA-4821",
+      "avatarAssetKey": null
+    },
+    "toUser": {
+      "userId": "user_123",
+      "nickname": "나",
+      "friendCode": "LUPA1234",
+      "displayFriendCode": "LUPA-1234",
+      "avatarAssetKey": null
+    },
     "status": "REJECTED",
+    "createdAt": "2026-05-04T18:30:00+09:00",
     "respondedAt": "2026-05-04T18:35:00+09:00"
   }
 }
+```
+
+가능한 에러:
+
+```text
+REQUEST_NOT_FOUND
+REQUEST_NOT_PENDING
+BLOCKED
 ```
 
 ### 5.7 보낸 친구 신청 취소
@@ -654,7 +712,22 @@ Response:
 {
   "request": {
     "id": "friend_request_001",
+    "fromUser": {
+      "userId": "user_123",
+      "nickname": "나",
+      "friendCode": "LUPA1234",
+      "displayFriendCode": "LUPA-1234",
+      "avatarAssetKey": null
+    },
+    "toUser": {
+      "userId": "user_456",
+      "nickname": "친구루파",
+      "friendCode": "LUPA4821",
+      "displayFriendCode": "LUPA-4821",
+      "avatarAssetKey": null
+    },
     "status": "CANCELED",
+    "createdAt": "2026-05-04T18:30:00+09:00",
     "respondedAt": "2026-05-04T18:35:00+09:00"
   }
 }
@@ -664,8 +737,8 @@ Response:
 
 ```text
 REQUEST_NOT_FOUND
-REQUEST_ALREADY_RESPONDED
-NOT_REQUEST_SENDER
+REQUEST_NOT_PENDING
+BLOCKED
 ```
 
 ### 5.8 친구 목록 조회
@@ -685,10 +758,11 @@ Response:
         "userId": "user_456",
         "nickname": "친구루파",
         "friendCode": "LUPA4821",
+        "displayFriendCode": "LUPA-4821",
         "avatarAssetKey": null
       },
-      "createdAt": "2026-05-04T18:35:00+09:00",
-      "lastVisitedAt": null
+      "status": "ACCEPTED",
+      "friendsSince": "2026-05-04T18:35:00+09:00"
     }
   ]
 }
@@ -710,92 +784,333 @@ Response:
 
 ```text
 FRIEND_NOT_FOUND
+NOT_FRIENDS
 ```
 
-### 5.10 친구 집 방문 정보 조회
+### 5.10 친구 집 초대 보내기
 
-친구의 집 화면을 열 때 필요한 정보를 가져온다.
+친구에게 내 집 방문 초대를 보낸다.
 
 ```http
-GET /friends/{friendUserId}/home
+POST /friends/home-invitations
+```
+
+Request:
+
+```json
+{
+  "friendUserId": "user_456",
+  "message": "우리 집 구경하러 올래?"
+}
 ```
 
 Response:
 
 ```json
 {
-  "owner": {
-    "userId": "user_456",
-    "nickname": "친구루파",
-    "friendCode": "LUPA4821",
-    "avatarAssetKey": null
-  },
-  "roomLayout": {
-    "layoutRevision": 13,
-    "layoutHash": "sha256:def456",
-    "wallAssetKey": "room/walls/main_wall",
-    "floorAssetKey": "room/floors/main_floor",
-    "placedItems": [
-      {
-        "placementId": "placement_001",
-        "inventoryItemId": "inventory_item_001",
-        "shopItemId": "shop_item_001",
-        "assetKey": "room/objects/bed_basic",
-        "type": "BED",
-        "anchorType": "FLOOR",
-        "tilePlacement": {
-          "tile": {
-            "x": 0,
-            "y": 0
-          },
-          "footprint": {
-            "widthTiles": 2,
-            "depthTiles": 2
-          },
-          "anchorMode": "FRONT_CENTER"
-        },
-        "wallPlacement": null,
-        "scale": 1.0,
-        "rotation": 0,
-        "depthBias": 0
-      }
-    ]
-  },
-  "pet": {
-    "petId": "pet_456",
-    "ownerUserId": "user_456",
-    "name": "루파",
-    "characterAssetKey": "room/characters/lupa_default",
-    "appearance": {
-      "headSizeScale": 1.02,
-      "bodySizeScale": 1.10,
-      "eyeSizeScale": 0.94,
-      "noseSizeScale": 1.05,
-      "mouthSizeScale": 0.98
+  "invitation": {
+    "id": "home_invitation_001",
+    "fromUser": {
+      "userId": "user_123",
+      "nickname": "나",
+      "friendCode": "LUPA1234",
+      "displayFriendCode": "LUPA-1234",
+      "avatarAssetKey": null
     },
-    "status": {
-      "hunger": 80,
-      "fatigue": 25,
-      "isEgg": false,
-      "action": "IDLE",
-      "anchor": {
-        "u": 0.58,
-        "v": 0.52
-      }
+    "toUser": {
+      "userId": "user_456",
+      "nickname": "친구루파",
+      "friendCode": "LUPA4821",
+      "displayFriendCode": "LUPA-4821",
+      "avatarAssetKey": null
     },
-    "personality": "CALM",
-    "equippedItemIds": []
-  },
-  "visitedAt": "2026-05-04T19:00:00+09:00"
+    "status": "PENDING",
+    "message": "우리 집 구경하러 올래?",
+    "createdAt": "2026-05-09T18:30:00+09:00",
+    "respondedAt": null,
+    "expiresAt": "2026-05-09T19:30:00+09:00"
+  }
 }
+```
+
+가능한 에러:
+
+```text
+FRIEND_NOT_FOUND
+NOT_FRIENDS
+HOME_INVITATION_ALREADY_SENT
+BLOCKED
 ```
 
 비고:
 
-- `roomLayout`은 `7. 내 방 레이아웃 동기화 API`의 방 레이아웃 모델과 같은 구조를 사용한다.
-- `pet`은 `4.3 내 펫 정보 조회`의 펫 모델과 같은 구조를 사용한다.
-- 배치 아이템 좌표 체계는 타일 기반 좌표를 우선 사용한다.
-- 친구가 아닌 유저의 집을 조회하면 `403` 또는 `404`를 반환한다.
+- 초대 발신 UI의 진입점은 아직 확정하지 않는다.
+- 현재 프론트 범위는 받은 초대를 우편함에서 확인하고 수락/거절하는 흐름이다.
+
+### 5.11 받은 집 초대 목록
+
+우편함에 표시할 내가 받은 대기 중인 집 초대 목록을 조회한다.
+
+```http
+GET /friends/home-invitations/received
+```
+
+Response:
+
+```json
+{
+  "invitations": [
+    {
+      "id": "home_invitation_001",
+      "fromUser": {
+        "userId": "user_456",
+        "nickname": "친구루파",
+        "friendCode": "LUPA4821",
+        "displayFriendCode": "LUPA-4821",
+        "avatarAssetKey": null
+      },
+      "toUser": {
+        "userId": "user_123",
+        "nickname": "나",
+        "friendCode": "LUPA1234",
+        "displayFriendCode": "LUPA-1234",
+        "avatarAssetKey": null
+      },
+      "status": "PENDING",
+      "message": "우리 집 구경하러 올래?",
+      "createdAt": "2026-05-09T18:30:00+09:00",
+      "respondedAt": null,
+      "expiresAt": "2026-05-09T19:30:00+09:00"
+    }
+  ]
+}
+```
+
+### 5.12 보낸 집 초대 목록
+
+내가 보낸 집 초대 목록을 조회한다. MVP에서는 선택 API다.
+
+```http
+GET /friends/home-invitations/sent
+```
+
+Response:
+
+```json
+{
+  "invitations": []
+}
+```
+
+### 5.13 집 초대 수락 및 방문
+
+수신자가 우편함에서 `방문`을 누르면 호출한다.
+성공 응답은 친구 집 화면을 그리는 데 필요한 읽기 전용 `homeSnapshot`을 반환한다.
+
+```http
+POST /friends/home-invitations/{invitationId}/accept
+```
+
+Response:
+
+```json
+{
+  "invitation": {
+    "id": "home_invitation_001",
+    "fromUser": {
+      "userId": "user_456",
+      "nickname": "친구루파",
+      "friendCode": "LUPA4821",
+      "displayFriendCode": "LUPA-4821",
+      "avatarAssetKey": null
+    },
+    "toUser": {
+      "userId": "user_123",
+      "nickname": "나",
+      "friendCode": "LUPA1234",
+      "displayFriendCode": "LUPA-1234",
+      "avatarAssetKey": null
+    },
+    "status": "ACCEPTED",
+    "message": "우리 집 구경하러 올래?",
+    "createdAt": "2026-05-09T18:30:00+09:00",
+    "respondedAt": "2026-05-09T18:35:00+09:00",
+    "expiresAt": "2026-05-09T19:30:00+09:00"
+  },
+  "homeSnapshot": {
+    "owner": {
+      "userId": "user_456",
+      "nickname": "친구루파",
+      "friendCode": "LUPA4821",
+      "displayFriendCode": "LUPA-4821",
+      "avatarAssetKey": null
+    },
+    "room": {
+      "sceneId": "main_room",
+      "wallAssetKey": "room/walls/main_wall",
+      "floorAssetKey": "room/floors/main_floor",
+      "placedItems": [
+        {
+          "placedItemId": "placed_bed_001",
+          "itemId": "bed_basic",
+          "objectType": "BED",
+          "anchorType": "FLOOR",
+          "anchor": {
+            "u": 0.25,
+            "v": 0.25
+          },
+          "tile": {
+            "x": 0,
+            "y": 0,
+            "widthTiles": 2,
+            "depthTiles": 2,
+            "anchorMode": "CENTER"
+          }
+        }
+      ],
+      "layoutRevision": 12,
+      "updatedAt": "2026-05-09T18:30:00+09:00"
+    },
+    "petSnapshot": {
+      "petId": "pet_456",
+      "ownerUserId": "user_456",
+      "name": "루파",
+      "characterAssetKey": "room/characters/lupa_default",
+      "appearance": {
+        "headSizeScale": 1.08,
+        "bodySizeScale": 0.96,
+        "eyeSizeScale": 1.12,
+        "noseSizeScale": 0.92,
+        "mouthSizeScale": 1.04
+      },
+      "condition": {
+        "satiety": 80,
+        "vitality": 75,
+        "isEgg": false
+      },
+      "sceneState": {
+        "action": "IDLE",
+        "anchor": {
+          "u": 0.44,
+          "v": 0.64
+        }
+      },
+      "personality": "ACTIVE",
+      "equippedItemIds": []
+    },
+    "snapshotAt": "2026-05-09T18:35:00+09:00",
+    "visitedAt": "2026-05-09T18:35:00+09:00"
+  }
+}
+```
+
+가능한 에러:
+
+```text
+HOME_INVITATION_NOT_FOUND
+HOME_INVITATION_NOT_PENDING
+NOT_HOME_INVITATION_RECEIVER
+NOT_FRIENDS
+FRIEND_HOME_UNAVAILABLE
+BLOCKED
+```
+
+### 5.14 집 초대 거절
+
+```http
+POST /friends/home-invitations/{invitationId}/reject
+```
+
+Response:
+
+```json
+{
+  "invitation": {
+    "id": "home_invitation_001",
+    "fromUser": {
+      "userId": "user_456",
+      "nickname": "친구루파",
+      "friendCode": "LUPA4821",
+      "displayFriendCode": "LUPA-4821",
+      "avatarAssetKey": null
+    },
+    "toUser": {
+      "userId": "user_123",
+      "nickname": "나",
+      "friendCode": "LUPA1234",
+      "displayFriendCode": "LUPA-1234",
+      "avatarAssetKey": null
+    },
+    "status": "REJECTED",
+    "message": "우리 집 구경하러 올래?",
+    "createdAt": "2026-05-09T18:30:00+09:00",
+    "respondedAt": "2026-05-09T18:34:00+09:00",
+    "expiresAt": "2026-05-09T19:30:00+09:00"
+  }
+}
+```
+
+가능한 에러:
+
+```text
+HOME_INVITATION_NOT_FOUND
+HOME_INVITATION_NOT_PENDING
+NOT_HOME_INVITATION_RECEIVER
+```
+
+### 5.15 보낸 집 초대 취소
+
+아직 수락되지 않은 보낸 초대를 취소한다. MVP에서는 선택 API다.
+
+```http
+POST /friends/home-invitations/{invitationId}/cancel
+```
+
+Response:
+
+```json
+{
+  "invitation": {
+    "id": "home_invitation_001",
+    "fromUser": {
+      "userId": "user_123",
+      "nickname": "나",
+      "friendCode": "LUPA1234",
+      "displayFriendCode": "LUPA-1234",
+      "avatarAssetKey": null
+    },
+    "toUser": {
+      "userId": "user_456",
+      "nickname": "친구루파",
+      "friendCode": "LUPA4821",
+      "displayFriendCode": "LUPA-4821",
+      "avatarAssetKey": null
+    },
+    "status": "CANCELED",
+    "message": "우리 집 구경하러 올래?",
+    "createdAt": "2026-05-09T18:30:00+09:00",
+    "respondedAt": "2026-05-09T18:34:00+09:00",
+    "expiresAt": "2026-05-09T19:30:00+09:00"
+  }
+}
+```
+
+가능한 에러:
+
+```text
+HOME_INVITATION_NOT_FOUND
+HOME_INVITATION_NOT_PENDING
+NOT_HOME_INVITATION_SENDER
+```
+
+### 5.16 친구 집 초대 응답 구조 기준
+
+| 구조 | 이유 |
+|---|---|
+| `homeSnapshot` | 친구 집 방문 화면에 필요한 데이터를 하나의 읽기 전용 묶음으로 다룬다. |
+| `petSnapshot` | 방문 화면 렌더링용 펫 스냅샷임을 명확히 한다. |
+| `condition` | `satiety`, `vitality`, `isEgg`처럼 펫 컨디션 값을 묶는다. |
+| `sceneState` | `action`, `anchor`처럼 방문 화면의 위치와 행동 값을 묶는다. |
 
 ## 6. 친구 메시지 API
 
@@ -820,20 +1135,10 @@ Response:
   "messages": [
     {
       "id": "message_001",
-      "sender": {
-        "userId": "user_123",
-        "nickname": "나",
-        "friendCode": "LUPA1234",
-        "avatarAssetKey": null
-      },
-      "receiver": {
-        "userId": "user_456",
-        "nickname": "친구루파",
-        "friendCode": "LUPA4821",
-        "avatarAssetKey": null
-      },
-      "content": "집 예쁘다!",
-      "createdAt": "2026-05-04T19:10:00+09:00"
+      "friendUserId": "user_456",
+      "senderUserId": "user_123",
+      "text": "집 예쁘다!",
+      "sentAt": "2026-05-04T19:10:00+09:00"
     }
   ],
   "nextCursor": null
@@ -850,7 +1155,7 @@ Request:
 
 ```json
 {
-  "content": "집 예쁘다!"
+  "text": "집 예쁘다!"
 }
 ```
 
@@ -860,20 +1165,10 @@ Response:
 {
   "message": {
     "id": "message_001",
-    "sender": {
-      "userId": "user_123",
-      "nickname": "나",
-      "friendCode": "LUPA1234",
-      "avatarAssetKey": null
-    },
-    "receiver": {
-      "userId": "user_456",
-      "nickname": "친구루파",
-      "friendCode": "LUPA4821",
-      "avatarAssetKey": null
-    },
-    "content": "집 예쁘다!",
-    "createdAt": "2026-05-04T19:10:00+09:00"
+    "friendUserId": "user_456",
+    "senderUserId": "user_123",
+    "text": "집 예쁘다!",
+    "sentAt": "2026-05-04T19:10:00+09:00"
   }
 }
 ```
@@ -882,14 +1177,16 @@ Response:
 
 ```text
 FRIEND_NOT_FOUND
+NOT_FRIENDS
 EMPTY_MESSAGE
 MESSAGE_TOO_LONG
 ```
 
 권장 제한:
 
-- 메시지 최대 길이: 200자
+- 메시지 최대 길이: 120자
 - MVP에서는 이미지, 이모티콘, 실시간 socket은 제외
+- 프론트는 `senderUserId == 현재 로그인 userId`인지 비교해 내 메시지 여부를 판단한다.
 
 ## 7. 내 방 레이아웃 동기화 API
 
@@ -903,7 +1200,7 @@ MESSAGE_TOO_LONG
 - 배치된 가구 목록
 - 각 가구의 위치, 크기, 회전, 배치 기준
 
-펫의 현재 행동, 배고픔, 피로도, 알 상태, 치장 정보 같은 상태는 펫 API에서 별도로 관리한다.
+펫의 현재 행동, 포만감, 활력, 알 상태, 치장 정보 같은 상태는 펫 API에서 별도로 관리한다.
 
 ### 7.1 방 레이아웃 모델
 
@@ -1557,19 +1854,23 @@ MVP 개발에서는 다음 순서로 연결하는 것이 좋다.
 3. `GET /pets/me`
 4. `POST /rooms/me/layout/validate`
 5. `GET /friends`
-6. `POST /friends/requests`
-7. `GET /friends/requests/received`
-8. `POST /friends/requests/{requestId}/accept`
-9. `POST /friends/requests/{requestId}/reject`
-10. `GET /shop/items`
-11. `POST /shop/items/{itemId}/purchase`
-12. `GET /inventory/me`
-13. `PUT /rooms/me/layout`
-14. `PUT /pets/me/equipment`
-15. `PATCH /pets/me/status`
-16. `POST /minigames/{gameId}/results`
+6. `GET /friends/requests/received`
+7. `GET /friends/requests/sent`
+8. `POST /friends/requests`
+9. `POST /friends/requests/{requestId}/accept`
+10. `POST /friends/requests/{requestId}/reject`
+11. `GET /friends/home-invitations/received`
+12. `POST /friends/home-invitations/{invitationId}/accept`
+13. `POST /friends/home-invitations/{invitationId}/reject`
+14. `GET /shop/items`
+15. `POST /shop/items/{itemId}/purchase`
+16. `GET /inventory/me`
+17. `PUT /rooms/me/layout`
+18. `PUT /pets/me/equipment`
+19. `PATCH /pets/me/status`
+20. `POST /minigames/{gameId}/results`
 
-친구 집 방문과 메시지는 친구 시스템의 기본 CRUD가 안정화된 뒤 연결하는 것을 권장한다.
+친구 메시지와 보낸 집 초대 목록/초대 취소는 친구 시스템의 기본 CRUD와 우편함 흐름이 안정화된 뒤 연결하는 것을 권장한다.
 
 ## 13. 백엔드와 합의해야 할 사항
 
@@ -1582,7 +1883,7 @@ MVP 개발에서는 다음 순서로 연결하는 것이 좋다.
 5. 친구 코드 대소문자 구분 여부
 6. 친구 요청 거절 후 재신청 가능 여부
 7. 친구 삭제 후 재신청 가능 여부
-8. 친구 집 방문 데이터의 좌표 체계
+8. 친구 집 방문은 초대 수락 응답의 `homeSnapshot`으로 진입하는 정책
 9. 상점 아이템의 `assetKey` 명명 규칙
 10. 재화 보상 계산을 클라이언트가 보낼지 서버가 계산할지 여부
 11. 갤러리 이미지 파일을 서버에 업로드할지 로컬만 사용할지 여부
@@ -1595,7 +1896,8 @@ MVP 개발에서는 다음 순서로 연결하는 것이 좋다.
 18. 펫 성격을 서버가 랜덤 배정할지 사용자가 선택할지 여부
 19. 펫 알 상태가 언제 해제되는지에 대한 부화 조건
 20. 펫 치장 아이템을 단순 id 배열로 관리할지 부위별 슬롯으로 관리할지 여부
-21. 배고픔과 피로도 수치를 클라이언트가 보낼지 서버가 행동 결과로 계산할지 여부
+21. 포만감과 활력 수치를 클라이언트가 보낼지 서버가 행동 결과로 계산할지 여부
+22. 친구 집 초대 만료 시간을 1시간, 24시간, 또는 만료 없음 중 무엇으로 둘지 여부
 
 ## 14. MVP 권장 결정안
 
@@ -1607,6 +1909,8 @@ MVP 개발에서는 다음 순서로 연결하는 것이 좋다.
 - 친구 요청을 수락하면 양방향 친구 관계가 생성된다.
 - 친구 요청을 거절하면 같은 유저에게 재신청을 허용한다.
 - 친구 삭제 후 재신청을 허용한다.
+- 친구 집은 우편함의 집 초대를 수락한 경우에만 진입한다.
+- 친구 집 초대 수락 응답은 `homeSnapshot` 하나로 방, 펫 스냅샷, 방문 시각을 묶어서 내려준다.
 - 채팅은 실시간 socket 없이 REST 메시지 목록으로 시작한다.
 - 상점 구매와 재화 차감은 하나의 트랜잭션으로 서버에서 처리한다.
 - 미니게임 보상 금액은 서버에서 계산한다.
@@ -1618,7 +1922,7 @@ MVP 개발에서는 다음 순서로 연결하는 것이 좋다.
 - 펫 외형과 성격은 최초 생성 시 서버에서 랜덤으로 정한다.
 - 펫 치장 아이템은 MVP에서는 `equippedItemIds` 배열로 관리한다.
 - 착용 아이템이 없으면 `null` 대신 빈 배열 `[]`을 사용한다.
-- 배고픔과 피로도는 MVP에서는 `0`부터 `100` 사이 정수로 관리한다.
+- 포만감과 활력은 MVP에서는 `0`부터 `100` 사이 정수로 관리한다.
 
 ## 15. 클라이언트 구현 메모
 

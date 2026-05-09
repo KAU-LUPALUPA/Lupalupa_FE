@@ -19,8 +19,8 @@ data class PetResponseDto(
 )
 
 data class UpdatePetStatusRequestDto(
-    val hunger: Int? = null,
-    val fatigue: Int? = null,
+    val satiety: Int? = null,
+    val vitality: Int? = null,
     val isEgg: Boolean? = null,
     val action: String? = null,
     val anchor: PetAnchorDto? = null
@@ -62,8 +62,8 @@ data class PetAppearanceDto(
 )
 
 data class PetStatusDto(
-    val hunger: Int,
-    val fatigue: Int,
+    val satiety: Int,
+    val vitality: Int,
     val isEgg: Boolean
 )
 

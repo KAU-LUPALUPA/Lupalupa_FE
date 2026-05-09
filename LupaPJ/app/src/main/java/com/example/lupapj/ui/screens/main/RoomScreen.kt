@@ -40,8 +40,12 @@ import com.example.lupapj.data.model.BottomNavItem
 import com.example.lupapj.data.model.MainMenuAction
 import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.RoomUiState
+import com.example.lupapj.data.model.friend.FriendHomeInvitation
+import com.example.lupapj.data.model.friend.FriendRequest
 import com.example.lupapj.data.model.scene.FloorAnchor
+import com.example.lupapj.ui.components.FloatingMailboxButton
 import com.example.lupapj.ui.components.InventorySheet
+import com.example.lupapj.ui.components.MailboxSheet
 import com.example.lupapj.ui.components.RoomViewport
 import com.example.lupapj.ui.preview.previewRoomUiState
 import com.example.lupapj.ui.theme.LupaPJTheme
@@ -72,7 +76,16 @@ fun RoomScreen(
     onExitCameraMode: () -> Unit,
     currencyAmount: Int,
     purchasedShopItems: List<com.example.lupapj.data.model.ShopItem>,
-    onMinigameClick: () -> Unit
+    onMinigameClick: () -> Unit,
+    mailboxVisible: Boolean,
+    friendRequests: List<FriendRequest>,
+    homeInvitations: List<FriendHomeInvitation>,
+    onMailboxClick: () -> Unit,
+    onMailboxDismiss: () -> Unit,
+    onAcceptFriendRequest: (String) -> Unit,
+    onRejectFriendRequest: (String) -> Unit,
+    onAcceptHomeInvitation: (String) -> Unit,
+    onRejectHomeInvitation: (String) -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val rootView = LocalView.current
@@ -88,6 +101,7 @@ fun RoomScreen(
     }
 
     val room = uiState ?: return
+    val mailboxItemCount = friendRequests.size + homeInvitations.size
 
     Scaffold(
         snackbarHost = {
@@ -119,6 +133,8 @@ fun RoomScreen(
                 )
             } else {
                 LupaMainScreen(
+                    petSatiety = room.pet.status.satiety.coerceIn(0, 100),
+                    petVitality = room.pet.status.vitality.coerceIn(0, 100),
                     recentIconRes = recentMainMenuAction?.iconRes,
                     onRecentActionClick = onButtonAClick,
                     onInventoryClick = onButtonBClick,
@@ -157,6 +173,16 @@ fun RoomScreen(
                         )
                     )
                 }
+            }
+
+            if (!room.isCameraMode && !room.rearrangeMode && mailboxItemCount > 0) {
+                FloatingMailboxButton(
+                    itemCount = mailboxItemCount,
+                    onClick = onMailboxClick,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 198.dp, end = 14.dp)
+                )
             }
 
             if (room.rearrangeMode && room.selectedRearrangeObjectType != null) {
@@ -276,6 +302,18 @@ fun RoomScreen(
             onDismiss = onInventoryDismiss
         )
     }
+
+    if (mailboxVisible) {
+        MailboxSheet(
+            friendRequests = friendRequests,
+            homeInvitations = homeInvitations,
+            onDismiss = onMailboxDismiss,
+            onAcceptFriendRequest = onAcceptFriendRequest,
+            onRejectFriendRequest = onRejectFriendRequest,
+            onAcceptHomeInvitation = onAcceptHomeInvitation,
+            onRejectHomeInvitation = onRejectHomeInvitation
+        )
+    }
 }
 
 private val MainMenuAction.iconRes: Int
@@ -314,7 +352,16 @@ private fun RoomScreenPreview() {
             onExitCameraMode = {},
             currencyAmount = 100,
             purchasedShopItems = emptyList(),
-            onMinigameClick = {}
+            onMinigameClick = {},
+            mailboxVisible = false,
+            friendRequests = emptyList(),
+            homeInvitations = emptyList(),
+            onMailboxClick = {},
+            onMailboxDismiss = {},
+            onAcceptFriendRequest = {},
+            onRejectFriendRequest = {},
+            onAcceptHomeInvitation = {},
+            onRejectHomeInvitation = {}
         )
     }
 }

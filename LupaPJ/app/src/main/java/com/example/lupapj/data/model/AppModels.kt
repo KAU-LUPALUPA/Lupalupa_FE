@@ -71,8 +71,8 @@ data class PetAppearance(
 )
 
 data class PetStatus(
-    val hunger: Int = 80,
-    val fatigue: Int = 20,
+    val satiety: Int = 80,
+    val vitality: Int = 80,
     val isEgg: Boolean = false
 )
 
