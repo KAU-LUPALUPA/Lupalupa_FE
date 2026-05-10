@@ -11,6 +11,7 @@ import com.example.lupapj.data.model.plaza.PlazaOperationResult
 import com.example.lupapj.data.model.plaza.PlazaParticipant
 import com.example.lupapj.data.model.plaza.PlazaPetSnapshot
 import com.example.lupapj.data.model.plaza.PlazaRoom
+import com.example.lupapj.data.model.plaza.PlazaServerTime
 import com.example.lupapj.data.repository.PlazaRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -123,16 +124,21 @@ class MockPlazaRepository(
             ?: return PlazaOperationResult.Failure(PlazaOperationFailure.NOT_IN_PLAZA)
         val me = room.participants.firstOrNull { it.isMe }
             ?: return PlazaOperationResult.Failure(PlazaOperationFailure.NOT_IN_PLAZA)
+        val now = nowProvider()
         val chatMessage = PlazaChatMessage(
             id = "plaza-message-${nextMessageSequence++}",
             plazaId = room.plazaId,
             senderUserId = me.userId,
             senderNickname = me.nickname,
             text = trimmedMessage,
-            sentAtMillis = nowProvider()
+            sentAtMillis = now
         )
 
-        val updatedRoom = room.copy(messages = room.messages + chatMessage)
+        val updatedRoom = room.copy(
+            messages = room.messages + chatMessage,
+            roomRevision = room.roomRevision + 1L,
+            serverTime = serverTimeSnapshot(now)
+        )
         upsertRoom(updatedRoom)
         _activePlaza.value = updatedRoom
         return PlazaOperationResult.Success(chatMessage)
@@ -158,7 +164,9 @@ class MockPlazaRepository(
             plazaCode = plazaCode,
             participants = participants,
             messages = createInitialMessages(plazaId, participants, now),
-            joinedAtMillis = now
+            joinedAtMillis = now,
+            roomRevision = 1L,
+            serverTime = serverTimeSnapshot(now)
         )
     }
 
@@ -182,7 +190,9 @@ class MockPlazaRepository(
         )
         return copy(
             participants = currentParticipants + me,
-            joinedAtMillis = now
+            joinedAtMillis = now,
+            roomRevision = roomRevision + 1L,
+            serverTime = serverTimeSnapshot(now)
         )
     }
 
@@ -215,7 +225,11 @@ class MockPlazaRepository(
             if (participants.isEmpty()) {
                 null
             } else {
-                room.copy(participants = participants)
+                room.copy(
+                    participants = participants,
+                    roomRevision = room.roomRevision + 1L,
+                    serverTime = serverTimeSnapshot()
+                )
             }
         }
 
@@ -272,6 +286,13 @@ class MockPlazaRepository(
         }
     }
 
+    private fun serverTimeSnapshot(serverNowMillis: Long = nowProvider()): PlazaServerTime {
+        return PlazaServerTime(
+            serverNowMillis = serverNowMillis,
+            clientReceivedAtMillis = System.currentTimeMillis()
+        )
+    }
+
     private companion object {
         val demoParticipants = listOf(
             PlazaParticipant(
@@ -307,6 +328,18 @@ class MockPlazaRepository(
                     name = "포포",
                     status = PetStatus(satiety = 64, vitality = 67),
                     personality = PetPersonality.LAZY
+                ),
+                joinedAtMillis = 0L
+            ),
+            PlazaParticipant(
+                userId = "plaza_user_nari",
+                nickname = "나리",
+                pet = plazaPet(
+                    petId = "plaza_pet_nari",
+                    ownerUserId = "plaza_user_nari",
+                    name = "라라",
+                    status = PetStatus(satiety = 79, vitality = 81),
+                    personality = PetPersonality.ACTIVE
                 ),
                 joinedAtMillis = 0L
             )

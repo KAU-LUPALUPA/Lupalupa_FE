@@ -48,6 +48,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,10 +71,12 @@ import com.example.lupapj.data.model.plaza.PlazaChatMessage
 import com.example.lupapj.data.model.plaza.PlazaCode
 import com.example.lupapj.data.model.plaza.PlazaInteractionEvent
 import com.example.lupapj.data.model.plaza.PlazaInteractionType
+import com.example.lupapj.data.model.plaza.PlazaMovementCommand
 import com.example.lupapj.data.model.plaza.PlazaParticipant
 import com.example.lupapj.data.model.plaza.PlazaPetSnapshot
 import com.example.lupapj.data.model.plaza.PlazaPosition
 import com.example.lupapj.data.model.plaza.PlazaRoom
+import com.example.lupapj.data.model.plaza.PlazaServerTime
 import com.example.lupapj.ui.components.AnimatedCharacterSprite
 import com.example.lupapj.ui.components.CharacterAnimation
 import com.example.lupapj.ui.theme.LupaPJTheme
@@ -117,7 +120,7 @@ private const val PLAZA_REST_OFFSET_X = 0.065f
 private const val PLAZA_REST_OFFSET_Y = 0.02f
 
 private data class PlazaChatBubble(
-    val event: PlazaInteractionEvent,
+    val text: String,
     val expiresAtMillis: Long
 )
 
@@ -327,6 +330,8 @@ private fun PlazaRoomContent(
             participants = plaza.participants,
             messages = plaza.messages,
             remoteInteractions = plaza.interactions,
+            serverTime = plaza.serverTime,
+            isServerAuthoritative = plaza.isServerAuthoritative,
             modifier = Modifier.fillMaxWidth()
         )
         PlazaChatPanel(
@@ -404,10 +409,17 @@ private fun PlazaScene(
     participants: List<PlazaParticipant>,
     messages: List<PlazaChatMessage>,
     remoteInteractions: List<PlazaInteractionEvent>,
+    serverTime: PlazaServerTime?,
+    isServerAuthoritative: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val currentServerTime by rememberUpdatedState(serverTime)
     val sceneKey = remember(plazaId, participants) {
-        "$plazaId|${participants.joinToString(separator = "|") { it.userId }}"
+        val stableParticipantIds = participants
+            .map { it.userId }
+            .sorted()
+            .joinToString(separator = "|")
+        "$plazaId|$stableParticipantIds"
     }
     var petPositions by remember(sceneKey) {
         mutableStateOf(
@@ -432,18 +444,24 @@ private fun PlazaScene(
     var seenChatMessageIds by remember(sceneKey) {
         mutableStateOf(messages.map { it.id }.toSet())
     }
-    var seenChatInteractionIds by remember(sceneKey) {
-        mutableStateOf(
-            remoteInteractions
-                .filter { it.type == PlazaInteractionType.CHAT }
-                .map { it.id }
-                .toSet()
-        )
+
+    LaunchedEffect(participants, sceneKey) {
+        val now = currentServerTime.serverNowMillis()
+        val serverPositions = participants
+            .mapNotNull { participant ->
+                participant.authoritativePositionAt(now)?.let { position ->
+                    participant.userId to position
+                }
+            }
+            .toMap()
+        if (serverPositions.isNotEmpty()) {
+            petPositions = petPositions + serverPositions
+        }
     }
 
     LaunchedEffect(messages, sceneKey) {
         val participantIds = participants.map { it.userId }.toSet()
-        val now = System.currentTimeMillis()
+        val now = currentServerTime.serverNowMillis()
         val newMessages = messages.filter { message ->
             message.id !in seenChatMessageIds &&
                 message.senderUserId in participantIds
@@ -455,9 +473,8 @@ private fun PlazaScene(
         val nextBubbles = newMessages
             .takeLast(participants.size.coerceAtLeast(1))
             .mapNotNull { message ->
-                val event = message.toChatInteractionEvent(startedAtMillis = now)
-                event.toChatBubbleEntry(
-                    participantIds = participantIds,
+                message.senderUserId to PlazaChatBubble(
+                    text = message.text.toPlazaChatBubbleText(),
                     expiresAtMillis = now + PLAZA_CHAT_BUBBLE_DURATION_MS
                 )
             }
@@ -467,19 +484,18 @@ private fun PlazaScene(
     }
 
     LaunchedEffect(remoteInteractions, sceneKey) {
-        val actionInteractions = remoteInteractions.filterNot { it.type == PlazaInteractionType.CHAT }
-        if (actionInteractions.isEmpty()) {
+        if (remoteInteractions.isEmpty()) {
             activeRemoteInteraction = null
             return@LaunchedEffect
         }
 
         while (isActive) {
-            val now = System.currentTimeMillis()
-            activeRemoteInteraction = actionInteractions.lastOrNull { interaction ->
-                now in interaction.startedAtMillis..(interaction.startedAtMillis + interaction.durationMillis)
+            val now = currentServerTime.serverNowMillis()
+            activeRemoteInteraction = remoteInteractions.lastOrNull { interaction ->
+                interaction.isActiveAt(now)
             }
 
-            val hasPendingOrActiveInteraction = actionInteractions.any { interaction ->
+            val hasPendingOrActiveInteraction = remoteInteractions.any { interaction ->
                 interaction.startedAtMillis + interaction.durationMillis > now
             }
             if (!hasPendingOrActiveInteraction) break
@@ -488,48 +504,19 @@ private fun PlazaScene(
         }
     }
 
-    LaunchedEffect(remoteInteractions, sceneKey) {
-        val participantIds = participants.map { it.userId }.toSet()
-        val now = System.currentTimeMillis()
-        val chatInteractions = remoteInteractions.filter { it.type == PlazaInteractionType.CHAT }
-        val newChatInteractions = chatInteractions.filter { interaction ->
-            val ownerUserId = interaction.chatBubbleOwnerUserId()
-            interaction.id !in seenChatInteractionIds &&
-                ownerUserId != null &&
-                ownerUserId in participantIds &&
-                interaction.startedAtMillis + interaction.durationMillis > now
-        }
-
-        seenChatInteractionIds = seenChatInteractionIds + chatInteractions.map { it.id }
-        if (newChatInteractions.isEmpty()) return@LaunchedEffect
-
-        val nextBubbles = newChatInteractions
-            .takeLast(participants.size.coerceAtLeast(1))
-            .mapNotNull { interaction ->
-                interaction.toChatBubbleEntry(
-                    participantIds = participantIds,
-                    expiresAtMillis = maxOf(
-                        now + 1_000L,
-                        interaction.startedAtMillis + interaction.durationMillis
-                    )
-                )
-            }
-            .toMap()
-
-        activeChatBubbles = activeChatBubbles + nextBubbles
-    }
-
     LaunchedEffect(activeChatBubbles) {
         if (activeChatBubbles.isEmpty()) return@LaunchedEffect
 
         while (isActive && activeChatBubbles.isNotEmpty()) {
             delay(250L)
-            val now = System.currentTimeMillis()
+            val now = currentServerTime.serverNowMillis()
             activeChatBubbles = activeChatBubbles.filterValues { it.expiresAtMillis > now }
         }
     }
 
-    LaunchedEffect(sceneKey, remoteInteractions) {
+    LaunchedEffect(sceneKey, remoteInteractions, isServerAuthoritative) {
+        if (isServerAuthoritative) return@LaunchedEffect
+
         var scansWithoutNearby = 0
         while (isActive) {
             delay(PLAZA_INTERACTION_SCAN_INTERVAL_MS)
@@ -565,7 +552,8 @@ private fun PlazaScene(
                 plazaId = plazaId,
                 first = interactionPair.first,
                 second = interactionPair.second,
-                positions = petPositions
+                positions = petPositions,
+                startedAtMillis = currentServerTime.serverNowMillis()
             )
             delay(localInteraction?.durationMillis ?: PLAZA_INTERACTION_COOLDOWN_MS)
             localInteraction = null
@@ -590,7 +578,10 @@ private fun PlazaScene(
             val activeInteraction = activeRemoteInteraction ?: localInteraction
             val interactionPresentation = remember(
                 activeInteraction?.id,
-                activeInteraction?.movementTargetByUserId
+                activeInteraction?.movementTargetByUserId,
+                activeInteraction?.facingTargetByUserId,
+                activeInteraction?.animationByUserId,
+                petPositions
             ) {
                 activeInteraction?.toPresentation(petPositions)
             }
@@ -605,32 +596,33 @@ private fun PlazaScene(
                     val interaction = interactionPresentation?.event
                     val interactionPartnerId = interaction?.partnerOf(participant.userId)
                     val chatBubble = activeChatBubbles[participant.userId]
-                    val chatPresentation = chatBubble?.event?.toPresentation(petPositions)
+                    val serverNowMillis = currentServerTime.serverNowMillis()
+                    val authoritativePosition = participant.authoritativePositionAt(
+                        serverNowMillis
+                    )
                     key(participant.userId) {
                         PlazaPetActor(
                             participant = participant,
                             index = index,
+                            authoritativePosition = authoritativePosition,
+                            authoritativeMovement = participant.movement,
+                            serverNowMillis = serverNowMillis,
+                            canWander = !isServerAuthoritative,
                             isInteractionLocked = interactionPresentation
                                 ?.lockedWanderingUserIds
                                 ?.contains(participant.userId) == true,
                             isInteractionAnimating = interactionPresentation
                                 ?.animatedSpriteUserIds
-                                ?.contains(participant.userId) == true ||
-                                chatPresentation
-                                    ?.animatedSpriteUserIds
-                                    ?.contains(participant.userId) == true,
+                                ?.contains(participant.userId) == true,
                             interactionIdleAnimation = interactionPresentation
                                 ?.idleAnimationByUserId
                                 ?.get(participant.userId),
                             interactionText = interaction?.textFor(participant.userId),
                             interactionBubbleColor = interactionPresentation?.bubbleColor,
                             interactionBubbleTextColor = interactionPresentation?.bubbleTextColor,
-                            chatBubbleText = chatBubble
-                                ?.event
-                                ?.textFor(participant.userId)
-                                ?.toPlazaChatBubbleText(),
-                            chatBubbleColor = chatPresentation?.bubbleColor,
-                            chatBubbleTextColor = chatPresentation?.bubbleTextColor,
+                            chatBubbleText = chatBubble?.text,
+                            chatBubbleColor = null,
+                            chatBubbleTextColor = null,
                             movementTargetPosition = interactionPresentation
                                 ?.movementTargetByUserId
                                 ?.get(participant.userId),
@@ -757,6 +749,10 @@ private fun PlazaSceneBackground(
 private fun PlazaPetActor(
     participant: PlazaParticipant,
     index: Int,
+    authoritativePosition: PlazaPosition?,
+    authoritativeMovement: PlazaMovementCommand?,
+    serverNowMillis: Long,
+    canWander: Boolean,
     isInteractionLocked: Boolean,
     isInteractionAnimating: Boolean,
     interactionIdleAnimation: CharacterAnimation?,
@@ -779,13 +775,16 @@ private fun PlazaPetActor(
         val actorHeight = 150.dp
         val actorWidthPx = with(density) { actorWidth.toPx() }
         val actorHeightPx = with(density) { actorHeight.toPx() }
-        var targetPosition by remember(participant.userId, index) {
+        var targetPosition by remember(participant.userId) {
             mutableStateOf(participant.position ?: initialPlazaPetPosition(index, participant.userId))
         }
+        val moveDurationMillis = authoritativeMovement
+            ?.remainingDurationMillis(serverNowMillis)
+            ?: PLAZA_PET_MOVE_DURATION_MS
         val animatedX by animateFloatAsState(
             targetValue = targetPosition.x,
             animationSpec = tween(
-                durationMillis = PLAZA_PET_MOVE_DURATION_MS,
+                durationMillis = moveDurationMillis,
                 easing = FastOutSlowInEasing
             ),
             label = "PlazaPetX"
@@ -793,7 +792,7 @@ private fun PlazaPetActor(
         val animatedY by animateFloatAsState(
             targetValue = targetPosition.y,
             animationSpec = tween(
-                durationMillis = PLAZA_PET_MOVE_DURATION_MS,
+                durationMillis = moveDurationMillis,
                 easing = FastOutSlowInEasing
             ),
             label = "PlazaPetY"
@@ -831,10 +830,25 @@ private fun PlazaPetActor(
             }
         }
 
-        LaunchedEffect(participant.userId, index, isInteractionLocked) {
-            if (isInteractionLocked) return@LaunchedEffect
+        LaunchedEffect(authoritativePosition, authoritativeMovement, isInteractionLocked) {
+            if (!isInteractionLocked) {
+                val movement = authoritativeMovement
+                if (movement != null) {
+                    val startDelayMillis = movement.delayUntilStartMillis(serverNowMillis)
+                    if (startDelayMillis > 0L) {
+                        delay(startDelayMillis)
+                    }
+                    targetPosition = movement.to
+                } else {
+                    targetPosition = authoritativePosition ?: targetPosition
+                }
+            }
+        }
 
-            val random = Random(participant.userId.hashCode() + index * 37)
+        LaunchedEffect(participant.userId, canWander, isInteractionLocked) {
+            if (!canWander || isInteractionLocked) return@LaunchedEffect
+
+            val random = Random(participant.userId.hashCode())
             var currentPosition = targetPosition
             delay(index * 280L)
             while (isActive) {
@@ -1004,48 +1018,46 @@ private fun Random.nextSignedFloat(radius: Float): Float {
     return (nextFloat() * 2f - 1f) * radius
 }
 
+private fun PlazaServerTime?.serverNowMillis(
+    clientNowMillis: Long = System.currentTimeMillis()
+): Long {
+    return this?.currentServerNowMillis(clientNowMillis) ?: clientNowMillis
+}
+
+private fun PlazaParticipant.authoritativePositionAt(nowMillis: Long): PlazaPosition? {
+    return movement?.positionAt(nowMillis) ?: position
+}
+
+private fun PlazaMovementCommand.positionAt(nowMillis: Long): PlazaPosition {
+    val progress = if (durationMillis <= 0L) {
+        1f
+    } else {
+        ((nowMillis - startedAtMillis).toFloat() / durationMillis).coerceIn(0f, 1f)
+    }
+    return PlazaPosition(
+        x = from.x + (to.x - from.x) * progress,
+        y = from.y + (to.y - from.y) * progress
+    )
+}
+
+private fun PlazaMovementCommand.remainingDurationMillis(nowMillis: Long): Int {
+    val elapsedMillis = (nowMillis - startedAtMillis).coerceAtLeast(0L)
+    val remainingMillis = (durationMillis - elapsedMillis).coerceAtLeast(0L)
+    return remainingMillis.coerceIn(250L, 6_000L).toInt()
+}
+
+private fun PlazaMovementCommand.delayUntilStartMillis(nowMillis: Long): Long {
+    return (startedAtMillis - nowMillis).coerceAtLeast(0L)
+}
+
+private fun PlazaInteractionEvent.isActiveAt(nowMillis: Long): Boolean {
+    return startedAtMillis <= nowMillis && nowMillis <= startedAtMillis + durationMillis
+}
+
 private fun String.toPlazaChatBubbleText(): String {
     val compactText = trim().replace(Regex("\\s+"), " ")
     if (compactText.length <= PLAZA_CHAT_BUBBLE_MAX_LENGTH) return compactText
     return compactText.take(PLAZA_CHAT_BUBBLE_MAX_LENGTH - 3) + "..."
-}
-
-private fun PlazaChatMessage.toChatInteractionEvent(startedAtMillis: Long): PlazaInteractionEvent {
-    return PlazaInteractionEvent(
-        id = "chat-message-$id",
-        plazaId = plazaId,
-        type = PlazaInteractionType.CHAT,
-        actorUserId = senderUserId,
-        textByUserId = mapOf(senderUserId to text.toPlazaChatBubbleText()),
-        startedAtMillis = startedAtMillis,
-        durationMillis = PLAZA_CHAT_BUBBLE_DURATION_MS
-    )
-}
-
-private fun PlazaInteractionEvent.toChatBubbleEntry(
-    participantIds: Set<String>,
-    expiresAtMillis: Long
-): Pair<String, PlazaChatBubble>? {
-    if (type != PlazaInteractionType.CHAT) return null
-    val ownerUserId = chatBubbleOwnerUserId()
-        ?.takeIf { it in participantIds }
-        ?: return null
-
-    return ownerUserId to PlazaChatBubble(
-        event = copy(
-            textByUserId = textByUserId.mapValues { (_, text) -> text.toPlazaChatBubbleText() }
-        ),
-        expiresAtMillis = expiresAtMillis
-    )
-}
-
-private fun PlazaInteractionEvent.chatBubbleOwnerUserId(): String? {
-    return when {
-        actorUserId in textByUserId -> actorUserId
-        targetUserId != null && targetUserId in textByUserId -> targetUserId
-        textByUserId.isNotEmpty() -> textByUserId.keys.first()
-        else -> actorUserId
-    }
 }
 
 private fun closestPlazaParticipantPair(
@@ -1082,18 +1094,18 @@ private fun createPlazaInteraction(
     plazaId: String,
     first: PlazaParticipant,
     second: PlazaParticipant,
-    positions: Map<String, PlazaPosition>
+    positions: Map<String, PlazaPosition>,
+    startedAtMillis: Long
 ): PlazaInteractionEvent {
-    val now = System.currentTimeMillis()
     val type = chooseLocalInteractionType(
         first = first,
         second = second,
         positions = positions,
-        now = now
+        now = startedAtMillis
     )
-    val phrase = phraseForInteractionType(type, now)
+    val phrase = phraseForInteractionType(type, startedAtMillis)
     val interaction = PlazaInteractionEvent(
-        id = "local-interaction-${type.name.lowercase()}-${first.userId}-${second.userId}-$now",
+        id = "local-interaction-${type.name.lowercase()}-${first.userId}-${second.userId}-$startedAtMillis",
         plazaId = plazaId,
         type = type,
         actorUserId = first.userId,
@@ -1102,7 +1114,7 @@ private fun createPlazaInteraction(
             first.userId to phrase.first,
             second.userId to phrase.second
         ),
-        startedAtMillis = now,
+        startedAtMillis = startedAtMillis,
         durationMillis = durationForInteractionType(type)
     )
     return interaction.copy(
@@ -1166,10 +1178,6 @@ private fun phraseForInteractionType(
             "이쪽이야!" to "알겠어!",
             "같이 가자!" to "좋아!"
         )
-
-        PlazaInteractionType.CHAT -> listOf(
-            "말 걸었어!" to "들었어!"
-        )
     }
     return phrases[now.mod(phrases.size)]
 }
@@ -1180,7 +1188,6 @@ private fun durationForInteractionType(type: PlazaInteractionType): Long {
         PlazaInteractionType.PLAY -> 2_900L
         PlazaInteractionType.REST -> 2_800L
         PlazaInteractionType.FOLLOW -> 3_100L
-        PlazaInteractionType.CHAT -> PLAZA_CHAT_BUBBLE_DURATION_MS
     }
 }
 
@@ -1188,16 +1195,19 @@ private fun PlazaInteractionEvent.toPresentation(
     positions: Map<String, PlazaPosition>
 ): PlazaInteractionPresentation {
     val movementTargets = movementTargetsForInteraction(positions)
+    val serverAnimations = animationByUserId.toCharacterAnimations()
     return PlazaInteractionPresentation(
         event = this,
         movementTargetByUserId = movementTargets,
-        facingTargetByUserId = facingTargetsForInteraction(
-            positions = positions,
-            movementTargets = movementTargets
-        ),
+        facingTargetByUserId = facingTargetByUserId.ifEmpty {
+            facingTargetsForInteraction(
+                positions = positions,
+                movementTargets = movementTargets
+            )
+        },
         lockedWanderingUserIds = lockedWanderingUsersForInteraction(),
-        animatedSpriteUserIds = animatedSpriteUsersForInteraction(),
-        idleAnimationByUserId = idleAnimationsForInteraction(),
+        animatedSpriteUserIds = animatedSpriteUsersForInteraction() + serverAnimations.keys,
+        idleAnimationByUserId = idleAnimationsForInteraction() + serverAnimations,
         bubbleColor = bubbleColorForInteractionType(type),
         bubbleTextColor = bubbleTextColorForInteractionType(type)
     )
@@ -1213,8 +1223,15 @@ private fun PlazaInteractionEvent.movementTargetsForInteraction(
         PlazaInteractionType.PLAY -> playMovementTargets(positions)
         PlazaInteractionType.REST -> restMovementTargets(positions)
         PlazaInteractionType.FOLLOW -> followMovementTargets(positions)
-        else -> emptyMap()
     }
+}
+
+private fun Map<String, String>.toCharacterAnimations(): Map<String, CharacterAnimation> {
+    return mapNotNull { (userId, animationName) ->
+        CharacterAnimation.values()
+            .firstOrNull { it.name.equals(animationName, ignoreCase = true) }
+            ?.let { animation -> userId to animation }
+    }.toMap()
 }
 
 private fun PlazaInteractionEvent.greetMovementTargets(
@@ -1345,7 +1362,6 @@ private fun PlazaInteractionEvent.animatedSpriteUsersForInteraction(): Set<Strin
         PlazaInteractionType.PLAY,
         PlazaInteractionType.FOLLOW -> userIds
 
-        PlazaInteractionType.CHAT -> userIds + textByUserId.keys
         PlazaInteractionType.REST -> emptySet()
     }
 }
@@ -1365,8 +1381,6 @@ private fun PlazaInteractionEvent.lockedWanderingUsersForInteraction(): Set<Stri
         PlazaInteractionType.PLAY,
         PlazaInteractionType.REST,
         PlazaInteractionType.FOLLOW -> userIds
-
-        PlazaInteractionType.CHAT -> emptySet()
     }
 }
 
@@ -1376,14 +1390,12 @@ private fun bubbleColorForInteractionType(type: PlazaInteractionType): Color {
         PlazaInteractionType.PLAY -> Color(0xFFFFE58F)
         PlazaInteractionType.REST -> Color(0xFFDDF4C7)
         PlazaInteractionType.FOLLOW -> Color(0xFFD7ECFF)
-        PlazaInteractionType.CHAT -> Color.White.copy(alpha = 0.95f)
     }
 }
 
 private fun bubbleTextColorForInteractionType(type: PlazaInteractionType): Color {
     return when (type) {
-        PlazaInteractionType.GREET,
-        PlazaInteractionType.CHAT -> Color(0xFF3A3328)
+        PlazaInteractionType.GREET -> Color(0xFF3A3328)
 
         PlazaInteractionType.PLAY -> Color(0xFF5D4200)
         PlazaInteractionType.REST -> Color(0xFF264B21)

@@ -2,12 +2,12 @@ package com.example.lupapj.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,6 +19,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -27,6 +28,7 @@ import androidx.compose.ui.window.Dialog
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.platform.LocalContext
+import com.example.lupapj.data.remote.ServerConfig
 
 private val KakaoYellow = Color(0xFFFEE500)
 private val KakaoBlack = Color(0xFF191919)
@@ -39,6 +41,20 @@ fun AuthPopup(
     onDevLoginClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val devLoginModifier = if (isDevLoginEnabled) {
+        Modifier.pointerInput(isProcessingLogin) {
+            detectTapGestures(
+                onLongPress = {
+                    if (!isProcessingLogin) {
+                        onDevLoginClick()
+                    }
+                }
+            )
+        }
+    } else {
+        Modifier
+    }
+
     Dialog(onDismissRequest = {}) {
         Surface(
             modifier = Modifier
@@ -57,6 +73,7 @@ fun AuthPopup(
             ) {
                 Text(
                     text = "로그인",
+                    modifier = devLoginModifier,
                     color = KakaoBlack,
                     fontSize = 34.sp,
                     fontWeight = FontWeight.ExtraBold,
@@ -79,7 +96,7 @@ fun AuthPopup(
                         onKakaoLoginClick()
                         val intent = Intent(
                             Intent.ACTION_VIEW,
-                            Uri.parse("http://54.180.145.58:8080/oauth2/authorization/kakao")
+                            Uri.parse(ServerConfig.KAKAO_AUTH_URL)
                         )
                         context.startActivity(intent)
                     },
@@ -128,29 +145,6 @@ fun AuthPopup(
                         )
 
                         Spacer(modifier = Modifier.width(48.dp))
-                    }
-                }
-
-                if (isDevLoginEnabled) {
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    OutlinedButton(
-                        onClick = onDevLoginClick,
-                        enabled = !isProcessingLogin,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFF4A4A4A),
-                            disabledContentColor = Color(0xFF9A9A9A)
-                        )
-                    ) {
-                        Text(
-                            text = "개발용 입장",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
                     }
                 }
 

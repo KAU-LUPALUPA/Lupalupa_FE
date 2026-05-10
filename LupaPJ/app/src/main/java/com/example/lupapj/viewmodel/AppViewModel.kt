@@ -123,7 +123,18 @@ class AppViewModel(
         }
         viewModelScope.launch {
             plazaRepository.activePlaza.collect { plaza ->
-                _uiState.update { it.copy(activePlaza = plaza) }
+                _uiState.update { state ->
+                    val currentPlaza = state.activePlaza
+                    if (
+                        plaza != null &&
+                        currentPlaza?.plazaId == plaza.plazaId &&
+                        plaza.roomRevision <= currentPlaza.roomRevision
+                    ) {
+                        state
+                    } else {
+                        state.copy(activePlaza = plaza)
+                    }
+                }
             }
         }
         

@@ -68,13 +68,31 @@ data class PlazaPosition(
     val y: Float
 )
 
+data class PlazaMovementCommand(
+    val from: PlazaPosition,
+    val to: PlazaPosition,
+    val startedAtMillis: Long,
+    val durationMillis: Long
+)
+
+data class PlazaServerTime(
+    val serverNowMillis: Long,
+    val clientReceivedAtMillis: Long
+) {
+    fun currentServerNowMillis(clientNowMillis: Long): Long {
+        return serverNowMillis + (clientNowMillis - clientReceivedAtMillis)
+    }
+}
+
 data class PlazaParticipant(
     val userId: String,
     val nickname: String,
     val pet: PlazaPetSnapshot,
     val joinedAtMillis: Long,
     val isMe: Boolean = false,
-    val position: PlazaPosition? = null
+    val position: PlazaPosition? = null,
+    val movement: PlazaMovementCommand? = null,
+    val positionUpdatedAtMillis: Long? = null
 )
 
 data class PlazaChatMessage(
@@ -88,7 +106,6 @@ data class PlazaChatMessage(
 
 enum class PlazaInteractionType {
     GREET,
-    CHAT,
     PLAY,
     REST,
     FOLLOW
@@ -103,7 +120,10 @@ data class PlazaInteractionEvent(
     val textByUserId: Map<String, String> = emptyMap(),
     val startedAtMillis: Long,
     val durationMillis: Long,
-    val movementTargetByUserId: Map<String, PlazaPosition> = emptyMap()
+    val movementTargetByUserId: Map<String, PlazaPosition> = emptyMap(),
+    val facingTargetByUserId: Map<String, PlazaPosition> = emptyMap(),
+    val animationByUserId: Map<String, String> = emptyMap(),
+    val metadata: Map<String, String> = emptyMap()
 )
 
 data class PlazaRoom(
@@ -113,7 +133,10 @@ data class PlazaRoom(
     val messages: List<PlazaChatMessage> = emptyList(),
     val interactions: List<PlazaInteractionEvent> = emptyList(),
     val maxParticipants: Int = PLAZA_MAX_PARTICIPANTS,
-    val joinedAtMillis: Long
+    val joinedAtMillis: Long,
+    val roomRevision: Long = 0L,
+    val serverTime: PlazaServerTime? = null,
+    val isServerAuthoritative: Boolean = false
 ) {
     val displayCode: String
         get() = PlazaCode.display(plazaCode.value)
