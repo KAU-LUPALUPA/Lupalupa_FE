@@ -53,7 +53,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
-
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 @Composable
 fun RoomScreen(
     uiState: RoomUiState?,
@@ -186,7 +189,7 @@ fun RoomScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Text(
-                            text = "현재 재배치 중입니다. 가구를 누른 뒤 화살표로 이동하세요.",
+                            text = "현재 재배치 중입니다.",
                             color = Color(0xFF5C4033)
                         )
 
@@ -214,7 +217,18 @@ fun RoomScreen(
                         .padding(top = 198.dp, end = 14.dp)
                 )
             }
-
+            if (room.rearrangeMode) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(110.dp)
+                        .background(Color.Transparent)
+                        .clickable(enabled = true) {
+                            // 재배치 중 하단 메뉴 클릭만 막기
+                        }
+                )
+            }
             if (room.rearrangeMode && room.selectedRearrangeObjectType != null) {
 
                 Column(
