@@ -38,7 +38,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.random.Random
-
+import com.example.lupapj.ui.screens.main.RearrangeController
 private const val FOOD_CONSUME_AFTER_TRAVEL_DELAY_MS = 900L
 private const val FOOD_CONSUME_PAUSE_MS = 650L
 private const val AUTONOMOUS_MOVEMENT_RETRY_DELAY_MS = 800L
