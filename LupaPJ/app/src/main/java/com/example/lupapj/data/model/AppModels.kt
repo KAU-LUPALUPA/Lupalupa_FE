@@ -28,6 +28,7 @@ enum class AppPhase {
     GALLERY, // [추가됨] 갤러리 화면 상태 추가
     FRIENDS,
     FRIEND_ROOM,
+    PLAZA,
     SHOP,        // [추가됨(권)] 상점 메인 화면 페이즈. 상점 하단 탭 클릭 시 진입.
     SHOP_DETAIL, // [추가됨(권)] 상점 아이템 상세 및 치장 미리보기 화면 페이즈. 아이템 클릭 시 진입.
     MINIGAME     // [추가됨(권)] 미니게임 플레이 화면 페이즈.

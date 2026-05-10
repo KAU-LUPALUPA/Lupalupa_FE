@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.lupapj.BuildConfig
 import com.example.lupapj.data.model.AppPhase
 import com.example.lupapj.ui.screens.friends.FriendRoomScreen
 import com.example.lupapj.ui.screens.friends.FriendScreen
@@ -15,6 +16,7 @@ import com.example.lupapj.ui.screens.gallery.GalleryScreen
 import com.example.lupapj.ui.screens.main.MainLoadingScreen
 import com.example.lupapj.ui.screens.main.RoomScreen
 import com.example.lupapj.ui.screens.minigame.MinigameScreen
+import com.example.lupapj.ui.screens.plaza.PlazaScreen
 import com.example.lupapj.ui.screens.shop.ShopDetailScreen
 import com.example.lupapj.ui.screens.shop.ShopScreen
 import com.example.lupapj.viewmodel.AppViewModel
@@ -30,6 +32,7 @@ fun LupaApp(deepLink: Uri? = null) {
             roomRepository = container.roomRepository,
             galleryRepository = container.galleryRepository,
             friendRepository = container.friendRepository,
+            plazaRepository = container.plazaRepository,
             currencyRepository = container.currencyRepository,
             shopRepository = container.shopRepository
         )
@@ -57,7 +60,9 @@ fun LupaApp(deepLink: Uri? = null) {
                 authPopupVisible = uiState.authPopupVisible,
                 isProcessingLogin = uiState.isProcessingLogin,
                 galleryImages = uiState.galleryImages,
-                onKakaoLoginClick = appViewModel::onKakaoLoginClick
+                isDevLoginEnabled = BuildConfig.DEBUG,
+                onKakaoLoginClick = appViewModel::onKakaoLoginClick,
+                onDevLoginClick = appViewModel::onDevLoginClick
             )
         }
 
@@ -91,7 +96,7 @@ fun LupaApp(deepLink: Uri? = null) {
                 purchasedShopItems = uiState.shopItems.filter { item ->
                     uiState.purchasedItems.any { it.masterId == item.id }
                 },
-                onMinigameClick = appViewModel::openMinigame,
+                onPlaygroundClick = appViewModel::openPlaza,
                 mailboxVisible = uiState.mailboxVisible,
                 friendRequests = uiState.receivedFriendRequests,
                 homeInvitations = uiState.receivedHomeInvitations,
@@ -149,6 +154,25 @@ fun LupaApp(deepLink: Uri? = null) {
                 onSendMessage = appViewModel::sendFriendMessage,
                 onBackToFriendsClick = appViewModel::backToFriendsFromFriendRoom,
                 onReturnHomeClick = appViewModel::returnHomeFromFriendRoom
+            )
+        }
+
+        AppPhase.PLAZA -> {
+            PlazaScreen(
+                activePlaza = uiState.activePlaza,
+                codeInput = uiState.plazaCodeInput,
+                messageInput = uiState.plazaMessageInput,
+                isJoining = uiState.isJoiningPlaza,
+                isSendingMessage = uiState.isSendingPlazaMessage,
+                feedbackMessage = uiState.plazaFeedbackMessage,
+                onRandomJoin = appViewModel::joinRandomPlaza,
+                onCodeInputChange = appViewModel::onPlazaCodeChange,
+                onCodeJoin = appViewModel::joinPlazaByCode,
+                onMessageInputChange = appViewModel::onPlazaMessageChange,
+                onSendMessage = appViewModel::sendPlazaMessage,
+                onLeavePlaza = appViewModel::leaveCurrentPlaza,
+                onBackHome = appViewModel::returnHomeFromPlaza,
+                onFeedbackConsumed = appViewModel::onPlazaFeedbackConsumed
             )
         }
 

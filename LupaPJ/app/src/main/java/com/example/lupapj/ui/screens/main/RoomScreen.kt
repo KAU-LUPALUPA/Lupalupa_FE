@@ -84,7 +84,7 @@ fun RoomScreen(
     onExitCameraMode: () -> Unit,
     currencyAmount: Int,
     purchasedShopItems: List<com.example.lupapj.data.model.ShopItem>,
-    onMinigameClick: () -> Unit,
+    onPlaygroundClick: () -> Unit,
     mailboxVisible: Boolean,
     friendRequests: List<FriendRequest>,
     homeInvitations: List<FriendHomeInvitation>,
@@ -157,7 +157,7 @@ fun RoomScreen(
                     onInventoryClick = onButtonBClick,
                     onSettingClick = onSettingsClick,
                     onPopupMenuItemClick = onBottomNavItemClick,
-                    onPlaygroundClick = onMinigameClick,
+                    onPlaygroundClick = onPlaygroundClick,
                     roomContent = {
                         RoomViewport(
                             uiState = room,
@@ -453,7 +453,7 @@ private fun RoomScreenPreview() {
             onExitCameraMode = {},
             currencyAmount = 100,
             purchasedShopItems = emptyList(),
-            onMinigameClick = {},
+            onPlaygroundClick = {},
             mailboxVisible = false,
             friendRequests = emptyList(),
             homeInvitations = emptyList(),

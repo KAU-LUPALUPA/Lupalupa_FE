@@ -11,6 +11,7 @@ import com.example.lupapj.data.model.friend.FriendRequest
 import com.example.lupapj.data.model.friend.FriendSummary
 import com.example.lupapj.data.model.friend.FriendUser
 import com.example.lupapj.data.model.InventoryItem // [추가됨]
+import com.example.lupapj.data.model.plaza.PlazaRoom // [보존] 팀원 작업 내용
 import com.example.lupapj.data.model.ShopItem // [추가됨(권)] 상점 아이템 데이터 모델 Import
 
 data class AppUiState(
@@ -36,6 +37,12 @@ data class AppUiState(
     val isSendingFriendMessage: Boolean = false,
     val friendFeedbackMessage: String? = null,
     val mailboxVisible: Boolean = false,
+    val activePlaza: PlazaRoom? = null, // [보존] 팀원 작업 내용
+    val plazaCodeInput: String = "", // [보존] 팀원 작업 내용
+    val plazaMessageInput: String = "", // [보존] 팀원 작업 내용
+    val isJoiningPlaza: Boolean = false, // [보존] 팀원 작업 내용
+    val isSendingPlazaMessage: Boolean = false, // [보존] 팀원 작업 내용
+    val plazaFeedbackMessage: String? = null, // [보존] 팀원 작업 내용
     
     // [추가됨(권)] 상점 및 재화 관련 상태
     val currencyAmount: Long = 0L, // [추가됨(권)] 현재 보유한 재화 양
