@@ -12,6 +12,16 @@ import com.example.lupapj.data.model.scene.WallFace
 import com.example.lupapj.data.model.scene.WallPlaneSpec
 import com.example.lupapj.data.model.scene.initialHouseSceneState
 
+// [추가됨(권)] 행동 디버깅용 정보
+data class BehaviorDebugInfo(
+    val consecutiveTicks: Int = 0,
+    val currentProbability: Float = 0f,
+    val isCrisis: Boolean = false,
+    val isVisible: Boolean = false,
+    val mValue: Float = 0f,
+    val kValue: Float = 0f
+)
+
 enum class AppPhase {
     MAIN_LOADING,
     ROOM,
@@ -47,6 +57,7 @@ enum class PetAction {
     IDLE,
     WALKING,
     RESTING,
+    BED_RESTING, // [추가됨(권)] 침대 휴식
     PLAYING,
     EATING
 }
@@ -71,8 +82,8 @@ data class PetAppearance(
 )
 
 data class PetStatus(
-    val satiety: Int = 80,
-    val vitality: Int = 80,
+    val satiety: Int = 100, // [수정됨(권)] 서버 초기값과 일치
+    val vitality: Int = 100, // [수정됨(권)] 서버 초기값과 일치
     val isEgg: Boolean = false
 )
 
@@ -170,6 +181,7 @@ val PetAction.label: String
         PetAction.IDLE -> "대기 중"
         PetAction.WALKING -> "산책 중"
         PetAction.RESTING -> "휴식 중"
+        PetAction.BED_RESTING -> "침대에서 휴식 중" // [추가됨(권)]
         PetAction.PLAYING -> "노는 중"
         PetAction.EATING -> "먹는 중"
     }

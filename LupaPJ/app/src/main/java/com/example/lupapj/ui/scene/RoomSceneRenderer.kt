@@ -1,7 +1,11 @@
 package com.example.lupapj.ui.scene
 
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -29,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -36,6 +41,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -130,10 +136,12 @@ fun RoomSceneRenderer(
         val viewportWidthPx = with(density) { maxWidth.toPx() }
         val viewportHeightPx = with(density) { maxHeight.toPx() }
 
+        val petMovementDuration = (PET_MOVE_DURATION_MS / houseSceneState.pet.movement.speedMultiplier).toInt()
+
         val animatedPetU by animateFloatAsState(
             targetValue = houseSceneState.pet.anchor.u,
             animationSpec = tween(
-                durationMillis = PET_MOVE_DURATION_MS,
+                durationMillis = petMovementDuration,
                 easing = FastOutSlowInEasing
             ),
             label = "PetAnchorU"
@@ -141,7 +149,7 @@ fun RoomSceneRenderer(
         val animatedPetV by animateFloatAsState(
             targetValue = houseSceneState.pet.anchor.v,
             animationSpec = tween(
-                durationMillis = PET_MOVE_DURATION_MS,
+                durationMillis = petMovementDuration,
                 easing = FastOutSlowInEasing
             ),
             label = "PetAnchorV"
@@ -151,8 +159,8 @@ fun RoomSceneRenderer(
             v = animatedPetV
         )
         val isPetMoving =
-            abs(animatedPetU - houseSceneState.pet.anchor.u) > 0.0015f ||
-                abs(animatedPetV - houseSceneState.pet.anchor.v) > 0.0015f
+            abs(animatedPetU - houseSceneState.pet.anchor.u) > 0.0005f ||
+                abs(animatedPetV - houseSceneState.pet.anchor.v) > 0.0005f
         var lockedPetAnimation by remember { mutableStateOf(CharacterAnimation.Row3) }
         LaunchedEffect(houseSceneState.pet.anchor) {
             lockedPetAnimation = resolveCharacterAnimationForMovement(
@@ -255,7 +263,13 @@ fun RoomSceneRenderer(
                                         .fillMaxSize()
                                         .petMovementStyle(
                                             style = houseSceneState.pet.movement.style,
-                                            isMoving = isPetMoving
+                                            isMoving = isPetMoving,
+                                            bouncePx = houseSceneState.pet.movement.bouncePx,
+                                            durationMillis = petMovementDuration
+                                        )
+                                        // [수정됨(권)] 옆으로 눕기 플래그가 활성화된 경우에만 회전 애니메이션 적용
+                                        .petRestingStyle(
+                                            isResting = houseSceneState.pet.isLyingSide
                                         ),
                                     animation = petAnimation,
                                     appearance = houseSceneState.pet.appearance,
@@ -274,7 +288,34 @@ fun RoomSceneRenderer(
                             }
 
                             is FloorRenderableModel.ToyRenderable -> {
-                                ToyPlaceholder()
+                                val isPlaying = houseSceneState.pet.action == com.example.lupapj.data.model.PetAction.PLAYING
+                                // ToyRenderable은 항상 droppedToyAnchor를 기반으로 생성되므로 isTargetToy는 참으로 간주
+                                val isKnocked = houseSceneState.currentSceneRuntime.isToyKnockedOver
+
+                                val rotation by animateFloatAsState(
+                                    targetValue = if (isKnocked) 90f else 0f,
+                                    animationSpec = tween(durationMillis = 500, easing = androidx.compose.animation.core.LinearOutSlowInEasing),
+                                    label = "ToyRotation"
+                                )
+
+                                val shakeTransition = rememberInfiniteTransition(label = "ToyShake")
+                                val shakeValue by shakeTransition.animateFloat(
+                                    initialValue = -1.5f,
+                                    targetValue = 1.5f,
+                                    animationSpec = infiniteRepeatable(
+                                        animation = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                                        repeatMode = RepeatMode.Reverse
+                                    ),
+                                    label = "Shake"
+                                )
+
+                                val finalRotation = rotation + if (isPlaying || isKnocked) shakeValue else 0f
+
+                                Box(modifier = Modifier.graphicsLayer {
+                                    rotationZ = finalRotation
+                                }) {
+                                    ToyPlaceholder()
+                                }
                             }
                         }
                     }
@@ -493,14 +534,51 @@ private fun projectSceneObject(
 
 private fun Modifier.petMovementStyle(
     style: PetMovementStyle,
-    isMoving: Boolean
-): Modifier {
-    if (!isMoving) return this
+    isMoving: Boolean,
+    bouncePx: Float = 0f,
+    durationMillis: Int = 1000
+): Modifier = composed {
+    if (!isMoving || bouncePx <= 0f) return@composed this
 
-    return when (style) {
+    when (style) {
         PetMovementStyle.SMOOTH -> this
-        // Bounce rendering will plug in here without changing destination-picking logic.
-        PetMovementStyle.BOUNCY -> this
+        PetMovementStyle.BOUNCY -> {
+            val infiniteTransition = rememberInfiniteTransition(label = "BounceTransition")
+            val yOffset by infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = -bouncePx,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = 250, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "BounceOffset"
+            )
+            this.graphicsLayer { translationY = yOffset }
+        }
+    }
+}
+
+private fun Modifier.petRestingStyle(
+    isResting: Boolean
+): Modifier = composed {
+    if (!isResting) return@composed this
+
+    val infiniteTransition = rememberInfiniteTransition(label = "RestingBreathing")
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "BreathingScale"
+    )
+
+    this.graphicsLayer {
+        rotationZ = 90f // 옆으로 누운 자세
+        scaleX = scale
+        scaleY = scale * 0.85f // 약간 납작해진 느낌
+        translationX = 15f // 회전으로 인한 중심축 이탈 보정
     }
 }
 

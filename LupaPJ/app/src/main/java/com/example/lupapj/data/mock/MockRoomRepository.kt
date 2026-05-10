@@ -13,9 +13,15 @@ import com.example.lupapj.data.model.scene.RoomSceneRuntimeState
 import com.example.lupapj.data.model.scene.SceneObjectDefinition
 import com.example.lupapj.data.model.scene.initialHouseSceneState
 import com.example.lupapj.data.repository.RoomRepository
+import com.example.lupapj.data.model.scene.updateCurrentSceneRuntime
+import com.example.lupapj.data.model.scene.updatePet
+import com.example.lupapj.data.model.scene.updatePetStatus
 import kotlinx.coroutines.delay
 
-class MockRoomRepository : RoomRepository {
+class MockRoomRepository(
+    private val localCache: com.example.lupapj.data.local.RoomLocalCache
+) : RoomRepository {
+    private var isInitialized = false
 
     private var roomState = initialRoomUiState(
         sceneDefinition = DemoScenes.mainRoom,
@@ -39,6 +45,20 @@ class MockRoomRepository : RoomRepository {
     )
 
     override suspend fun getRoom(): RoomUiState {
+        if (!isInitialized) {
+            val food = localCache.getDroppedFood()
+            val toy = localCache.getDroppedToy()
+            roomState = roomState.copy(
+                houseSceneState = roomState.houseSceneState.updateCurrentSceneRuntime {
+                    it.copy(
+                        droppedFoodAnchor = food?.let { FloorAnchor(it.first, it.second) },
+                        droppedToyAnchor = toy?.let { FloorAnchor(it.first, it.second) },
+                        isToyKnockedOver = toy?.third ?: false
+                    )
+                }
+            )
+            isInitialized = true
+        }
         delay(180)
         return roomState
     }
@@ -50,13 +70,7 @@ class MockRoomRepository : RoomRepository {
             RoomObjectType.BED -> roomState.copy(
                 feedMode = false,
                 toyMode = false,
-                houseSceneState = roomState.houseSceneState.updatePet(
-                    action = PetAction.RESTING,
-                    anchor = roomState.resolveFloorObjectAnchor(
-                        objectType = RoomObjectType.BED,
-                        fallback = FloorAnchor(u = 0.33f, v = 0.62f)
-                    )
-                ).updateCurrentSceneRuntime {
+                houseSceneState = roomState.houseSceneState.updateCurrentSceneRuntime {
                     it.copy(
                         droppedFoodAnchor = null,
                         droppedToyAnchor = null
@@ -90,6 +104,7 @@ class MockRoomRepository : RoomRepository {
             v = position.v.coerceIn(0.28f, 0.84f)
         )
 
+        // [수정됨(권)] 사료 배치 시 펫이 즉시 순간이동하지 않도록 로컬 펫 상태 업데이트 로직 제거
         roomState = roomState.copy(
             feedMode = false,
             toyMode = false,
@@ -97,14 +112,8 @@ class MockRoomRepository : RoomRepository {
                 .updateCurrentSceneRuntime {
                     it.copy(droppedFoodAnchor = clampedAnchor)
                 }
-                .updatePet(
-                    action = PetAction.EATING,
-                    anchor = FloorAnchor(
-                        u = clampedAnchor.u,
-                        v = (clampedAnchor.v - 0.05f).coerceAtLeast(0.22f)
-                    )
-                )
         )
+        localCache.saveDroppedFood(clampedAnchor.u, clampedAnchor.v)
 
         return roomState
     }
@@ -126,6 +135,7 @@ class MockRoomRepository : RoomRepository {
                     next = PetAction.IDLE
                 )
         )
+        localCache.saveDroppedFood(null, null)
 
         return roomState
     }
@@ -140,21 +150,19 @@ class MockRoomRepository : RoomRepository {
             v = position.v.coerceIn(0.28f, 0.84f)
         )
 
+        // [수정됨(권)] 장난감 배치 시 펫이 즉시 순간이동하지 않도록 로컬 펫 상태 업데이트 로직 제거
         roomState = roomState.copy(
             feedMode = false,
             toyMode = false,
             houseSceneState = roomState.houseSceneState
                 .updateCurrentSceneRuntime {
-                    it.copy(droppedToyAnchor = clampedAnchor)
-                }
-                .updatePet(
-                    action = PetAction.PLAYING,
-                    anchor = FloorAnchor(
-                        u = clampedAnchor.u,
-                        v = (clampedAnchor.v - 0.04f).coerceAtLeast(0.22f)
+                    it.copy(
+                        droppedToyAnchor = clampedAnchor,
+                        isToyKnockedOver = false // 새로 놓을 때는 다시 똑바로 세움
                     )
-                )
+                }
         )
+        localCache.saveDroppedToy(clampedAnchor.u, clampedAnchor.v, isKnockedOver = false)
 
         return roomState
     }
@@ -166,6 +174,15 @@ class MockRoomRepository : RoomRepository {
 
         roomState = room
 
+        return roomState
+    }
+    override suspend fun updateToyKnockedOver(isKnockedOver: Boolean): RoomUiState {
+        roomState = roomState.copy(
+            houseSceneState = roomState.houseSceneState.updateCurrentSceneRuntime {
+                it.copy(isToyKnockedOver = isKnockedOver)
+            }
+        )
+        localCache.saveToyKnockedOver(isKnockedOver)
         return roomState
     }
 }

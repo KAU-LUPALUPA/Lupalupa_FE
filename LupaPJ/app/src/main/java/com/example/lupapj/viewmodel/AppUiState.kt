@@ -43,5 +43,6 @@ data class AppUiState(
     val purchasedItems: List<InventoryItem> = emptyList(), // [변경됨(권)] 보유 중인 상점 아이템 (인스턴스 정보 포함)
     val selectedShopItem: ShopItem? = null, // [추가됨(권)] 상세 화면에서 보고 있는 선택된 아이템
     val isPurchasing: Boolean = false, // [추가됨(권)] 구매 진행 중 로딩 상태 표시
-    val shopFeedbackMessage: String? = null // [추가됨(권)] 상점 구매 성공/실패 메시지 팝업용
+    val shopFeedbackMessage: String? = null, // [추가됨(권)] 상점 구매 성공/실패 메시지 팝업용
+    val behaviorDebugInfo: com.example.lupapj.data.model.BehaviorDebugInfo = com.example.lupapj.data.model.BehaviorDebugInfo() // [추가됨(권)]
 )

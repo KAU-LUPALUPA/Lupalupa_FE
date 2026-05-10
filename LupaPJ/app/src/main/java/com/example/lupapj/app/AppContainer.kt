@@ -47,7 +47,8 @@ class AppContainer(context: Context) {
     private val currencyRemoteDataSource = CurrencyRemoteDataSource(currencyApiService)
 
     val authRepository: AuthRepository = MockAuthRepository()
-    val roomRepository: RoomRepository = MockRoomRepository()
+    private val roomLocalCache = com.example.lupapj.data.local.RoomLocalCache(appContext)
+    val roomRepository: RoomRepository = MockRoomRepository(roomLocalCache)
     val friendRepository: FriendRepository = MockFriendRepository()
     val galleryRepository: GalleryRepository by lazy { GalleryRepository(appContext) }
     

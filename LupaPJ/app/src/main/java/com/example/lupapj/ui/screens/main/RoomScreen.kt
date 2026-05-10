@@ -21,8 +21,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.TransformOrigin
@@ -90,10 +92,13 @@ fun RoomScreen(
     onMailboxDismiss: () -> Unit,
     onAcceptFriendRequest: (String) -> Unit,
     onRejectFriendRequest: (String) -> Unit,
-    onAcceptHomeInvitation: (String) -> Unit,
-    onRejectHomeInvitation: (String) -> Unit
+    onAcceptHomeInvitation: (String) -> Unit, // [추가됨(권)] 복구됨
+    onRejectHomeInvitation: (String) -> Unit,
+    behaviorDebugInfo: com.example.lupapj.data.model.BehaviorDebugInfo,
+    onToggleBehaviorDebugClick: () -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope() // [추가됨(권)]
     val rootView = LocalView.current
     val density = LocalDensity.current
     var cameraOverlaySize by remember { mutableStateOf(IntSize.Zero) }
@@ -141,7 +146,13 @@ fun RoomScreen(
                 LupaMainScreen(
                     petSatiety = room.pet.status.satiety.coerceIn(0, 100),
                     petVitality = room.pet.status.vitality.coerceIn(0, 100),
+                    petPersonality = room.pet.personality, // [추가됨(권)]
                     recentIconRes = recentMainMenuAction?.iconRes,
+                    onConditionTabClick = { // [추가됨(권)] 터치 시 성격 스낵바 출력
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("현재 성격: ${room.pet.personality.name}")
+                        }
+                    },
                     onRecentActionClick = onButtonAClick,
                     onInventoryClick = onButtonBClick,
                     onSettingClick = onSettingsClick,
@@ -154,6 +165,34 @@ fun RoomScreen(
                             onFloorTap = onFloorTap,
                             modifier = Modifier.fillMaxSize()
                         )
+                        
+                        // [추가됨(권)] 행동 디버깅 토글 버튼
+                        androidx.compose.material3.TextButton(
+                            onClick = onToggleBehaviorDebugClick,
+                            modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 120.dp)
+                        ) {
+                            Text("디버그", color = Color.White)
+                        }
+
+                        // [추가됨(권)] 행동 디버깅 윈도우 (구석 배치)
+                        if (behaviorDebugInfo.isVisible) {
+                            Surface(
+                                color = Color.Black.copy(alpha = 0.7f),
+                                contentColor = Color.Green,
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(start = 16.dp, bottom = 180.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text("Action: ${room.pet.currentAction.name}")
+                                    Text("Crisis: ${behaviorDebugInfo.isCrisis}")
+                                    Text("Ticks: ${behaviorDebugInfo.consecutiveTicks}")
+                                    Text("Prob: ${"%.2f".format(behaviorDebugInfo.currentProbability)}")
+                                    Text("M: ${behaviorDebugInfo.mValue}, k: ${behaviorDebugInfo.kValue}")
+                                }
+                            }
+                        }
                     }
                 )
             }
@@ -423,7 +462,9 @@ private fun RoomScreenPreview() {
             onAcceptFriendRequest = {},
             onRejectFriendRequest = {},
             onAcceptHomeInvitation = {},
-            onRejectHomeInvitation = {}
+            onRejectHomeInvitation = {},
+            behaviorDebugInfo = com.example.lupapj.data.model.BehaviorDebugInfo(),
+            onToggleBehaviorDebugClick = {}
         )
     }
 }

@@ -43,7 +43,7 @@ private const val FOOD_CONSUME_AFTER_TRAVEL_DELAY_MS = 900L
 private const val FOOD_CONSUME_PAUSE_MS = 650L
 private const val AUTONOMOUS_MOVEMENT_RETRY_DELAY_MS = 800L
 private const val FRIEND_MESSAGE_POLL_INTERVAL_MS = 3_000L
-private const val PET_CONDITION_TICK_INTERVAL_MS = 1_000L
+private const val PET_CONDITION_TICK_INTERVAL_MS = 2_000L // [수정됨] 단기 틱 2초로 변경
 
 class AppViewModel(
     private val authRepository: AuthRepository,
@@ -56,11 +56,16 @@ class AppViewModel(
     private val _uiState = MutableStateFlow(AppUiState())
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
     private var roomBeforeRearrange: RoomUiState? = null
+    private var behaviorConsecutiveTicks = 0
+    
+    // TODO: 아래 상태 변수들과 행동 시퀀스 로직을 PetBehaviorEngine 클래스로 분리 고려 (God Class 방지)
+    private var petConditionRemainder = PetConditionTickRemainder()
+    private var droppedFoodTicks = 0 // [수정됨(권)] 사료 방치 시간 (M, K 확률 계산용)
+    private var droppedToyTicks = 0  // [수정됨(권)] 장난감 방치 시간 (M, K 확률 계산용)
     private var pendingFoodConsumeJob: Job? = null
     private var autonomousPetMovementJob: Job? = null
     private var friendMessagePollingJob: Job? = null
     private var petConditionJob: Job? = null
-    private var petConditionRemainder = PetConditionTickRemainder()
 
     init {
         runBootstrap()
@@ -171,8 +176,6 @@ class AppViewModel(
                     placeholderMessage = "${displayName}님 환영합니다!"
                 )
             }
-
-            startAutonomousPetMovement()
             startPetConditionTicker()
         }
     }
@@ -221,8 +224,17 @@ class AppViewModel(
         if (objectType == RoomObjectType.WINDOW) return
 
         viewModelScope.launch {
-            val nextRoom = roomRepository.performObjectAction(objectType)
-            applyRepositoryRoom(nextRoom)
+            if (objectType == RoomObjectType.BED) {
+                // [수정됨] 침대 클릭 시 즉시 침대로 이동 시퀀스 시작
+                val roomState = _uiState.value.room ?: return@launch
+                val bedAnchor = roomState.sceneDefinition.objects.find { it.type == RoomObjectType.BED }?.anchor as? FloorAnchor
+                if (bedAnchor != null) {
+                    startBedRestingSequence(bedAnchor)
+                }
+            } else {
+                val nextRoom = roomRepository.performObjectAction(objectType)
+                applyRepositoryRoom(nextRoom)
+            }
         }
     }
 
@@ -317,8 +329,9 @@ class AppViewModel(
             }
             applyRepositoryRoom(nextRoom)
 
-            if (placingFood && nextRoom.droppedFoodAnchor != null) {
-                scheduleFoodConsumption()
+            if (placingFood && nextRoom.houseSceneState.currentSceneRuntime.droppedFoodAnchor != null) {
+                // [수정됨] 직접 먹이 주기 시 즉시 반응하지 않고, 행동 엔진의 다음 틱에서 확률적으로 결정하도록 유도
+                _uiState.update { it.copy(placeholderMessage = "바닥에 사료를 놓았습니다.") }
             }
         }
     }
@@ -732,6 +745,13 @@ class AppViewModel(
         _uiState.update { it.copy(shopFeedbackMessage = null) }
     }
 
+    // [추가됨(권)] 행동 디버그 윈도우 토글
+    fun toggleBehaviorDebugWindow() {
+        _uiState.update { 
+            it.copy(behaviorDebugInfo = it.behaviorDebugInfo.copy(isVisible = !it.behaviorDebugInfo.isVisible)) 
+        }
+    }
+
     private fun runBootstrap() {
         viewModelScope.launch {
             delay(150)
@@ -746,55 +766,227 @@ class AppViewModel(
         }
     }
 
-    private fun startAutonomousPetMovement() {
-        if (autonomousPetMovementJob?.isActive == true) return
+    private fun calculateTileDistance(a: com.example.lupapj.data.model.scene.FloorAnchor, b: com.example.lupapj.data.model.scene.FloorAnchor, spec: com.example.lupapj.data.model.scene.IsoRoomProjectionSpec): Float {
+        val dx = (a.u - b.u) * spec.roomWidthTiles
+        val dy = (a.v - b.v) * spec.roomDepthTiles
+        return kotlin.math.sqrt(dx * dx + dy * dy)
+    }
 
-        autonomousPetMovementJob = viewModelScope.launch {
-            while (isActive) {
-                val state = _uiState.value
-                val room = state.room
+    // [추가됨(권)] 행동 상태 전이 평가 (매 초마다 호출됨)
+    private fun evaluateBehaviorTransition() {
+        val state = _uiState.value
+        val room = state.room ?: return
+        val pet = room.houseSceneState.pet
 
-                if (room == null || !state.canStartAutonomousPetMovement()) {
-                    delay(AUTONOMOUS_MOVEMENT_RETRY_DELAY_MS)
-                    continue
+        if (state.phase != AppPhase.ROOM || room.feedMode || room.toyMode || room.isCameraMode || pet.status.isEgg || pet.movement.isMoving) {
+            return
+        }
+
+        behaviorConsecutiveTicks++
+
+        // [수정됨(권)] 먹기/놀기 상태는 애니메이션 시퀀스가 종료될 때까지 상태 기계의 개입을 차단함
+        if (pet.action == PetAction.EATING || pet.action == PetAction.PLAYING) {
+            return
+        }
+
+        val isCrisis = com.example.lupapj.data.model.BehaviorStateMachine.isCrisis(pet.status.satiety, pet.status.vitality)
+
+        // [수정됨] 휴식 행동일 경우 10초(장기 틱) 주기로만 전이 평가
+        // 긴급 상태(활력 < 30)에서의 휴식은 일정 수치 이상 회복될 때까지 이탈하지 않음
+        val isRestingState = pet.action == PetAction.RESTING || pet.action == PetAction.BED_RESTING
+        if (isRestingState) {
+            if (isCrisis && pet.status.vitality < 30) return // 위기 상황에서는 30까지 무조건 휴식
+            if (behaviorConsecutiveTicks % 5 != 0) return
+        }
+
+        // 성격 및 상태(위기/안정)에 따른 확률 변수 선택
+        val (m, k) = if (isCrisis) {
+            com.example.lupapj.data.model.BehaviorStateMachine.getCrisisTransitionParams(pet.personality)
+        } else {
+            // ACTIVE 배회 중 특수 로직: 목적지 도달 후 1초 대기 후 즉시 이탈
+            if (pet.personality == com.example.lupapj.data.model.PetPersonality.ACTIVE && pet.action == PetAction.WALKING) {
+                1.0f to 10.0f // 즉시 전이 유도
+            } else {
+                com.example.lupapj.data.model.BehaviorStateMachine.getStableTransitionParams(pet.personality, pet.action)
+            }
+        }
+
+        val shouldTransition = com.example.lupapj.data.model.BehaviorStateMachine.checkTransitionProbability(behaviorConsecutiveTicks, m, k)
+        val currentProb = m * (1f - kotlin.math.exp(-k * behaviorConsecutiveTicks)).toFloat()
+
+        _uiState.update { s -> 
+            s.copy(behaviorDebugInfo = s.behaviorDebugInfo.copy(
+                consecutiveTicks = behaviorConsecutiveTicks,
+                currentProbability = currentProb,
+                isCrisis = isCrisis,
+                mValue = m,
+                kValue = k
+            ))
+        }
+        
+        if (shouldTransition || pet.action == PetAction.IDLE) {
+            // [추가됨(권)] 놀이 종료 시 장난감 쓰러짐 상태로 변경
+            if (pet.action == PetAction.PLAYING) {
+                viewModelScope.launch {
+                    val nextRoom = roomRepository.updateToyKnockedOver(true)
+                    applyRepositoryRoom(nextRoom)
+                }
+            }
+            behaviorConsecutiveTicks = 0
+            
+            val hasFood = room.houseSceneState.currentSceneRuntime.droppedFoodAnchor != null
+            val hasToy = room.houseSceneState.currentSceneRuntime.droppedToyAnchor != null
+
+            // [추가됨] 아이템 방치 시간 업데이트
+            if (hasFood) droppedFoodTicks++ else droppedFoodTicks = 0
+            if (hasToy) droppedToyTicks++ else droppedToyTicks = 0
+
+            // [수정됨(권)] 아이템 발견 확률 체크 (M, K 수식 적용)
+            // 휴식 중이거나 행동 중일 때는 주변 인지를 차단하여 버그 방지
+            if (!isCrisis && !isRestingState && pet.action != PetAction.EATING && pet.action != PetAction.PLAYING) {
+                val (mN, kN) = com.example.lupapj.data.model.BehaviorStateMachine.getNoticeParams(pet.personality)
+                
+                val discoveredFood = hasFood && com.example.lupapj.data.model.BehaviorStateMachine.checkTransitionProbability(droppedFoodTicks, mN, kN)
+                if (discoveredFood) {
+                    // [수정됨(권)] 사료 발견 시 즉시 식사 시퀀스로 전환
+                    executeBehaviorAction(PetAction.EATING, pet)
+                    droppedFoodTicks = 0
+                    return
                 }
 
-                val profile = autonomousMovementProfileFor(room.houseSceneState.pet.personality)
-                delay(profile.nextIdleDelayMillis(Random.Default))
-
-                val latestState = _uiState.value
-                val latestRoom = latestState.room
-                if (latestRoom == null || !latestState.canStartAutonomousPetMovement()) {
-                    continue
+                val discoveredToy = hasToy && com.example.lupapj.data.model.BehaviorStateMachine.checkTransitionProbability(droppedToyTicks, mN, kN)
+                if (discoveredToy) {
+                    // [수정됨(권)] 장난감 발견 시 즉시 놀이 시퀀스로 전환
+                    executeBehaviorAction(PetAction.PLAYING, pet)
+                    droppedToyTicks = 0
+                    return
                 }
+            }
 
-                val currentPet = latestRoom.houseSceneState.pet
+            val nextAction = if (isCrisis) {
+                // 위기 시 생존 행동(식사/수면) 중 부족한 수치 우선 선택
+                if (pet.status.satiety < pet.status.vitality) PetAction.EATING else PetAction.BED_RESTING
+            } else {
+                // [수정됨] 확률 수식을 사용하여 행동 결정 (기존 가중치 기반)
+                com.example.lupapj.data.model.BehaviorStateMachine.rollStableBehavior(
+                    personality = pet.personality,
+                    satiety = pet.status.satiety,
+                    hasFood = hasFood,
+                    hasToy = hasToy
+                )
+            }
+            executeBehaviorAction(nextAction, pet)
+        }
+    }
+
+    private fun executeBehaviorAction(action: PetAction, pet: com.example.lupapj.data.model.scene.PetSceneState) {
+        val room = _uiState.value.room ?: return
+        val houseSceneState = room.houseSceneState
+        
+        when (action) {
+            PetAction.WALKING -> {
+                val profile = autonomousMovementProfileFor(pet.personality)
                 val targetAnchor = chooseAutonomousPetTarget(
-                    currentAnchor = currentPet.anchor,
-                    sceneDefinition = latestRoom.sceneDefinition,
+                    currentAnchor = pet.anchor,
+                    sceneDefinition = room.sceneDefinition,
                     profile = profile,
                     random = Random.Default
                 )
-
-                if (targetAnchor == null) {
-                    delay(AUTONOMOUS_MOVEMENT_RETRY_DELAY_MS)
-                    continue
+                if (targetAnchor != null) {
+                    moveToTargetAndExecute(targetAnchor, pet, PetAction.IDLE, profile) // [수정됨] 도착 후 IDLE로 변경하여 재추첨 유도
                 }
+            }
+            PetAction.RESTING -> {
+                setPetAction(PetAction.RESTING)
+            }
+            PetAction.BED_RESTING -> {
+                val bedAnchor = room.sceneDefinition.objects.find { it.type == RoomObjectType.BED }?.anchor as? FloorAnchor
+                if (bedAnchor != null) {
+                    // [수정됨] 침대 휴식 결정 시 즉시 침대로 이동
+                    startBedRestingSequence(bedAnchor)
+                } else {
+                    setPetAction(PetAction.RESTING)
+                }
+            }
+            PetAction.PLAYING -> {
+                val targetAnchor = houseSceneState.currentSceneRuntime.droppedToyAnchor 
+                    ?: room.sceneDefinition.objects.find { it.type == RoomObjectType.TOY_BOX }?.anchor?.let { it as? FloorAnchor }
+                
+                if (targetAnchor != null) {
+                    // [추가됨] 침대 근처 필터링 로직 유지
+                    val bedAnchor = room.sceneDefinition.objects.find { it.type == RoomObjectType.BED }?.anchor as? FloorAnchor
+                    if (bedAnchor != null) {
+                        val distToBed = calculateTileDistance(targetAnchor, bedAnchor, room.sceneDefinition.projectionSpec)
+                        if (distToBed < 1.0f) { /* 스킵 로직 */ }
+                    }
 
-                movePetAutonomously(
-                    targetAnchor = targetAnchor,
-                    movementState = PetMovementState(
-                        targetAnchor = targetAnchor,
-                        isMoving = true,
-                        style = profile.style,
-                        isAutonomous = true
-                    )
-                )
-                delay(PET_AUTONOMOUS_MOVE_DURATION_MS)
-                finishAutonomousPetMovement(targetAnchor)
+                    if (pet.personality == com.example.lupapj.data.model.PetPersonality.LAZY) {
+                        val dist = calculateTileDistance(pet.anchor, targetAnchor, room.sceneDefinition.projectionSpec)
+                        if (dist > 3f) {
+                            setPetAction(PetAction.RESTING)
+                            return
+                        }
+                    }
+                    
+                    // [수정됨] 통합된 놀이 시퀀스 호출
+                    startPlayingSequence(targetAnchor)
+                } else {
+                    setPetAction(PetAction.IDLE)
+                }
+            }
+            PetAction.EATING -> {
+                val targetAnchor = houseSceneState.currentSceneRuntime.droppedFoodAnchor 
+                    ?: room.sceneDefinition.objects.find { it.type == RoomObjectType.FOOD_BAG }?.anchor?.let { it as? FloorAnchor }
+                if (targetAnchor != null) {
+                    if (pet.personality == com.example.lupapj.data.model.PetPersonality.LAZY) {
+                        val dist = calculateTileDistance(pet.anchor, targetAnchor, room.sceneDefinition.projectionSpec)
+                        if (dist > 3f) {
+                            setPetAction(PetAction.RESTING)
+                            return
+                        }
+                    }
+                    // [수정됨] 통합된 식사 시퀀스 호출
+                    startEatingSequence(targetAnchor, skipMovement = false)
+                } else {
+                    setPetAction(PetAction.IDLE)
+                }
+            }
+            else -> {
+                setPetAction(PetAction.IDLE)
             }
         }
     }
+
+    private fun moveToTargetAndExecute(
+        targetAnchor: FloorAnchor,
+        pet: com.example.lupapj.data.model.scene.PetSceneState,
+        finalAction: PetAction,
+        profile: com.example.lupapj.data.model.scene.PetAutonomousMovementProfile
+    ) {
+        viewModelScope.launch {
+            // [추가됨] 침대에서 일어날 때 완전히 일어난 뒤 이동하도록 지연 시간 추가
+            if (pet.isLyingSide) {
+                setPetAction(PetAction.IDLE)
+                delay(600L)
+            }
+            
+            movePetAutonomously(
+                targetAnchor = targetAnchor,
+                movementState = com.example.lupapj.data.model.scene.PetMovementState(
+                    targetAnchor = targetAnchor,
+                    isMoving = true,
+                    style = profile.style,
+                    isAutonomous = true,
+                    speedMultiplier = profile.speedMultiplier,
+                    bouncePx = profile.bouncePx
+                )
+            )
+            delay((com.example.lupapj.data.model.scene.PET_AUTONOMOUS_MOVE_DURATION_MS / profile.speedMultiplier).toLong())
+            finishAutonomousPetMovement(targetAnchor)
+            setPetAction(finalAction)
+        }
+    }
+
 
     private fun startPetConditionTicker() {
         if (petConditionJob?.isActive == true) return
@@ -802,7 +994,8 @@ class AppViewModel(
         petConditionJob = viewModelScope.launch {
             while (isActive) {
                 delay(PET_CONDITION_TICK_INTERVAL_MS)
-                advanceCurrentPetCondition(elapsedSeconds = 1L)
+                advanceCurrentPetCondition(elapsedSeconds = 2L) // [수정됨] 2초씩 진행
+                evaluateBehaviorTransition() // [추가됨(권)] 매 틱(2초) 행동 전이 평가
             }
         }
     }
@@ -838,17 +1031,7 @@ class AppViewModel(
         }
     }
 
-    private fun AppUiState.canStartAutonomousPetMovement(): Boolean {
-        val room = room ?: return false
-        val pet = room.houseSceneState.pet
-
-        return phase == AppPhase.ROOM &&
-            !room.feedMode &&
-            !room.toyMode &&
-            !room.isCameraMode &&
-            !pet.status.isEgg &&
-            pet.action == PetAction.IDLE
-    }
+    // canStartAutonomousPetMovement 제거됨 (BehaviorTicker로 대체)
 
     private fun movePetAutonomously(
         targetAnchor: FloorAnchor,
@@ -861,7 +1044,8 @@ class AppViewModel(
                     pet = houseSceneState.pet.copy(
                         action = PetAction.WALKING,
                         anchor = targetAnchor,
-                        movement = movementState
+                        movement = movementState,
+                        isLyingSide = false // 이동 시작 시 무조건 눕기 해제
                     )
                 )
             )
@@ -902,17 +1086,29 @@ class AppViewModel(
 
     private fun applyRepositoryRoom(repositoryRoom: RoomUiState) {
         val currentRoom = _uiState.value.room
-        val currentPetStatus = currentRoom?.houseSceneState?.pet?.status
-        val mergedHouseSceneState = if (currentPetStatus == null) {
-            repositoryRoom.houseSceneState
-        } else {
-            val repositoryPet = repositoryRoom.houseSceneState.pet
-            repositoryRoom.houseSceneState.copy(
-                pet = repositoryPet.copy(status = currentPetStatus)
+        val currentPet = currentRoom?.houseSceneState?.pet
+        
+        // [수정됨(권)] 레포지토리 업데이트 시 펫의 일시적인 로컬 상태(위치, 이동, 휴식 중 여부)와 실시간 수치를 보존합니다.
+        // 레포지토리의 수치가 초기값(80, 75)인 경우 로컬에서 시뮬레이션 중인 수치를 우선하여 UI 튀는 현상 방지.
+        val repositoryPet = repositoryRoom.houseSceneState.pet
+        val mergedPet = if (currentPet != null && repositoryPet.action == PetAction.IDLE && !repositoryPet.isLyingSide) {
+            repositoryPet.copy(
+                anchor = currentPet.anchor,
+                action = currentPet.action,
+                movement = currentPet.movement,
+                isLyingSide = currentPet.isLyingSide,
+                status = if (repositoryPet.status.satiety == 80 && repositoryPet.status.vitality == 75) {
+                    currentPet.status 
+                } else {
+                    repositoryPet.status 
+                }
             )
+        } else {
+            repositoryPet
         }
+
         val mergedRoom = repositoryRoom.copy(
-            houseSceneState = mergedHouseSceneState,
+            houseSceneState = repositoryRoom.houseSceneState.copy(pet = mergedPet),
             navBarVisible = currentRoom?.navBarVisible ?: false,
             inventoryVisible = currentRoom?.inventoryVisible ?: false
         )
@@ -929,9 +1125,9 @@ class AppViewModel(
             room.copy(
                 houseSceneState = houseSceneState.copy(
                     pet = pet.copy(
-                        status = applyFeedRecovery(
+                        status = com.example.lupapj.data.model.applyFeedRecovery(
                             status = pet.status,
-                            policy = DemoPetConditionPolicy
+                            policy = com.example.lupapj.data.model.DemoPetConditionPolicy
                         )
                     )
                 )
@@ -939,17 +1135,142 @@ class AppViewModel(
         }
     }
 
-    private fun scheduleFoodConsumption() {
+    // [추가됨(권)] 거리에 따른 이동 지연 시간 계산
+    private fun calculateMovementDelay(from: FloorAnchor, to: FloorAnchor, profile: com.example.lupapj.data.model.scene.PetAutonomousMovementProfile): Long {
+        val room = _uiState.value.room ?: return 1000L
+        val dist = calculateTileDistance(from, to, room.sceneDefinition.projectionSpec)
+        // 1타일당 400ms 기준 (속도 배율 적용)
+        val duration = (dist * 400L / profile.speedMultiplier).toLong()
+        return duration.coerceIn(300L, 3000L)
+    }
+
+    // [추가됨(권)] 식사 시퀀스 통합 관리 (이동 -> 6초 대기 -> 소모 및 회복)
+    private fun startEatingSequence(targetAnchor: FloorAnchor, skipMovement: Boolean = false) {
         pendingFoodConsumeJob?.cancel()
         pendingFoodConsumeJob = viewModelScope.launch {
-            delay(FOOD_CONSUME_AFTER_TRAVEL_DELAY_MS + FOOD_CONSUME_PAUSE_MS)
+            val pet = _uiState.value.room?.houseSceneState?.pet ?: return@launch
+            val profile = autonomousMovementProfileFor(pet.personality)
 
-            val currentRoom = _uiState.value.room ?: return@launch
-            if (currentRoom.droppedFoodAnchor == null) return@launch
+            if (!skipMovement) {
+                // [추가됨] 자고 있었다면 일어나는 시간 확보
+                if (pet.isLyingSide) {
+                    setPetAction(PetAction.IDLE)
+                    delay(600L)
+                }
 
-            val nextRoom = roomRepository.consumeFood()
-            applyRepositoryRoom(nextRoom)
-            recoverPetSatietyFromFood()
+                val delayMs = calculateMovementDelay(pet.anchor, targetAnchor, profile)
+                movePetAutonomously(
+                    targetAnchor = targetAnchor,
+                    movementState = com.example.lupapj.data.model.scene.PetMovementState(
+                        targetAnchor = targetAnchor,
+                        isMoving = true,
+                        style = profile.style,
+                        isAutonomous = true,
+                        speedMultiplier = profile.speedMultiplier,
+                        bouncePx = profile.bouncePx
+                    )
+                )
+                delay(delayMs)
+                finishAutonomousPetMovement(targetAnchor)
+            }
+
+            setPetAction(PetAction.EATING)
+            delay(6000L) // 고정 식사 시간
+
+            if (_uiState.value.room?.houseSceneState?.pet?.action == PetAction.EATING) {
+                val nextRoom = roomRepository.consumeFood()
+                applyRepositoryRoom(nextRoom)
+                recoverPetSatietyFromFood()
+                setPetAction(PetAction.IDLE)
+            }
+        }
+    }
+
+    // [추가됨(권)] 놀이 시퀀스 통합 관리 (이동 -> 6초 대기 -> 장난감 쓰러뜨리기)
+    private fun startPlayingSequence(targetAnchor: FloorAnchor) {
+        pendingFoodConsumeJob?.cancel()
+        pendingFoodConsumeJob = viewModelScope.launch {
+            val pet = _uiState.value.room?.houseSceneState?.pet ?: return@launch
+            val profile = autonomousMovementProfileFor(pet.personality)
+
+            val delayMs = calculateMovementDelay(pet.anchor, targetAnchor, profile)
+            movePetAutonomously(
+                targetAnchor = targetAnchor,
+                movementState = com.example.lupapj.data.model.scene.PetMovementState(
+                    targetAnchor = targetAnchor,
+                    isMoving = true,
+                    style = profile.style,
+                    isAutonomous = true,
+                    speedMultiplier = profile.speedMultiplier,
+                    bouncePx = profile.bouncePx
+                )
+            )
+            delay(delayMs)
+            finishAutonomousPetMovement(targetAnchor)
+
+            setPetAction(PetAction.PLAYING)
+            delay(6000L) // 고정 놀이 시간
+
+            if (_uiState.value.room?.houseSceneState?.pet?.action == PetAction.PLAYING) {
+                val nextRoom = roomRepository.updateToyKnockedOver(true)
+                applyRepositoryRoom(nextRoom)
+                setPetAction(PetAction.IDLE)
+            }
+        }
+    }
+
+    // [추가됨(권)] 침대 휴식 시퀀스 통합 관리 (이동 -> 도착 후 옆으로 눕기)
+    private fun startBedRestingSequence(targetAnchor: FloorAnchor) {
+        pendingFoodConsumeJob?.cancel()
+        pendingFoodConsumeJob = viewModelScope.launch {
+            val pet = _uiState.value.room?.houseSceneState?.pet ?: return@launch
+            val profile = autonomousMovementProfileFor(pet.personality)
+
+            val delayMs = calculateMovementDelay(pet.anchor, targetAnchor, profile)
+            movePetAutonomously(
+                targetAnchor = targetAnchor,
+                movementState = com.example.lupapj.data.model.scene.PetMovementState(
+                    targetAnchor = targetAnchor,
+                    isMoving = true,
+                    style = profile.style,
+                    isAutonomous = false, // 침대 이동은 사용자 명령 또는 긴급 상황이므로 비자율 처리
+                    speedMultiplier = profile.speedMultiplier,
+                    bouncePx = profile.bouncePx
+                )
+            )
+            delay(delayMs)
+            finishAutonomousPetMovement(targetAnchor)
+
+            // 도착 후 침대 휴식 상태 및 옆으로 눕기 플래그 설정
+            _uiState.update { state ->
+                val room = state.room ?: return@update state
+                state.copy(
+                    room = room.copy(
+                        houseSceneState = room.houseSceneState.copy(
+                            pet = room.houseSceneState.pet.copy(
+                                action = PetAction.BED_RESTING,
+                                isLyingSide = true
+                            )
+                        )
+                    )
+                )
+            }
+        }
+    }
+
+    private fun setPetAction(action: PetAction) {
+        _uiState.update { state ->
+            val room = state.room ?: return@update state
+            state.copy(
+                room = room.copy(
+                    houseSceneState = room.houseSceneState.copy(
+                        pet = room.houseSceneState.pet.copy(
+                            action = action,
+                            isLyingSide = false // 일반 액션 시에는 눕기 해제
+                        )
+                    )
+                )
+            )
         }
     }
 

@@ -9,7 +9,8 @@ data class PetConditionPolicy(
     val vitalityDecayAmount: Int,
     val feedRecoveryAmount: Int,
     val restRecoveryIntervalSeconds: Long,
-    val restRecoveryAmount: Int,
+    val floorRestRecoveryAmount: Int,
+    val bedRestRecoveryAmount: Int,
     val restSatietyDecayMultiplier: Float
 )
 
@@ -26,13 +27,14 @@ data class PetConditionTickResult(
 )
 
 val DemoPetConditionPolicy = PetConditionPolicy(
-    satietyDecayIntervalSeconds = 5L,
-    satietyDecayAmount = 1,
-    vitalityDecayIntervalSeconds = 4L,
+    satietyDecayIntervalSeconds = 10L,
+    satietyDecayAmount = 2,
+    vitalityDecayIntervalSeconds = 10L,
     vitalityDecayAmount = 1,
-    feedRecoveryAmount = 20,
-    restRecoveryIntervalSeconds = 2L,
-    restRecoveryAmount = 3,
+    feedRecoveryAmount = 30,
+    restRecoveryIntervalSeconds = 10L,
+    floorRestRecoveryAmount = 2,
+    bedRestRecoveryAmount = 6,
     restSatietyDecayMultiplier = 1.0f
 )
 
@@ -62,13 +64,14 @@ fun advancePetCondition(
     )
     val nextSatiety = status.satiety - satietyDecayAmount
 
-    val vitalityResult = if (action == PetAction.RESTING) {
+    val vitalityResult = if (action == PetAction.RESTING || action == PetAction.BED_RESTING) {
         val restTick = consumeInterval(
             currentSeconds = remainder.restRecoverySeconds,
             addedSeconds = elapsedSeconds,
             intervalSeconds = policy.restRecoveryIntervalSeconds
         )
-        val nextVitality = status.vitality + (restTick.steps * policy.restRecoveryAmount)
+        val recoveryAmount = if (action == PetAction.BED_RESTING) policy.bedRestRecoveryAmount else policy.floorRestRecoveryAmount
+        val nextVitality = status.vitality + (restTick.steps * recoveryAmount)
         VitalityAdvanceResult(
             vitality = nextVitality,
             vitalityDecaySeconds = 0L,
@@ -100,7 +103,7 @@ fun advancePetCondition(
             vitalityDecaySeconds = vitalityResult.vitalityDecaySeconds,
             restRecoverySeconds = vitalityResult.restRecoverySeconds
         ),
-        shouldStopResting = action == PetAction.RESTING && nextStatus.vitality == 100
+        shouldStopResting = (action == PetAction.RESTING || action == PetAction.BED_RESTING) && nextStatus.vitality == 100
     )
 }
 
@@ -146,7 +149,7 @@ private fun satietyDecayAmountFor(
     if (steps <= 0) return 0
 
     val baseAmount = steps * policy.satietyDecayAmount
-    if (action != PetAction.RESTING) return baseAmount
+    if (action != PetAction.RESTING && action != PetAction.BED_RESTING) return baseAmount
 
     return (baseAmount * policy.restSatietyDecayMultiplier)
         .roundToInt()

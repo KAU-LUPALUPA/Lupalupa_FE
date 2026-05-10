@@ -100,7 +100,9 @@ fun LupaApp(deepLink: Uri? = null) {
                 onAcceptFriendRequest = appViewModel::acceptFriendRequest,
                 onRejectFriendRequest = appViewModel::rejectFriendRequest,
                 onAcceptHomeInvitation = appViewModel::acceptHomeInvitation,
-                onRejectHomeInvitation = appViewModel::rejectHomeInvitation
+                onRejectHomeInvitation = appViewModel::rejectHomeInvitation,
+                behaviorDebugInfo = uiState.behaviorDebugInfo,
+                onToggleBehaviorDebugClick = appViewModel::toggleBehaviorDebugWindow
             )
         }
 

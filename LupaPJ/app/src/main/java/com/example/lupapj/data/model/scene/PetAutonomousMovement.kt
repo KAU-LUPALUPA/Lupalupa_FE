@@ -18,6 +18,8 @@ data class PetAutonomousMovementProfile(
     val radius: Float,
     val minIdleDelayMillis: Long,
     val maxIdleDelayMillis: Long,
+    val bouncePx: Float = 0f, // [추가됨(권)] 바운스 연출
+    val speedMultiplier: Float = 1.0f, // [추가됨(권)] 이동 속도 배율
     val style: PetMovementStyle = PetMovementStyle.BOUNCY
 ) {
     fun nextIdleDelayMillis(random: Random): Long {
@@ -31,21 +33,27 @@ fun autonomousMovementProfileFor(
 ): PetAutonomousMovementProfile {
     return when (personality) {
         PetPersonality.ACTIVE -> PetAutonomousMovementProfile(
-            radius = 0.32f,
+            radius = 0.55f, // 5~6 타일 (화면 비율에 맞춰 조정)
             minIdleDelayMillis = 1_500L,
-            maxIdleDelayMillis = 3_200L
+            maxIdleDelayMillis = 3_200L,
+            bouncePx = 6f,
+            speedMultiplier = 1.2f // [수정됨] 1.5 -> 1.2
         )
 
         PetPersonality.CALM -> PetAutonomousMovementProfile(
-            radius = 0.22f,
+            radius = 0.35f, // 3~4 타일
             minIdleDelayMillis = 3_000L,
-            maxIdleDelayMillis = 5_500L
+            maxIdleDelayMillis = 5_500L,
+            bouncePx = 4f,
+            speedMultiplier = 1.0f
         )
 
         PetPersonality.LAZY -> PetAutonomousMovementProfile(
-            radius = 0.18f,
+            radius = 0.15f, // 1~2 타일
             minIdleDelayMillis = 5_500L,
-            maxIdleDelayMillis = 8_500L
+            maxIdleDelayMillis = 8_500L,
+            bouncePx = 0f,
+            speedMultiplier = 1.0f
         )
     }
 }
