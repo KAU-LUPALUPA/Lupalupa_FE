@@ -90,8 +90,8 @@ object RearrangeController {
 
             is WallAnchor -> {
                 anchor.copy(
-                    u = (anchor.u + dx).coerceIn(0.08f, 0.92f),
-                    v = (anchor.v + dy).coerceIn(0.12f, 0.88f)
+                    u = (anchor.u + dx).coerceIn(0.18f, 0.82f),
+                    v = (anchor.v + dy).coerceIn(0.22f, 0.78f)
                 )
             }
         }
