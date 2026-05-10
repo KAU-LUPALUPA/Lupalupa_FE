@@ -341,7 +341,7 @@ fun RoomScreen(
                 )
             }
         }
-    }
+
 
     if (room.inventoryVisible) {
         InventorySheet(
