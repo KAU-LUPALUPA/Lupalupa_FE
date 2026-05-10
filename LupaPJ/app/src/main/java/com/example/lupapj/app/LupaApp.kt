@@ -1,11 +1,32 @@
 package com.example.lupapj.app
 
 import android.net.Uri
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.lupapj.BuildConfig
@@ -20,11 +41,20 @@ import com.example.lupapj.ui.screens.plaza.PlazaScreen
 import com.example.lupapj.ui.screens.shop.ShopDetailScreen
 import com.example.lupapj.ui.screens.shop.ShopScreen
 import com.example.lupapj.viewmodel.AppViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.io.OutputStreamWriter
+import java.net.HttpURLConnection
+import java.net.URL
 
 @Composable
 fun LupaApp(deepLink: Uri? = null) {
     val context = LocalContext.current
     val container = remember { AppContainer(context) }
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     val appViewModel: AppViewModel = viewModel(
         factory = AppViewModel.Factory(
@@ -40,16 +70,80 @@ fun LupaApp(deepLink: Uri? = null) {
 
     val uiState by appViewModel.uiState.collectAsStateWithLifecycle()
 
-    // [추가됨] 딥링크를 통한 카카오 로그인 처리 로직
+    var userId by remember { mutableStateOf<String?>(null) }
+    var isAppForeground by remember { mutableStateOf(false) }
+    var showOfflineDialog by remember { mutableStateOf(false) }
+    var offlineDialogMessage by remember { mutableStateOf("") }
+    var hasShownOfflineDialog by remember { mutableStateOf(false) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> isAppForeground = true
+                Lifecycle.Event.ON_STOP -> {
+                    isAppForeground = false
+                    hasShownOfflineDialog = false
+                }
+                else -> Unit
+            }
+        }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     LaunchedEffect(deepLink) {
         val token = deepLink?.getQueryParameter("accessToken")
         val nickname = deepLink?.getQueryParameter("nickname")
+        val uid = deepLink?.getQueryParameter("uid")
 
         if (!token.isNullOrBlank()) {
+            userId = uid ?: nickname
+
             appViewModel.onKakaoLoginSuccess(
                 accessToken = token,
                 nickname = nickname
             )
+        }
+    }
+
+    LaunchedEffect(uiState.phase, userId, isAppForeground) {
+        val currentUserId = userId ?: return@LaunchedEffect
+
+        if (
+            uiState.phase == AppPhase.ROOM &&
+            isAppForeground &&
+            !hasShownOfflineDialog
+        ) {
+            val offlineSeconds = withContext(Dispatchers.IO) {
+                sendHeartbeatToServer(currentUserId)
+            }
+
+            if (offlineSeconds != null && offlineSeconds > 0L) {
+                offlineDialogMessage = formatOfflineMessage(offlineSeconds)
+                showOfflineDialog = true
+            }
+
+            hasShownOfflineDialog = true
+        }
+    }
+
+    LaunchedEffect(uiState.phase, userId, isAppForeground) {
+        val currentUserId = userId ?: return@LaunchedEffect
+
+        if (uiState.phase != AppPhase.ROOM || !isAppForeground) {
+            return@LaunchedEffect
+        }
+
+        while (isActive && isAppForeground && uiState.phase == AppPhase.ROOM) {
+            delay(30_000)
+
+            withContext(Dispatchers.IO) {
+                sendHeartbeatToServer(currentUserId)
+            }
         }
     }
 
@@ -67,46 +161,77 @@ fun LupaApp(deepLink: Uri? = null) {
         }
 
         AppPhase.ROOM -> {
-            RoomScreen(
-                uiState = uiState.room,
-                placeholderMessage = uiState.placeholderMessage,
-                onButtonAClick = appViewModel::onButtonAClick,
-                onButtonBClick = appViewModel::onButtonBClick,
-                onInventoryDismiss = appViewModel::onInventoryDismiss,
-                onSettingsClick = appViewModel::onSettingsClick,
-                onRoomObjectClick = appViewModel::onRoomObjectClick,
+            Box {
+                RoomScreen(
+                    uiState = uiState.room,
+                    placeholderMessage = uiState.placeholderMessage,
+                    onButtonAClick = appViewModel::onButtonAClick,
+                    onButtonBClick = appViewModel::onButtonBClick,
+                    onInventoryDismiss = appViewModel::onInventoryDismiss,
+                    onSettingsClick = appViewModel::onSettingsClick,
+                    onRoomObjectClick = appViewModel::onRoomObjectClick,
 
-                // [sub_branch에서 가져온 가구 재배치 로직]
-                onRearrangeClick = appViewModel::onRearrangeClick,
-                onRearrangeMoveUp = appViewModel::onRearrangeMoveUp,
-                onRearrangeMoveDown = appViewModel::onRearrangeMoveDown,
-                onRearrangeMoveLeft = appViewModel::onRearrangeMoveLeft,
-                onRearrangeMoveRight = appViewModel::onRearrangeMoveRight,
-                onRearrangeConfirm = appViewModel::onRearrangeConfirm,
-                onRearrangeCancel = appViewModel::onRearrangeCancel,
+                    onRearrangeClick = appViewModel::onRearrangeClick,
+                    onRearrangeMoveUp = appViewModel::onRearrangeMoveUp,
+                    onRearrangeMoveDown = appViewModel::onRearrangeMoveDown,
+                    onRearrangeMoveLeft = appViewModel::onRearrangeMoveLeft,
+                    onRearrangeMoveRight = appViewModel::onRearrangeMoveRight,
+                    onRearrangeConfirm = appViewModel::onRearrangeConfirm,
+                    onRearrangeCancel = appViewModel::onRearrangeCancel,
 
-                onFloorTap = appViewModel::onFloorTap,
-                onBottomNavItemClick = appViewModel::onBottomNavItemClick,
-                recentMainMenuAction = uiState.recentMainMenuAction,
-                onPlaceholderMessageConsumed = appViewModel::onPlaceholderMessageConsumed,
-                onSetCameraZoom = appViewModel::setCameraZoom,
-                onCaptureClick = appViewModel::captureScreen,
-                onExitCameraMode = appViewModel::exitCameraMode,
-                currencyAmount = uiState.currencyAmount.toInt(), // Long -> Int 변환
-                purchasedShopItems = uiState.shopItems.filter {
-                    uiState.purchasedItemIds.contains(it.id)
-                },
-                onPlaygroundClick = appViewModel::openPlaza,
-                mailboxVisible = uiState.mailboxVisible,
-                friendRequests = uiState.receivedFriendRequests,
-                homeInvitations = uiState.receivedHomeInvitations,
-                onMailboxClick = appViewModel::openMailbox,
-                onMailboxDismiss = appViewModel::closeMailbox,
-                onAcceptFriendRequest = appViewModel::acceptFriendRequest,
-                onRejectFriendRequest = appViewModel::rejectFriendRequest,
-                onAcceptHomeInvitation = appViewModel::acceptHomeInvitation,
-                onRejectHomeInvitation = appViewModel::rejectHomeInvitation
-            )
+                    onFloorTap = appViewModel::onFloorTap,
+                    onBottomNavItemClick = appViewModel::onBottomNavItemClick,
+                    recentMainMenuAction = uiState.recentMainMenuAction,
+                    onPlaceholderMessageConsumed = appViewModel::onPlaceholderMessageConsumed,
+                    onSetCameraZoom = appViewModel::setCameraZoom,
+                    onCaptureClick = appViewModel::captureScreen,
+                    onExitCameraMode = appViewModel::exitCameraMode,
+                    currencyAmount = uiState.currencyAmount.toInt(),
+                    purchasedShopItems = uiState.shopItems.filter {
+                        uiState.purchasedItemIds.contains(it.id)
+                    },
+                    onPlaygroundClick = appViewModel::openPlaza,
+                    mailboxVisible = uiState.mailboxVisible,
+                    friendRequests = uiState.receivedFriendRequests,
+                    homeInvitations = uiState.receivedHomeInvitations,
+                    onMailboxClick = appViewModel::openMailbox,
+                    onMailboxDismiss = appViewModel::closeMailbox,
+                    onAcceptFriendRequest = appViewModel::acceptFriendRequest,
+                    onRejectFriendRequest = appViewModel::rejectFriendRequest,
+                    onAcceptHomeInvitation = appViewModel::acceptHomeInvitation,
+                    onRejectHomeInvitation = appViewModel::rejectHomeInvitation
+                )
+
+                if (showOfflineDialog) {
+                    Dialog(
+                        onDismissRequest = { showOfflineDialog = false }
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .background(
+                                    color = Color(0xFFE6A64A),
+                                    shape = RoundedCornerShape(18.dp)
+                                )
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = offlineDialogMessage,
+                                color = Color.White,
+                                fontSize = 18.sp
+                            )
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Button(
+                                onClick = { showOfflineDialog = false }
+                            ) {
+                                Text("확인")
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         AppPhase.GALLERY -> {
@@ -176,7 +301,7 @@ fun LupaApp(deepLink: Uri? = null) {
 
         AppPhase.SHOP -> {
             ShopScreen(
-                currencyAmount = uiState.currencyAmount.toInt(), // Long -> Int 변환
+                currencyAmount = uiState.currencyAmount.toInt(),
                 shopItems = uiState.shopItems,
                 purchasedItemIds = uiState.purchasedItemIds,
                 onItemClick = appViewModel::selectShopItem,
@@ -190,7 +315,7 @@ fun LupaApp(deepLink: Uri? = null) {
             if (selectedItem != null) {
                 ShopDetailScreen(
                     item = selectedItem,
-                    currencyAmount = uiState.currencyAmount.toInt(), // Long -> Int 변환
+                    currencyAmount = uiState.currencyAmount.toInt(),
                     isPurchased = uiState.purchasedItemIds.contains(selectedItem.id),
                     isPurchasing = uiState.isPurchasing,
                     feedbackMessage = uiState.shopFeedbackMessage,
@@ -205,12 +330,69 @@ fun LupaApp(deepLink: Uri? = null) {
 
         AppPhase.MINIGAME -> {
             MinigameScreen(
-                currencyAmount = uiState.currencyAmount.toInt(), // Long -> Int 변환
+                currencyAmount = uiState.currencyAmount.toInt(),
                 feedbackMessage = uiState.shopFeedbackMessage,
                 onEarnCurrencyClick = appViewModel::earnCurrencyFromMinigame,
                 onBackClick = appViewModel::exitMinigame,
                 onFeedbackConsumed = appViewModel::consumeShopFeedback
             )
         }
+    }
+}
+
+private fun sendHeartbeatToServer(userId: String): Long? {
+    val url = URL("http://15.164.49.236:8080/user/heartbeat")
+    val connection = url.openConnection() as HttpURLConnection
+
+    return try {
+        connection.requestMethod = "POST"
+        connection.instanceFollowRedirects = false
+        connection.setRequestProperty("Content-Type", "application/json")
+        connection.connectTimeout = 5000
+        connection.readTimeout = 5000
+        connection.doOutput = true
+
+        val body = """
+            {
+                "userId": "$userId"
+            }
+        """.trimIndent()
+
+        OutputStreamWriter(connection.outputStream).use { writer ->
+            writer.write(body)
+            writer.flush()
+        }
+
+        val responseCode = connection.responseCode
+        println("Heartbeat responseCode: $responseCode")
+
+        if (responseCode in 200..299) {
+            val responseBody = connection.inputStream.bufferedReader().use { it.readText() }
+            println("Heartbeat responseBody: $responseBody")
+
+            val json = JSONObject(responseBody)
+            json.optLong("offlineSeconds", 0L)
+        } else {
+            println("Heartbeat redirectLocation: ${connection.getHeaderField("Location")}")
+            null
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
+    } finally {
+        connection.disconnect()
+    }
+}
+
+private fun formatOfflineMessage(seconds: Long): String {
+    val minutes = seconds / 60
+    val hours = minutes / 60
+    val days = hours / 24
+
+    return when {
+        days > 0 -> "${days}일 ${hours % 24}시간 동안\n자리를 비웠어요!"
+        hours > 0 -> "${hours}시간 ${minutes % 60}분 동안\n자리를 비웠어요!"
+        minutes > 0 -> "${minutes}분 동안\n자리를 비웠어요!"
+        else -> "${seconds}초 동안\n자리를 비웠어요!"
     }
 }
