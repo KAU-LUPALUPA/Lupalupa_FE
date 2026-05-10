@@ -48,7 +48,9 @@ fun MainLoadingScreen(
     authPopupVisible: Boolean,
     isProcessingLogin: Boolean,
     galleryImages: List<GalleryImage> = emptyList(), // [추가됨] 로딩 화면용 이미지 목록
-    onKakaoLoginClick: () -> Unit
+    isDevLoginEnabled: Boolean = false,
+    onKakaoLoginClick: () -> Unit,
+    onDevLoginClick: () -> Unit = {}
 ) {
     // 팝업 노출 상태는 최상위 레벨에서 remember 선언
     var showLoginPopup by remember { mutableStateOf(false) }
@@ -158,7 +160,9 @@ fun MainLoadingScreen(
                 // 기존 로그인 팝업 렌더링
                 AuthPopup(
                     isProcessingLogin = isProcessingLogin,
-                    onKakaoLoginClick = onKakaoLoginClick
+                    isDevLoginEnabled = isDevLoginEnabled,
+                    onKakaoLoginClick = onKakaoLoginClick,
+                    onDevLoginClick = onDevLoginClick
                 )
             }
         }
@@ -174,7 +178,9 @@ private fun MainLoadingScreenPreview() {
             authPopupVisible = previewLoadingUiState.authPopupVisible,
             isProcessingLogin = false,
             galleryImages = emptyList(), // [추가됨]
-            onKakaoLoginClick = {}
+            isDevLoginEnabled = true,
+            onKakaoLoginClick = {},
+            onDevLoginClick = {}
         )
     }
 }

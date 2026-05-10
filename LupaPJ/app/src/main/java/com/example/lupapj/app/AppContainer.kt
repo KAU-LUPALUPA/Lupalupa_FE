@@ -3,10 +3,12 @@ package com.example.lupapj.app
 import android.content.Context
 import com.example.lupapj.data.mock.MockAuthRepository
 import com.example.lupapj.data.mock.MockFriendRepository
+import com.example.lupapj.data.mock.MockPlazaRepository
 import com.example.lupapj.data.mock.MockRoomRepository
 import com.example.lupapj.data.repository.AuthRepository
 import com.example.lupapj.data.repository.FriendRepository
 import com.example.lupapj.data.repository.GalleryRepository // [추가됨]
+import com.example.lupapj.data.repository.PlazaRepository
 import com.example.lupapj.data.repository.RoomRepository
 import com.example.lupapj.data.mock.MockCurrencyRepository
 import com.example.lupapj.data.mock.MockShopRepository
@@ -18,6 +20,7 @@ import com.example.lupapj.data.repository.NetworkCurrencyRepository // [추가�
 import com.example.lupapj.data.remote.CurrencyApiService // [추가됨(권)]
 import com.example.lupapj.data.remote.AuthInterceptor // [추가됨(권)]
 import com.example.lupapj.data.remote.CurrencyRemoteDataSource // [추가됨(권)]
+import com.example.lupapj.data.remote.ServerConfig
 import okhttp3.OkHttpClient // [추가됨(권)]
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -37,7 +40,7 @@ class AppContainer(context: Context) { // [수정됨] Context 주입받도록 �
 
     // [추가됨(권)] Retrofit 설정 (기본 URL 및 컨버터 설정)
     private val retrofit = Retrofit.Builder()
-        .baseUrl("http://3.39.237.57:8080/") // [수정됨(권)] 개발 중인 백엔드 실제 IP 주소
+        .baseUrl(ServerConfig.BASE_URL) // [수정됨(권)] 개발 중인 백엔드 실제 IP 주소
         .client(okHttpClient) // OkHttpClient 연결
         .addConverterFactory(ScalarsConverterFactory.create()) // String 응답 처리용
         .addConverterFactory(GsonConverterFactory.create())    // JSON 요청 처리용
@@ -51,6 +54,7 @@ class AppContainer(context: Context) { // [수정됨] Context 주입받도록 �
     val authRepository: AuthRepository = MockAuthRepository()
     val roomRepository: RoomRepository = MockRoomRepository()
     val friendRepository: FriendRepository = MockFriendRepository()
+    val plazaRepository: PlazaRepository = MockPlazaRepository()
     val galleryRepository: GalleryRepository by lazy { GalleryRepository(appContext) } // [추가됨] 갤러리 리포지토리 생성
     
     // [추가됨(권)] 로컬 캐시 인스턴스. 서버 응답 성공 후에만 기록되는 읽기 캐시 역할.
