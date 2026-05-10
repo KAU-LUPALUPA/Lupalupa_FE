@@ -52,6 +52,8 @@ import com.example.lupapj.ui.theme.LupaPJTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.Arrangement
+
 @Composable
 fun RoomScreen(
     uiState: RoomUiState?,
@@ -67,6 +69,7 @@ fun RoomScreen(
     onRearrangeMoveLeft: () -> Unit,
     onRearrangeMoveRight: () -> Unit,
     onRearrangeConfirm: () -> Unit,
+    onRearrangeCancel: () -> Unit,
     onFloorTap: (FloorAnchor) -> Unit,
     onBottomNavItemClick: (BottomNavItem) -> Unit,
     recentMainMenuAction: MainMenuAction?,
@@ -153,25 +156,52 @@ fun RoomScreen(
             }
 
             if (!room.rearrangeMode) {
-
                 Surface(
                     onClick = onRearrangeClick,
+                    shape = RoundedCornerShape(18.dp),
+                    color = Color(0xFF7F5539),
+                    shadowElevation = 6.dp,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 90.dp, end = 16.dp)
+                ) {
+                    Text(
+                        text = "재배치",
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                    )
+                }
+            } else {
+                Surface(
                     shape = RoundedCornerShape(18.dp),
                     color = Color(0xFFEADFD3),
                     shadowElevation = 6.dp,
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 130.dp, end = 16.dp)
+                        .align(Alignment.TopCenter)
+                        .padding(top = 120.dp, start = 16.dp, end = 16.dp)
                 ) {
-
-                    Text(
-                        text = "재배치",
-                        color = Color(0xFF5C4033),
-                        modifier = Modifier.padding(
-                            horizontal = 18.dp,
-                            vertical = 10.dp
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "현재 재배치 중입니다. 가구를 누른 뒤 화살표로 이동하세요.",
+                            color = Color(0xFF5C4033)
                         )
-                    )
+
+                        Surface(
+                            onClick = onRearrangeCancel,
+                            shape = RoundedCornerShape(14.dp),
+                            color = Color(0xFF7F5539)
+                        ) {
+                            Text(
+                                text = "취소",
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
                 }
             }
 
@@ -194,16 +224,8 @@ fun RoomScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
 
-                    RearrangeCircleButton(
-                        onClick = onRearrangeMoveUp
-                    ) {
-                        Text(
-                            text = "↑",
-                            color = Color.White
-                        )
-                    }
-
                     Row(
+                        horizontalArrangement = Arrangement.spacedBy(80.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
 
@@ -211,23 +233,47 @@ fun RoomScreen(
                             onClick = onRearrangeMoveLeft
                         ) {
                             Text(
-                                text = "←",
+                                text = "↖",
                                 color = Color.White
                             )
                         }
 
-                        Surface(
-                            onClick = onRearrangeConfirm,
-                            shape = RoundedCornerShape(50),
-                            color = Color(0xFFB08968),
-                            shadowElevation = 6.dp,
-                            modifier = Modifier.padding(horizontal = 6.dp)
+                        RearrangeCircleButton(
+                            onClick = onRearrangeMoveUp
                         ) {
-
                             Text(
-                                text = "✓",
-                                color = Color.White,
-                                modifier = Modifier.padding(16.dp)
+                                text = "↗",
+                                color = Color.White
+                            )
+                        }
+                    }
+
+                    Surface(
+                        onClick = onRearrangeConfirm,
+                        shape = RoundedCornerShape(50),
+                        color = Color(0xFFB08968),
+                        shadowElevation = 6.dp,
+                        modifier = Modifier.padding(vertical = 10.dp)
+                    ) {
+
+                        Text(
+                            text = "✓",
+                            color = Color.White,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(80.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+
+                        RearrangeCircleButton(
+                            onClick = onRearrangeMoveDown
+                        ) {
+                            Text(
+                                text = "↙",
+                                color = Color.White
                             )
                         }
 
@@ -235,17 +281,18 @@ fun RoomScreen(
                             onClick = onRearrangeMoveRight
                         ) {
                             Text(
-                                text = "→",
+                                text = "↘",
                                 color = Color.White
                             )
                         }
                     }
+                }
 
                     RearrangeCircleButton(
                         onClick = onRearrangeMoveDown
                     ) {
                         Text(
-                            text = "↓",
+                            text = "↙",
                             color = Color.White
                         )
                     }
@@ -343,6 +390,7 @@ private fun RoomScreenPreview() {
             onRearrangeMoveLeft = {},
             onRearrangeMoveRight = {},
             onRearrangeConfirm = {},
+            onRearrangeCancel = {},
             onFloorTap = {},
             onBottomNavItemClick = {},
             recentMainMenuAction = MainMenuAction.SHOP,

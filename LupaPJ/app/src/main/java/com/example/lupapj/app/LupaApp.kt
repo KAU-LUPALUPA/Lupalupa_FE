@@ -78,6 +78,7 @@ fun LupaApp(deepLink: Uri? = null) {
                 onRearrangeMoveLeft = appViewModel::onRearrangeMoveLeft,
                 onRearrangeMoveRight = appViewModel::onRearrangeMoveRight,
                 onRearrangeConfirm = appViewModel::onRearrangeConfirm,
+                onRearrangeCancel = appViewModel::onRearrangeCancel,
 
                 onFloorTap = appViewModel::onFloorTap,
                 onBottomNavItemClick = appViewModel::onBottomNavItemClick,

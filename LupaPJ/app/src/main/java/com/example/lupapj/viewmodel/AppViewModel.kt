@@ -55,6 +55,7 @@ class AppViewModel(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AppUiState())
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
+    private var roomBeforeRearrange: RoomUiState? = null
     private var pendingFoodConsumeJob: Job? = null
     private var autonomousPetMovementJob: Job? = null
     private var friendMessagePollingJob: Job? = null
@@ -226,11 +227,45 @@ class AppViewModel(
     }
 
     fun onRearrangeClick() {
-        updateRoom { room ->
-            com.example.lupapj.ui.screens.main.RearrangeController.toggle(room)
+        val room = _uiState.value.room ?: return
+
+        if (!room.rearrangeMode) {
+            roomBeforeRearrange = room
+
+            updateRoom {
+                RearrangeController.toggle(it)
+            }
+
+            _uiState.update {
+                it.copy(
+                    placeholderMessage = "현재 재배치 중입니다. 취소하면 변경 전 배치로 돌아갑니다."
+                )
+            }
+        } else {
+            onRearrangeCancel()
         }
     }
+    fun onRearrangeCancel() {
+        val previousRoom = roomBeforeRearrange
 
+        updateRoom { room ->
+            previousRoom?.copy(
+                rearrangeMode = false,
+                selectedRearrangeObjectType = null
+            ) ?: room.copy(
+                rearrangeMode = false,
+                selectedRearrangeObjectType = null
+            )
+        }
+
+        roomBeforeRearrange = null
+
+        _uiState.update {
+            it.copy(
+                placeholderMessage = "재배치를 취소했습니다."
+            )
+        }
+    }
     fun onRearrangeMoveUp() {
         updateRoom { room ->
             com.example.lupapj.ui.screens.main.RearrangeController.moveUp(room)
@@ -264,7 +299,7 @@ class AppViewModel(
             val savedRoom = roomRepository.saveRoomLayout(
                 confirmedRoom
             )
-
+            roomBeforeRearrange = null
             applyRepositoryRoom(savedRoom)
         }
     }
