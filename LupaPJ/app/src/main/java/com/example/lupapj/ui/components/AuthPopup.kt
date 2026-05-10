@@ -75,7 +75,7 @@ fun AuthPopup(
                     onClick = {
                         val intent = Intent(
                             Intent.ACTION_VIEW,
-                            Uri.parse("http://54.180.145.58:8080/oauth2/authorization/kakao")
+                            Uri.parse("http://15.164.49.236:8080/oauth2/authorization/kakao")
                         )
                         context.startActivity(intent)
                     },
