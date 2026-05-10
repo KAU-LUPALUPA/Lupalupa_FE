@@ -1,0 +1,139 @@
+package com.example.lupapj.data.model.plaza
+
+import com.example.lupapj.data.model.DEFAULT_PET_CHARACTER_ASSET_KEY
+import com.example.lupapj.data.model.DEFAULT_PET_ID
+import com.example.lupapj.data.model.DEFAULT_PET_NAME
+import com.example.lupapj.data.model.DEFAULT_PET_OWNER_USER_ID
+import com.example.lupapj.data.model.PetAppearance
+import com.example.lupapj.data.model.PetPersonality
+import com.example.lupapj.data.model.PetStatus
+
+const val PLAZA_MAX_PARTICIPANTS = 4
+const val PLAZA_MESSAGE_MAX_LENGTH = 120
+
+@JvmInline
+value class PlazaCode(val value: String) {
+    init {
+        require(value.isNotBlank()) { "Plaza code must not be blank." }
+    }
+
+    companion object {
+        private const val PREFIX = "PZ"
+        private val ignoredSeparators = Regex("[\\s-]+")
+        private val validCode = Regex("^$PREFIX[A-Z0-9]{4,6}$")
+
+        fun fromInput(input: String): PlazaCode? {
+            val compact = input
+                .trim()
+                .uppercase()
+                .replace(ignoredSeparators, "")
+
+            if (compact.isBlank()) return null
+
+            val normalized = if (compact.startsWith(PREFIX)) {
+                compact
+            } else {
+                "$PREFIX$compact"
+            }
+
+            return normalized
+                .takeIf { validCode.matches(it) }
+                ?.let(::PlazaCode)
+        }
+
+        fun display(value: String): String {
+            val code = fromInput(value)?.value ?: return value
+            return if (code.length <= PREFIX.length) {
+                code
+            } else {
+                "$PREFIX-${code.drop(PREFIX.length)}"
+            }
+        }
+    }
+}
+
+data class PlazaPetSnapshot(
+    val petId: String = DEFAULT_PET_ID,
+    val ownerUserId: String = DEFAULT_PET_OWNER_USER_ID,
+    val name: String = DEFAULT_PET_NAME,
+    val characterAssetKey: String = DEFAULT_PET_CHARACTER_ASSET_KEY,
+    val appearance: PetAppearance = PetAppearance(),
+    val status: PetStatus = PetStatus(),
+    val personality: PetPersonality = PetPersonality.ACTIVE,
+    val equippedItemIds: List<String> = emptyList()
+)
+
+data class PlazaPosition(
+    val x: Float,
+    val y: Float
+)
+
+data class PlazaParticipant(
+    val userId: String,
+    val nickname: String,
+    val pet: PlazaPetSnapshot,
+    val joinedAtMillis: Long,
+    val isMe: Boolean = false,
+    val position: PlazaPosition? = null
+)
+
+data class PlazaChatMessage(
+    val id: String,
+    val plazaId: String,
+    val senderUserId: String,
+    val senderNickname: String,
+    val text: String,
+    val sentAtMillis: Long
+)
+
+enum class PlazaInteractionType {
+    GREET,
+    CHAT,
+    PLAY,
+    REST,
+    FOLLOW
+}
+
+data class PlazaInteractionEvent(
+    val id: String,
+    val plazaId: String,
+    val type: PlazaInteractionType,
+    val actorUserId: String,
+    val targetUserId: String? = null,
+    val textByUserId: Map<String, String> = emptyMap(),
+    val startedAtMillis: Long,
+    val durationMillis: Long,
+    val movementTargetByUserId: Map<String, PlazaPosition> = emptyMap()
+)
+
+data class PlazaRoom(
+    val plazaId: String,
+    val plazaCode: PlazaCode,
+    val participants: List<PlazaParticipant>,
+    val messages: List<PlazaChatMessage> = emptyList(),
+    val interactions: List<PlazaInteractionEvent> = emptyList(),
+    val maxParticipants: Int = PLAZA_MAX_PARTICIPANTS,
+    val joinedAtMillis: Long
+) {
+    val displayCode: String
+        get() = PlazaCode.display(plazaCode.value)
+
+    val participantCountText: String
+        get() = "${participants.size}/$maxParticipants"
+}
+
+enum class PlazaOperationFailure {
+    EMPTY_CODE,
+    INVALID_CODE,
+    PLAZA_NOT_FOUND,
+    PLAZA_FULL,
+    EMPTY_MESSAGE,
+    MESSAGE_TOO_LONG,
+    NOT_IN_PLAZA,
+    UNKNOWN
+}
+
+sealed interface PlazaOperationResult<out T> {
+    data class Success<T>(val value: T) : PlazaOperationResult<T>
+    data class Failure(val reason: PlazaOperationFailure) : PlazaOperationResult<Nothing>
+}

@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,7 +34,9 @@ private val KakaoBlack = Color(0xFF191919)
 @Composable
 fun AuthPopup(
     isProcessingLogin: Boolean,
-    onKakaoLoginClick: () -> Unit
+    isDevLoginEnabled: Boolean = false,
+    onKakaoLoginClick: () -> Unit,
+    onDevLoginClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
     Dialog(onDismissRequest = {}) {
@@ -73,6 +76,7 @@ fun AuthPopup(
 
                 ElevatedButton(
                     onClick = {
+                        onKakaoLoginClick()
                         val intent = Intent(
                             Intent.ACTION_VIEW,
                             Uri.parse("http://54.180.145.58:8080/oauth2/authorization/kakao")
@@ -124,6 +128,29 @@ fun AuthPopup(
                         )
 
                         Spacer(modifier = Modifier.width(48.dp))
+                    }
+                }
+
+                if (isDevLoginEnabled) {
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedButton(
+                        onClick = onDevLoginClick,
+                        enabled = !isProcessingLogin,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFF4A4A4A),
+                            disabledContentColor = Color(0xFF9A9A9A)
+                        )
+                    ) {
+                        Text(
+                            text = "개발용 입장",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
 

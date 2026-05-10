@@ -9,6 +9,7 @@ import com.example.lupapj.data.model.DemoPetConditionPolicy
 import com.example.lupapj.data.model.MainMenuAction
 import com.example.lupapj.data.model.PetAction
 import com.example.lupapj.data.model.PetConditionTickRemainder
+import com.example.lupapj.data.model.PetUiState
 import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.repository.AuthRepository
@@ -22,6 +23,10 @@ import com.example.lupapj.data.model.ShopItem // [추가됨(권)] 상점 아이�
 import com.example.lupapj.data.model.friend.FRIEND_MESSAGE_MAX_LENGTH
 import com.example.lupapj.data.model.friend.FriendOperationFailure
 import com.example.lupapj.data.model.friend.FriendOperationResult
+import com.example.lupapj.data.model.plaza.PLAZA_MESSAGE_MAX_LENGTH
+import com.example.lupapj.data.model.plaza.PlazaOperationFailure
+import com.example.lupapj.data.model.plaza.PlazaOperationResult
+import com.example.lupapj.data.model.plaza.PlazaPetSnapshot
 import com.example.lupapj.data.model.scene.FloorAnchor
 import com.example.lupapj.data.model.scene.PET_AUTONOMOUS_MOVE_DURATION_MS
 import com.example.lupapj.data.model.scene.PetMovementState
@@ -29,6 +34,7 @@ import com.example.lupapj.data.model.advancePetCondition
 import com.example.lupapj.data.model.applyFeedRecovery
 import com.example.lupapj.data.model.scene.autonomousMovementProfileFor
 import com.example.lupapj.data.model.scene.chooseAutonomousPetTarget
+import com.example.lupapj.data.repository.PlazaRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,12 +50,15 @@ private const val FOOD_CONSUME_PAUSE_MS = 650L
 private const val AUTONOMOUS_MOVEMENT_RETRY_DELAY_MS = 800L
 private const val FRIEND_MESSAGE_POLL_INTERVAL_MS = 3_000L
 private const val PET_CONDITION_TICK_INTERVAL_MS = 1_000L
+private const val DEV_LOGIN_ACCESS_TOKEN = "dev-access-token"
+private const val DEV_LOGIN_NICKNAME = "개발자"
 
 class AppViewModel(
     private val authRepository: AuthRepository,
     private val roomRepository: RoomRepository,
     private val galleryRepository: GalleryRepository, // [추가됨]
     private val friendRepository: FriendRepository,
+    private val plazaRepository: PlazaRepository,
     private val currencyRepository: CurrencyRepository, // [추가됨(권)] ViewModel 파라미터로 추가
     private val shopRepository: ShopRepository // [추가됨(권)] ViewModel 파라미터로 추가
 ) : ViewModel() {
@@ -59,6 +68,9 @@ class AppViewModel(
     private var autonomousPetMovementJob: Job? = null
     private var friendMessagePollingJob: Job? = null
     private var petConditionJob: Job? = null
+    private var plazaJoinJob: Job? = null
+    private var plazaMessageSendJob: Job? = null
+    private var plazaJoinRequestId = 0
     private var petConditionRemainder = PetConditionTickRemainder()
 
     init {
@@ -107,6 +119,11 @@ class AppViewModel(
                         )
                     }
                 }
+            }
+        }
+        viewModelScope.launch {
+            plazaRepository.activePlaza.collect { plaza ->
+                _uiState.update { it.copy(activePlaza = plaza) }
             }
         }
         
@@ -176,13 +193,22 @@ class AppViewModel(
         }
     }
 
+    fun onDevLoginClick() {
+        if (_uiState.value.isProcessingLogin) return
+
+        onKakaoLoginSuccess(
+            accessToken = DEV_LOGIN_ACCESS_TOKEN,
+            nickname = DEV_LOGIN_NICKNAME
+        )
+    }
+
     fun onButtonAClick() {
         when (_uiState.value.recentMainMenuAction) {
             MainMenuAction.SCREENSHOT -> onBottomNavItemClick(BottomNavItem.SCREENSHOT)
             MainMenuAction.GALLERY -> onBottomNavItemClick(BottomNavItem.GALLERY)
             MainMenuAction.CONTACTS -> onBottomNavItemClick(BottomNavItem.CONTACTS)
             MainMenuAction.SHOP -> onBottomNavItemClick(BottomNavItem.SHOP)
-            MainMenuAction.PLAYGROUND -> openMinigame()
+            MainMenuAction.PLAYGROUND -> openPlaza()
             null -> _uiState.update {
                 it.copy(placeholderMessage = "최근 사용한 기능이 없습니다.")
             }
@@ -342,6 +368,226 @@ class AppViewModel(
 
     fun exitFriends() {
         _uiState.update { it.copy(phase = AppPhase.ROOM) }
+    }
+
+    fun openPlaza() {
+        _uiState.update {
+            it.copy(
+                phase = AppPhase.PLAZA,
+                recentMainMenuAction = MainMenuAction.PLAYGROUND,
+                plazaFeedbackMessage = null
+            )
+        }
+    }
+
+    fun returnHomeFromPlaza() {
+        plazaJoinRequestId += 1
+        plazaJoinJob?.cancel()
+        plazaJoinJob = null
+        cancelPlazaMessageSend()
+        val shouldLeavePlaza = _uiState.value.activePlaza != null
+
+        _uiState.update {
+            it.copy(
+                phase = AppPhase.ROOM,
+                activePlaza = null,
+                plazaCodeInput = "",
+                plazaMessageInput = "",
+                isJoiningPlaza = false,
+                isSendingPlazaMessage = false,
+                plazaFeedbackMessage = null
+            )
+        }
+
+        if (!shouldLeavePlaza) return
+        viewModelScope.launch {
+            plazaRepository.leavePlaza()
+        }
+    }
+
+    fun onPlazaCodeChange(input: String) {
+        _uiState.update {
+            it.copy(plazaCodeInput = input.take(12).uppercase())
+        }
+    }
+
+    fun joinRandomPlaza() {
+        if (_uiState.value.isJoiningPlaza) return
+
+        val requestId = ++plazaJoinRequestId
+        plazaJoinJob?.cancel()
+        cancelPlazaMessageSend()
+        plazaJoinJob = viewModelScope.launch {
+            val participantProfile = currentPlazaParticipantProfile()
+            _uiState.update {
+                it.copy(
+                    isJoiningPlaza = true,
+                    plazaFeedbackMessage = null
+                )
+            }
+            val result = plazaRepository.joinRandomPlaza(
+                currentUserId = participantProfile.userId,
+                nickname = participantProfile.nickname,
+                pet = participantProfile.pet
+            )
+            if (!isActivePlazaJoinRequest(requestId)) {
+                if (
+                    result is PlazaOperationResult.Success &&
+                    plazaRepository.activePlaza.value?.plazaId == result.value.plazaId
+                ) {
+                    plazaRepository.leavePlaza()
+                }
+                return@launch
+            }
+            _uiState.update {
+                when (result) {
+                    is PlazaOperationResult.Success -> it.copy(
+                        isJoiningPlaza = false,
+                        plazaCodeInput = "",
+                        plazaFeedbackMessage = null
+                    )
+
+                    is PlazaOperationResult.Failure -> it.copy(
+                        isJoiningPlaza = false,
+                        plazaFeedbackMessage = result.reason.message
+                    )
+                }
+            }
+        }
+    }
+
+    fun joinPlazaByCode() {
+        if (_uiState.value.isJoiningPlaza) return
+
+        val requestId = ++plazaJoinRequestId
+        plazaJoinJob?.cancel()
+        cancelPlazaMessageSend()
+        plazaJoinJob = viewModelScope.launch {
+            val state = _uiState.value
+            val participantProfile = currentPlazaParticipantProfile()
+            _uiState.update {
+                it.copy(
+                    isJoiningPlaza = true,
+                    plazaFeedbackMessage = null
+                )
+            }
+            val result = plazaRepository.joinPlazaByCode(
+                codeInput = state.plazaCodeInput,
+                currentUserId = participantProfile.userId,
+                nickname = participantProfile.nickname,
+                pet = participantProfile.pet
+            )
+            if (!isActivePlazaJoinRequest(requestId)) {
+                if (
+                    result is PlazaOperationResult.Success &&
+                    plazaRepository.activePlaza.value?.plazaId == result.value.plazaId
+                ) {
+                    plazaRepository.leavePlaza()
+                }
+                return@launch
+            }
+            _uiState.update {
+                when (result) {
+                    is PlazaOperationResult.Success -> it.copy(
+                        isJoiningPlaza = false,
+                        plazaCodeInput = "",
+                        plazaFeedbackMessage = null
+                    )
+
+                    is PlazaOperationResult.Failure -> it.copy(
+                        isJoiningPlaza = false,
+                        plazaFeedbackMessage = result.reason.message
+                    )
+                }
+            }
+        }
+    }
+
+    fun leaveCurrentPlaza() {
+        plazaJoinRequestId += 1
+        plazaJoinJob?.cancel()
+        plazaJoinJob = null
+        cancelPlazaMessageSend()
+        val leavingPlaza = _uiState.value.activePlaza
+
+        _uiState.update {
+            it.copy(
+                activePlaza = null,
+                plazaMessageInput = "",
+                isJoiningPlaza = false,
+                isSendingPlazaMessage = false
+            )
+        }
+
+        viewModelScope.launch {
+            val result = plazaRepository.leavePlaza()
+            _uiState.update {
+                when (result) {
+                    is PlazaOperationResult.Success -> it.copy(
+                        plazaFeedbackMessage = "광장에서 나왔어요."
+                    )
+
+                    is PlazaOperationResult.Failure -> it.copy(
+                        activePlaza = leavingPlaza,
+                        plazaFeedbackMessage = result.reason.message
+                    )
+                }
+            }
+        }
+    }
+
+    fun onPlazaMessageChange(input: String) {
+        _uiState.update {
+            it.copy(plazaMessageInput = input.take(PLAZA_MESSAGE_MAX_LENGTH))
+        }
+    }
+
+    fun sendPlazaMessage() {
+        val state = _uiState.value
+        if (state.isSendingPlazaMessage) return
+        val sendingPlazaId = state.activePlaza?.plazaId
+            ?: return
+
+        plazaMessageSendJob = viewModelScope.launch {
+            _uiState.update { it.copy(isSendingPlazaMessage = true) }
+            val result = plazaRepository.sendMessage(state.plazaMessageInput)
+
+            _uiState.update { latestState ->
+                if (
+                    latestState.phase != AppPhase.PLAZA ||
+                    latestState.activePlaza?.plazaId != sendingPlazaId
+                ) {
+                    return@update latestState
+                }
+
+                when (result) {
+                    is PlazaOperationResult.Success -> latestState.copy(
+                        plazaMessageInput = "",
+                        isSendingPlazaMessage = false,
+                        plazaFeedbackMessage = null
+                    )
+
+                    is PlazaOperationResult.Failure -> latestState.copy(
+                        isSendingPlazaMessage = false,
+                        plazaFeedbackMessage = result.reason.message
+                    )
+                }
+            }
+        }
+    }
+
+    fun onPlazaFeedbackConsumed() {
+        _uiState.update { it.copy(plazaFeedbackMessage = null) }
+    }
+
+    private fun isActivePlazaJoinRequest(requestId: Int): Boolean {
+        val state = _uiState.value
+        return plazaJoinRequestId == requestId && state.phase == AppPhase.PLAZA
+    }
+
+    private fun cancelPlazaMessageSend() {
+        plazaMessageSendJob?.cancel()
+        plazaMessageSendJob = null
     }
 
     fun openMailbox() {
@@ -711,6 +957,19 @@ class AppViewModel(
         }
     }
 
+    private fun currentPlazaParticipantProfile(): PlazaParticipantProfile {
+        val state = _uiState.value
+        val friendProfile = state.myFriendProfile
+        val roomPet = state.room?.pet ?: PetUiState()
+        val ownerUserId = friendProfile?.userId ?: roomPet.ownerUserId
+
+        return PlazaParticipantProfile(
+            userId = ownerUserId,
+            nickname = friendProfile?.nickname ?: "나",
+            pet = roomPet.toPlazaPetSnapshot(ownerUserId = ownerUserId)
+        )
+    }
+
     private fun startAutonomousPetMovement() {
         if (autonomousPetMovementJob?.isActive == true) return
 
@@ -923,6 +1182,8 @@ class AppViewModel(
         autonomousPetMovementJob?.cancel()
         friendMessagePollingJob?.cancel()
         petConditionJob?.cancel()
+        plazaJoinJob?.cancel()
+        plazaMessageSendJob?.cancel()
         super.onCleared()
     }
 
@@ -931,6 +1192,7 @@ class AppViewModel(
         private val roomRepository: RoomRepository,
         private val galleryRepository: GalleryRepository, // [추가됨]
         private val friendRepository: FriendRepository,
+        private val plazaRepository: PlazaRepository,
         private val currencyRepository: CurrencyRepository, // [추가됨(권)] 팩토리 파라미터 추가
         private val shopRepository: ShopRepository // [추가됨(권)] 팩토리 파라미터 추가
     ) : ViewModelProvider.Factory {
@@ -941,11 +1203,31 @@ class AppViewModel(
                 roomRepository = roomRepository,
                 galleryRepository = galleryRepository,
                 friendRepository = friendRepository,
+                plazaRepository = plazaRepository,
                 currencyRepository = currencyRepository,
                 shopRepository = shopRepository
             ) as T
         }
     }
+}
+
+private data class PlazaParticipantProfile(
+    val userId: String,
+    val nickname: String,
+    val pet: PlazaPetSnapshot
+)
+
+private fun PetUiState.toPlazaPetSnapshot(ownerUserId: String): PlazaPetSnapshot {
+    return PlazaPetSnapshot(
+        petId = petId,
+        ownerUserId = ownerUserId,
+        name = name,
+        characterAssetKey = characterAssetKey,
+        appearance = appearance,
+        status = status,
+        personality = personality,
+        equippedItemIds = equippedItemIds
+    )
 }
 
 private fun FriendOperationResult<*>.feedbackMessage(
@@ -979,4 +1261,16 @@ private val FriendOperationFailure.message: String
         FriendOperationFailure.FRIEND_HOME_UNAVAILABLE -> "친구 집을 불러올 수 없어요."
         FriendOperationFailure.BLOCKED -> "초대를 수락해야 친구 집에 방문할 수 있어요."
         FriendOperationFailure.UNKNOWN -> "친구 기능을 잠시 사용할 수 없어요."
+    }
+
+private val PlazaOperationFailure.message: String
+    get() = when (this) {
+        PlazaOperationFailure.EMPTY_CODE -> "광장 코드를 입력해주세요."
+        PlazaOperationFailure.INVALID_CODE -> "광장 코드는 PZ-0000 형식으로 입력해주세요."
+        PlazaOperationFailure.PLAZA_NOT_FOUND -> "해당 광장을 찾을 수 없어요."
+        PlazaOperationFailure.PLAZA_FULL -> "광장이 가득 찼어요."
+        PlazaOperationFailure.EMPTY_MESSAGE -> "메시지를 입력해주세요."
+        PlazaOperationFailure.MESSAGE_TOO_LONG -> "메시지는 ${PLAZA_MESSAGE_MAX_LENGTH}자까지 보낼 수 있어요."
+        PlazaOperationFailure.NOT_IN_PLAZA -> "입장한 광장이 없어요."
+        PlazaOperationFailure.UNKNOWN -> "광장 기능을 잠시 사용할 수 없어요."
     }
