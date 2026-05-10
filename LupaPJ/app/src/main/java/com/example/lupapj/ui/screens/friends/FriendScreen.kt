@@ -53,6 +53,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.lupapj.data.mock.DemoFriendUsers
 import com.example.lupapj.data.model.friend.FriendCode
+import com.example.lupapj.data.model.friend.FriendHomeInvitation
+import com.example.lupapj.data.model.friend.FriendHomeInvitationStatus
 import com.example.lupapj.data.model.friend.FriendRequest
 import com.example.lupapj.data.model.friend.FriendRequestStatus
 import com.example.lupapj.data.model.friend.FriendSummary
@@ -62,6 +64,7 @@ import kotlinx.coroutines.launch
 
 private enum class FriendTab(val title: String) {
     Friends("친구"),
+    HomeInvites("집 초대"),
     Received("받은 요청"),
     Sent("보낸 요청")
 }
@@ -73,6 +76,7 @@ fun FriendScreen(
     friends: List<FriendSummary>,
     receivedRequests: List<FriendRequest>,
     sentRequests: List<FriendRequest>,
+    receivedHomeInvitations: List<FriendHomeInvitation>,
     friendCodeInput: String,
     isSendingFriendRequest: Boolean,
     feedbackMessage: String?,
@@ -81,7 +85,8 @@ fun FriendScreen(
     onAcceptRequest: (String) -> Unit,
     onRejectRequest: (String) -> Unit,
     onCancelRequest: (String) -> Unit,
-    onVisitFriend: (String) -> Unit,
+    onAcceptHomeInvitation: (String) -> Unit,
+    onRejectHomeInvitation: (String) -> Unit,
     onRemoveFriend: (String) -> Unit,
     onBackClick: () -> Unit,
     onFeedbackConsumed: () -> Unit,
@@ -164,6 +169,7 @@ fun FriendScreen(
                 FriendTab.entries.forEachIndexed { index, tab ->
                     val count = when (tab) {
                         FriendTab.Friends -> friends.size
+                        FriendTab.HomeInvites -> receivedHomeInvitations.size
                         FriendTab.Received -> receivedRequests.size
                         FriendTab.Sent -> sentRequests.size
                     }
@@ -178,8 +184,13 @@ fun FriendScreen(
             when (FriendTab.entries[selectedTabIndex]) {
                 FriendTab.Friends -> FriendList(
                     friends = friends,
-                    onVisitFriend = onVisitFriend,
                     onRemoveFriendClick = { friendPendingRemoval = it }
+                )
+
+                FriendTab.HomeInvites -> HomeInvitationList(
+                    invitations = receivedHomeInvitations,
+                    onAcceptHomeInvitation = onAcceptHomeInvitation,
+                    onRejectHomeInvitation = onRejectHomeInvitation
                 )
 
                 FriendTab.Received -> ReceivedRequestList(
@@ -280,7 +291,6 @@ private fun FriendCodePanel(
 @Composable
 private fun FriendList(
     friends: List<FriendSummary>,
-    onVisitFriend: (String) -> Unit,
     onRemoveFriendClick: (FriendUser) -> Unit
 ) {
     if (friends.isEmpty()) {
@@ -297,12 +307,42 @@ private fun FriendList(
             UserRow(
                 user = friend.user,
                 trailingContent = {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        TextButton(onClick = { onRemoveFriendClick(friend.user) }) {
-                            Text("삭제")
+                    TextButton(onClick = { onRemoveFriendClick(friend.user) }) {
+                        Text("삭제")
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeInvitationList(
+    invitations: List<FriendHomeInvitation>,
+    onAcceptHomeInvitation: (String) -> Unit,
+    onRejectHomeInvitation: (String) -> Unit
+) {
+    if (invitations.isEmpty()) {
+        EmptyState(text = "받은 집 초대가 없습니다.")
+        return
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        items(invitations, key = { it.id }) { invitation ->
+            UserRow(
+                user = invitation.fromUser,
+                supportingText = invitation.message ?: invitation.status.displayText,
+                trailingContent = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onRejectHomeInvitation(invitation.id) }) {
+                            Text("거절")
                         }
-                        Button(onClick = { onVisitFriend(friend.user.userId) }) {
-                            Text("방문")
+                        Button(onClick = { onAcceptHomeInvitation(invitation.id) }) {
+                            Text("수락")
                         }
                     }
                 }
@@ -460,6 +500,15 @@ private val FriendRequestStatus.displayText: String
         FriendRequestStatus.CANCELED -> "취소됨"
     }
 
+private val FriendHomeInvitationStatus.displayText: String
+    get() = when (this) {
+        FriendHomeInvitationStatus.PENDING -> "집 초대 대기 중"
+        FriendHomeInvitationStatus.ACCEPTED -> "초대 수락됨"
+        FriendHomeInvitationStatus.REJECTED -> "초대 거절됨"
+        FriendHomeInvitationStatus.CANCELED -> "초대 취소됨"
+        FriendHomeInvitationStatus.EXPIRED -> "만료됨"
+    }
+
 private fun copyToClipboard(context: Context, text: String) {
     val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboardManager.setPrimaryClip(
@@ -476,6 +525,13 @@ private fun FriendScreenPreview() {
         toUser = DemoFriendUsers.me,
         createdAtMillis = 1_000L
     )
+    val homeInvitation = FriendHomeInvitation(
+        id = "preview-home-invitation",
+        fromUser = DemoFriendUsers.alreadyFriend,
+        toUser = DemoFriendUsers.me,
+        message = "미나님의 집에 초대받았어요.",
+        createdAtMillis = 1_000L
+    )
 
     LupaPJTheme {
         FriendScreen(
@@ -488,6 +544,7 @@ private fun FriendScreenPreview() {
             ),
             receivedRequests = listOf(receivedRequest),
             sentRequests = emptyList(),
+            receivedHomeInvitations = listOf(homeInvitation),
             friendCodeInput = FriendCode.display("LUPA5B0RI"),
             isSendingFriendRequest = false,
             feedbackMessage = null,
@@ -496,7 +553,8 @@ private fun FriendScreenPreview() {
             onAcceptRequest = {},
             onRejectRequest = {},
             onCancelRequest = {},
-            onVisitFriend = {},
+            onAcceptHomeInvitation = {},
+            onRejectHomeInvitation = {},
             onRemoveFriend = {},
             onBackClick = {},
             onFeedbackConsumed = {}

@@ -78,6 +78,7 @@ fun LupaApp(deepLink: Uri? = null) {
                 onRearrangeMoveLeft = appViewModel::onRearrangeMoveLeft,
                 onRearrangeMoveRight = appViewModel::onRearrangeMoveRight,
                 onRearrangeConfirm = appViewModel::onRearrangeConfirm,
+                onRearrangeCancel = appViewModel::onRearrangeCancel,
 
                 onFloorTap = appViewModel::onFloorTap,
                 onBottomNavItemClick = appViewModel::onBottomNavItemClick,
@@ -90,7 +91,16 @@ fun LupaApp(deepLink: Uri? = null) {
                 purchasedShopItems = uiState.shopItems.filter { item ->
                     uiState.purchasedItems.any { it.masterId == item.id }
                 },
-                onMinigameClick = appViewModel::openMinigame
+                onMinigameClick = appViewModel::openMinigame,
+                mailboxVisible = uiState.mailboxVisible,
+                friendRequests = uiState.receivedFriendRequests,
+                homeInvitations = uiState.receivedHomeInvitations,
+                onMailboxClick = appViewModel::openMailbox,
+                onMailboxDismiss = appViewModel::closeMailbox,
+                onAcceptFriendRequest = appViewModel::acceptFriendRequest,
+                onRejectFriendRequest = appViewModel::rejectFriendRequest,
+                onAcceptHomeInvitation = appViewModel::acceptHomeInvitation,
+                onRejectHomeInvitation = appViewModel::rejectHomeInvitation
             )
         }
 
@@ -109,6 +119,7 @@ fun LupaApp(deepLink: Uri? = null) {
                 friends = uiState.friends,
                 receivedRequests = uiState.receivedFriendRequests,
                 sentRequests = uiState.sentFriendRequests,
+                receivedHomeInvitations = uiState.receivedHomeInvitations,
                 friendCodeInput = uiState.friendCodeInput,
                 isSendingFriendRequest = uiState.isSendingFriendRequest,
                 feedbackMessage = uiState.friendFeedbackMessage,
@@ -117,7 +128,8 @@ fun LupaApp(deepLink: Uri? = null) {
                 onAcceptRequest = appViewModel::acceptFriendRequest,
                 onRejectRequest = appViewModel::rejectFriendRequest,
                 onCancelRequest = appViewModel::cancelFriendRequest,
-                onVisitFriend = appViewModel::visitFriendHome,
+                onAcceptHomeInvitation = appViewModel::acceptHomeInvitation,
+                onRejectHomeInvitation = appViewModel::rejectHomeInvitation,
                 onRemoveFriend = appViewModel::removeFriend,
                 onBackClick = appViewModel::exitFriends,
                 onFeedbackConsumed = appViewModel::onFriendFeedbackConsumed

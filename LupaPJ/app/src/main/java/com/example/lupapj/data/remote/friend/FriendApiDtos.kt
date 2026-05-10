@@ -31,6 +31,19 @@ data class FriendsResponseDto(
     val friends: List<FriendshipDto>
 )
 
+data class FriendHomeInvitationsResponseDto(
+    val invitations: List<FriendHomeInvitationDto>
+)
+
+data class FriendHomeInvitationResponseDto(
+    val invitation: FriendHomeInvitationDto
+)
+
+data class AcceptHomeInvitationResponseDto(
+    val invitation: FriendHomeInvitationDto,
+    val homeSnapshot: FriendHomeSnapshotDto
+)
+
 data class FriendHomeResponseDto(
     val owner: FriendUserDto,
     val room: FriendRoomDto,
@@ -73,6 +86,17 @@ data class FriendshipDto(
     val friend: FriendUserDto,
     val status: String,
     val friendsSince: String
+)
+
+data class FriendHomeInvitationDto(
+    val id: String,
+    val fromUser: FriendUserDto,
+    val toUser: FriendUserDto,
+    val status: String,
+    val message: String? = null,
+    val createdAt: String,
+    val respondedAt: String? = null,
+    val expiresAt: String? = null
 )
 
 data class FriendMessageDto(
@@ -126,6 +150,26 @@ data class FriendPetDto(
     val anchor: FriendAnchorDto
 )
 
+data class FriendHomeSnapshotDto(
+    val owner: FriendUserDto,
+    val room: FriendRoomDto,
+    val petSnapshot: FriendPetSnapshotDto? = null,
+    val snapshotAt: String? = null,
+    val visitedAt: String
+)
+
+data class FriendPetSnapshotDto(
+    val petId: String,
+    val ownerUserId: String,
+    val name: String,
+    val characterAssetKey: String,
+    val appearance: FriendPetAppearanceDto,
+    val condition: FriendPetConditionDto,
+    val sceneState: FriendPetSceneStateDto,
+    val personality: String,
+    val equippedItemIds: List<String> = emptyList()
+)
+
 data class FriendPetAppearanceDto(
     val headSizeScale: Float,
     val bodySizeScale: Float,
@@ -135,7 +179,18 @@ data class FriendPetAppearanceDto(
 )
 
 data class FriendPetStatusDto(
-    val hunger: Int,
-    val fatigue: Int,
+    val satiety: Int,
+    val vitality: Int,
     val isEgg: Boolean
+)
+
+data class FriendPetConditionDto(
+    val satiety: Int,
+    val vitality: Int,
+    val isEgg: Boolean
+)
+
+data class FriendPetSceneStateDto(
+    val action: String,
+    val anchor: FriendAnchorDto
 )

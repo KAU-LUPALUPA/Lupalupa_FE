@@ -7,6 +7,8 @@ import com.example.lupapj.data.model.PetStatus
 import com.example.lupapj.data.model.friend.FRIEND_MESSAGE_MAX_LENGTH
 import com.example.lupapj.data.model.friend.FriendCode
 import com.example.lupapj.data.model.friend.FriendHome
+import com.example.lupapj.data.model.friend.FriendHomeInvitation
+import com.example.lupapj.data.model.friend.FriendHomeInvitationStatus
 import com.example.lupapj.data.model.friend.FriendMessage
 import com.example.lupapj.data.model.friend.FriendMessageSender
 import com.example.lupapj.data.model.friend.FriendOperationFailure
@@ -63,6 +65,7 @@ class MockFriendRepository(
     remoteUsers: List<FriendUser> = DemoFriendUsers.allRemoteUsers,
     initialFriends: List<FriendUser> = listOf(DemoFriendUsers.alreadyFriend),
     initialReceivedRequestUsers: List<FriendUser> = listOf(DemoFriendUsers.incomingRequester),
+    initialHomeInvitationUsers: List<FriendUser> = listOf(DemoFriendUsers.alreadyFriend),
     private val nowProvider: () -> Long = { System.currentTimeMillis() },
     private val simulatedDelayMillis: Long = 120L
 ) : FriendRepository {
@@ -74,6 +77,7 @@ class MockFriendRepository(
         user.userId to createFriendRoom(user)
     }
     private var nextRequestSequence = 1
+    private var nextInvitationSequence = 1
     private var nextMessageSequence = 1
 
     private val _friends = MutableStateFlow(
@@ -98,6 +102,22 @@ class MockFriendRepository(
 
     private val _sentRequests = MutableStateFlow<List<FriendRequest>>(emptyList())
     override val sentRequests: StateFlow<List<FriendRequest>> = _sentRequests.asStateFlow()
+
+    private val _receivedHomeInvitations = MutableStateFlow(
+        initialHomeInvitationUsers
+            .filter { invitedBy ->
+                initialFriends.any { friend -> friend.userId == invitedBy.userId }
+            }
+            .map { invitedBy ->
+                createHomeInvitation(
+                    fromUser = invitedBy,
+                    toUser = currentUser,
+                    message = "${invitedBy.nickname}님의 집에 초대받았어요."
+                )
+            }
+    )
+    override val receivedHomeInvitations: StateFlow<List<FriendHomeInvitation>> =
+        _receivedHomeInvitations.asStateFlow()
 
     private val _friendMessages = MutableStateFlow(createInitialMessages(remoteUsers))
     override val friendMessages: StateFlow<Map<String, List<FriendMessage>>> =
@@ -236,16 +256,63 @@ class MockFriendRepository(
     ): FriendOperationResult<FriendHome> {
         simulateLatency()
 
-        val friend = _friends.value.firstOrNull { it.user.userId == friendUserId }
+        if (_friends.value.none { it.user.userId == friendUserId }) {
+            return FriendOperationResult.Failure(FriendOperationFailure.NOT_FRIENDS)
+        }
+
+        return FriendOperationResult.Failure(FriendOperationFailure.BLOCKED)
+    }
+
+    override suspend fun acceptHomeInvitation(
+        invitationId: String
+    ): FriendOperationResult<FriendHome> {
+        simulateLatency()
+
+        val invitation = _receivedHomeInvitations.value.firstOrNull { it.id == invitationId }
+            ?: return FriendOperationResult.Failure(FriendOperationFailure.HOME_INVITATION_NOT_FOUND)
+
+        if (invitation.status != FriendHomeInvitationStatus.PENDING) {
+            return FriendOperationResult.Failure(FriendOperationFailure.HOME_INVITATION_NOT_PENDING)
+        }
+
+        val friend = _friends.value.firstOrNull { it.user.userId == invitation.fromUser.userId }
             ?: return FriendOperationResult.Failure(FriendOperationFailure.NOT_FRIENDS)
-        val room = friendRoomsByUserId[friendUserId]
+        val room = friendRoomsByUserId[friend.user.userId]
             ?: return FriendOperationResult.Failure(FriendOperationFailure.FRIEND_HOME_UNAVAILABLE)
+
+        _receivedHomeInvitations.update { invitations ->
+            invitations.filterNot { it.id == invitationId }
+        }
 
         return FriendOperationResult.Success(
             FriendHome(
                 owner = friend.user,
                 room = room,
                 visitedAtMillis = nowProvider()
+            )
+        )
+    }
+
+    override suspend fun rejectHomeInvitation(
+        invitationId: String
+    ): FriendOperationResult<FriendHomeInvitation> {
+        simulateLatency()
+
+        val invitation = _receivedHomeInvitations.value.firstOrNull { it.id == invitationId }
+            ?: return FriendOperationResult.Failure(FriendOperationFailure.HOME_INVITATION_NOT_FOUND)
+
+        if (invitation.status != FriendHomeInvitationStatus.PENDING) {
+            return FriendOperationResult.Failure(FriendOperationFailure.HOME_INVITATION_NOT_PENDING)
+        }
+
+        _receivedHomeInvitations.update { invitations ->
+            invitations.filterNot { it.id == invitationId }
+        }
+
+        return FriendOperationResult.Success(
+            invitation.copy(
+                status = FriendHomeInvitationStatus.REJECTED,
+                respondedAtMillis = nowProvider()
             )
         )
     }
@@ -306,6 +373,20 @@ class MockFriendRepository(
             id = "friend-request-${nextRequestSequence++}",
             fromUser = fromUser,
             toUser = toUser,
+            createdAtMillis = nowProvider()
+        )
+    }
+
+    private fun createHomeInvitation(
+        fromUser: FriendUser,
+        toUser: FriendUser,
+        message: String? = null
+    ): FriendHomeInvitation {
+        return FriendHomeInvitation(
+            id = "home-invitation-${nextInvitationSequence++}",
+            fromUser = fromUser,
+            toUser = toUser,
+            message = message,
             createdAtMillis = nowProvider()
         )
     }
@@ -375,8 +456,8 @@ class MockFriendRepository(
                     mouthSizeScale = 0.98f
                 ),
                 petStatus = PetStatus(
-                    hunger = 72,
-                    fatigue = 18,
+                    satiety = 72,
+                    vitality = 82,
                     isEgg = false
                 ),
                 petPersonality = PetPersonality.CALM
@@ -397,8 +478,8 @@ class MockFriendRepository(
                     mouthSizeScale = 1.08f
                 ),
                 petStatus = PetStatus(
-                    hunger = 88,
-                    fatigue = 34,
+                    satiety = 88,
+                    vitality = 66,
                     isEgg = false
                 ),
                 petPersonality = PetPersonality.ACTIVE,
@@ -420,8 +501,8 @@ class MockFriendRepository(
                     mouthSizeScale = 0.92f
                 ),
                 petStatus = PetStatus(
-                    hunger = 60,
-                    fatigue = 42,
+                    satiety = 60,
+                    vitality = 58,
                     isEgg = false
                 ),
                 petPersonality = PetPersonality.LAZY

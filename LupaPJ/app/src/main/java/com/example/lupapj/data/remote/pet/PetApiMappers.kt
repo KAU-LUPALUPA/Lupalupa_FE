@@ -39,8 +39,8 @@ internal fun PetAppearanceDto.toDomain(): PetAppearance {
 
 internal fun PetStatusDto.toDomain(): PetStatus {
     return PetStatus(
-        hunger = hunger.coerceIn(0, 100),
-        fatigue = fatigue.coerceIn(0, 100),
+        satiety = satiety.coerceIn(0, 100),
+        vitality = vitality.coerceIn(0, 100),
         isEgg = isEgg
     )
 }

@@ -40,14 +40,23 @@ import com.example.lupapj.data.model.BottomNavItem
 import com.example.lupapj.data.model.MainMenuAction
 import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.RoomUiState
+import com.example.lupapj.data.model.friend.FriendHomeInvitation
+import com.example.lupapj.data.model.friend.FriendRequest
 import com.example.lupapj.data.model.scene.FloorAnchor
+import com.example.lupapj.ui.components.FloatingMailboxButton
 import com.example.lupapj.ui.components.InventorySheet
+import com.example.lupapj.ui.components.MailboxSheet
 import com.example.lupapj.ui.components.RoomViewport
 import com.example.lupapj.ui.preview.previewRoomUiState
 import com.example.lupapj.ui.theme.LupaPJTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 @Composable
 fun RoomScreen(
     uiState: RoomUiState?,
@@ -63,6 +72,7 @@ fun RoomScreen(
     onRearrangeMoveLeft: () -> Unit,
     onRearrangeMoveRight: () -> Unit,
     onRearrangeConfirm: () -> Unit,
+    onRearrangeCancel: () -> Unit,
     onFloorTap: (FloorAnchor) -> Unit,
     onBottomNavItemClick: (BottomNavItem) -> Unit,
     recentMainMenuAction: MainMenuAction?,
@@ -72,7 +82,16 @@ fun RoomScreen(
     onExitCameraMode: () -> Unit,
     currencyAmount: Int,
     purchasedShopItems: List<com.example.lupapj.data.model.ShopItem>,
-    onMinigameClick: () -> Unit
+    onMinigameClick: () -> Unit,
+    mailboxVisible: Boolean,
+    friendRequests: List<FriendRequest>,
+    homeInvitations: List<FriendHomeInvitation>,
+    onMailboxClick: () -> Unit,
+    onMailboxDismiss: () -> Unit,
+    onAcceptFriendRequest: (String) -> Unit,
+    onRejectFriendRequest: (String) -> Unit,
+    onAcceptHomeInvitation: (String) -> Unit,
+    onRejectHomeInvitation: (String) -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val rootView = LocalView.current
@@ -88,6 +107,7 @@ fun RoomScreen(
     }
 
     val room = uiState ?: return
+    val mailboxItemCount = friendRequests.size + homeInvitations.size
 
     Scaffold(
         snackbarHost = {
@@ -119,6 +139,8 @@ fun RoomScreen(
                 )
             } else {
                 LupaMainScreen(
+                    petSatiety = room.pet.status.satiety.coerceIn(0, 100),
+                    petVitality = room.pet.status.vitality.coerceIn(0, 100),
                     recentIconRes = recentMainMenuAction?.iconRes,
                     onRecentActionClick = onButtonAClick,
                     onInventoryClick = onButtonBClick,
@@ -137,28 +159,76 @@ fun RoomScreen(
             }
 
             if (!room.rearrangeMode) {
-
                 Surface(
                     onClick = onRearrangeClick,
+                    shape = RoundedCornerShape(18.dp),
+                    color = Color(0xFF7F5539),
+                    shadowElevation = 6.dp,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 90.dp, end = 16.dp)
+                ) {
+                    Text(
+                        text = "재배치",
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                    )
+                }
+            } else {
+                Surface(
                     shape = RoundedCornerShape(18.dp),
                     color = Color(0xFFEADFD3),
                     shadowElevation = 6.dp,
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 130.dp, end = 16.dp)
+                        .align(Alignment.TopCenter)
+                        .padding(top = 120.dp, start = 16.dp, end = 16.dp)
                 ) {
-
-                    Text(
-                        text = "재배치",
-                        color = Color(0xFF5C4033),
-                        modifier = Modifier.padding(
-                            horizontal = 18.dp,
-                            vertical = 10.dp
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "현재 재배치 중입니다.",
+                            color = Color(0xFF5C4033)
                         )
-                    )
+
+                        Surface(
+                            onClick = onRearrangeCancel,
+                            shape = RoundedCornerShape(14.dp),
+                            color = Color(0xFF7F5539)
+                        ) {
+                            Text(
+                                text = "취소",
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
                 }
             }
 
+            if (!room.isCameraMode && !room.rearrangeMode && mailboxItemCount > 0) {
+                FloatingMailboxButton(
+                    itemCount = mailboxItemCount,
+                    onClick = onMailboxClick,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 198.dp, end = 14.dp)
+                )
+            }
+            if (room.rearrangeMode) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(110.dp)
+                        .background(Color.Transparent)
+                        .clickable(enabled = true) {
+                            // 재배치 중 하단 메뉴 클릭만 막기
+                        }
+                )
+            }
             if (room.rearrangeMode && room.selectedRearrangeObjectType != null) {
 
                 Column(
@@ -168,16 +238,8 @@ fun RoomScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
 
-                    RearrangeCircleButton(
-                        onClick = onRearrangeMoveUp
-                    ) {
-                        Text(
-                            text = "↑",
-                            color = Color.White
-                        )
-                    }
-
                     Row(
+                        horizontalArrangement = Arrangement.spacedBy(80.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
 
@@ -185,23 +247,47 @@ fun RoomScreen(
                             onClick = onRearrangeMoveLeft
                         ) {
                             Text(
-                                text = "←",
+                                text = "↖",
                                 color = Color.White
                             )
                         }
 
-                        Surface(
-                            onClick = onRearrangeConfirm,
-                            shape = RoundedCornerShape(50),
-                            color = Color(0xFFB08968),
-                            shadowElevation = 6.dp,
-                            modifier = Modifier.padding(horizontal = 6.dp)
+                        RearrangeCircleButton(
+                            onClick = onRearrangeMoveUp
                         ) {
-
                             Text(
-                                text = "✓",
-                                color = Color.White,
-                                modifier = Modifier.padding(16.dp)
+                                text = "↗",
+                                color = Color.White
+                            )
+                        }
+                    }
+
+                    Surface(
+                        onClick = onRearrangeConfirm,
+                        shape = RoundedCornerShape(50),
+                        color = Color(0xFFB08968),
+                        shadowElevation = 6.dp,
+                        modifier = Modifier.padding(vertical = 10.dp)
+                    ) {
+
+                        Text(
+                            text = "✓",
+                            color = Color.White,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(80.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+
+                        RearrangeCircleButton(
+                            onClick = onRearrangeMoveDown
+                        ) {
+                            Text(
+                                text = "↙",
+                                color = Color.White
                             )
                         }
 
@@ -209,17 +295,18 @@ fun RoomScreen(
                             onClick = onRearrangeMoveRight
                         ) {
                             Text(
-                                text = "→",
+                                text = "↘",
                                 color = Color.White
                             )
                         }
                     }
+                }
 
                     RearrangeCircleButton(
                         onClick = onRearrangeMoveDown
                     ) {
                         Text(
-                            text = "↓",
+                            text = "↙",
                             color = Color.White
                         )
                     }
@@ -268,12 +355,24 @@ fun RoomScreen(
                 )
             }
         }
-    }
+
 
     if (room.inventoryVisible) {
         InventorySheet(
             purchasedShopItems = purchasedShopItems,
             onDismiss = onInventoryDismiss
+        )
+    }
+
+    if (mailboxVisible) {
+        MailboxSheet(
+            friendRequests = friendRequests,
+            homeInvitations = homeInvitations,
+            onDismiss = onMailboxDismiss,
+            onAcceptFriendRequest = onAcceptFriendRequest,
+            onRejectFriendRequest = onRejectFriendRequest,
+            onAcceptHomeInvitation = onAcceptHomeInvitation,
+            onRejectHomeInvitation = onRejectHomeInvitation
         )
     }
 }
@@ -305,6 +404,7 @@ private fun RoomScreenPreview() {
             onRearrangeMoveLeft = {},
             onRearrangeMoveRight = {},
             onRearrangeConfirm = {},
+            onRearrangeCancel = {},
             onFloorTap = {},
             onBottomNavItemClick = {},
             recentMainMenuAction = MainMenuAction.SHOP,
@@ -314,7 +414,16 @@ private fun RoomScreenPreview() {
             onExitCameraMode = {},
             currencyAmount = 100,
             purchasedShopItems = emptyList(),
-            onMinigameClick = {}
+            onMinigameClick = {},
+            mailboxVisible = false,
+            friendRequests = emptyList(),
+            homeInvitations = emptyList(),
+            onMailboxClick = {},
+            onMailboxDismiss = {},
+            onAcceptFriendRequest = {},
+            onRejectFriendRequest = {},
+            onAcceptHomeInvitation = {},
+            onRejectHomeInvitation = {}
         )
     }
 }

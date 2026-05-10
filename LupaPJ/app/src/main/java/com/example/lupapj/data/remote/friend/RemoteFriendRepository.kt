@@ -3,6 +3,7 @@ package com.example.lupapj.data.remote.friend
 import com.example.lupapj.data.model.friend.FRIEND_MESSAGE_MAX_LENGTH
 import com.example.lupapj.data.model.friend.FriendCode
 import com.example.lupapj.data.model.friend.FriendHome
+import com.example.lupapj.data.model.friend.FriendHomeInvitation
 import com.example.lupapj.data.model.friend.FriendMessage
 import com.example.lupapj.data.model.friend.FriendOperationFailure
 import com.example.lupapj.data.model.friend.FriendOperationResult
@@ -11,6 +12,7 @@ import com.example.lupapj.data.model.friend.FriendSummary
 import com.example.lupapj.data.model.friend.FriendUser
 import com.example.lupapj.data.model.scene.RoomSceneDefinition
 import com.example.lupapj.data.repository.FriendRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,6 +35,10 @@ class RemoteFriendRepository(
     private val _sentRequests = MutableStateFlow<List<FriendRequest>>(emptyList())
     override val sentRequests: StateFlow<List<FriendRequest>> = _sentRequests.asStateFlow()
 
+    private val _receivedHomeInvitations = MutableStateFlow<List<FriendHomeInvitation>>(emptyList())
+    override val receivedHomeInvitations: StateFlow<List<FriendHomeInvitation>> =
+        _receivedHomeInvitations.asStateFlow()
+
     private val _friendMessages = MutableStateFlow<Map<String, List<FriendMessage>>>(emptyMap())
     override val friendMessages: StateFlow<Map<String, List<FriendMessage>>> =
         _friendMessages.asStateFlow()
@@ -43,11 +49,13 @@ class RemoteFriendRepository(
             val friends = apiClient.getFriends().friends.map { it.toDomain() }
             val receivedRequests = apiClient.getReceivedFriendRequests().requests.map { it.toDomain() }
             val sentRequests = apiClient.getSentFriendRequests().requests.map { it.toDomain() }
+            val receivedHomeInvitations = loadReceivedHomeInvitationsOrNull()
 
             _myProfile.value = currentProfile
             _friends.value = friends
             _receivedRequests.value = receivedRequests
             _sentRequests.value = sentRequests
+            receivedHomeInvitations?.let { _receivedHomeInvitations.value = it }
         }
     }
 
@@ -123,10 +131,32 @@ class RemoteFriendRepository(
     override suspend fun getFriendHome(
         friendUserId: String
     ): FriendOperationResult<FriendHome> {
+        return FriendOperationResult.Failure(FriendOperationFailure.BLOCKED)
+    }
+
+    override suspend fun acceptHomeInvitation(
+        invitationId: String
+    ): FriendOperationResult<FriendHome> {
         return apiCall {
-            apiClient
-                .getFriendHome(friendUserId)
+            val home = apiClient
+                .acceptHomeInvitation(invitationId)
                 .toDomain(sceneResolver = sceneResolver)
+            _receivedHomeInvitations.update { invitations ->
+                invitations.filterNot { it.id == invitationId }
+            }
+            home
+        }
+    }
+
+    override suspend fun rejectHomeInvitation(
+        invitationId: String
+    ): FriendOperationResult<FriendHomeInvitation> {
+        return apiCall {
+            val invitation = apiClient.rejectHomeInvitation(invitationId).invitation.toDomain()
+            _receivedHomeInvitations.update { invitations ->
+                invitations.filterNot { it.id == invitationId }
+            }
+            invitation
         }
     }
 
@@ -176,8 +206,23 @@ class RemoteFriendRepository(
             FriendOperationResult.Success(block())
         } catch (exception: FriendApiException) {
             FriendOperationResult.Failure(exception.toFriendOperationFailure())
+        } catch (exception: CancellationException) {
+            throw exception
         } catch (_: Exception) {
-            FriendOperationResult.Failure(FriendOperationFailure.FRIEND_HOME_UNAVAILABLE)
+            FriendOperationResult.Failure(FriendOperationFailure.UNKNOWN)
+        }
+    }
+
+    private suspend fun loadReceivedHomeInvitationsOrNull(): List<FriendHomeInvitation>? {
+        return try {
+            apiClient
+                .getReceivedHomeInvitations()
+                .invitations
+                .map { it.toDomain() }
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (_: Exception) {
+            null
         }
     }
 }

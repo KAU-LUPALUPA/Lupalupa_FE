@@ -24,17 +24,22 @@
 | 내 친구 코드 조회 | 유저 | 로그인 사용자 | GET | `/users/me/friend-code` | 없음 | 내 친구 코드를 조회한다. | `friendCode`, `displayFriendCode` | 화면에는 `displayFriendCode`, API 요청에는 `friendCode` 사용을 권장한다. |
 | 내 펫 정보 검증 | 펫 | 로그인 사용자 | POST | `/pets/me/validate` | Body: `localPetRevision`, `localPetHash`, `localUpdatedAt` | 앱 접속 시 로컬 펫 정보와 서버 펫 정보가 같은지 검증한다. | `syncStatus`, `serverPetRevision`, `serverPetHash`, `serverUpdatedAt`, `pet?` | `MATCH`면 로컬 유지, 서버가 최신이면 `pet` 전체 반환. |
 | 내 펫 정보 조회 | 펫 | 로그인 사용자 | GET | `/pets/me` | 없음 | 내 펫의 외형, 상태, 성격, 치장, 위치 정보를 조회한다. | `pet{petId, ownerUserId, name, appearance, status, personality, equippedItemIds, action, anchor, petRevision, petHash, updatedAt}` | 외형 크기값은 최초 생성 시 서버 랜덤 생성. |
-| 내 펫 상태 업데이트 | 펫 | 로그인 사용자 | PATCH | `/pets/me/status` | Body: `hunger`, `fatigue`, `isEgg`, `action`, `anchor` | 먹이, 휴식, 놀이, 알 부화 등으로 바뀐 펫 상태를 저장한다. | `pet{status, action, anchor, petRevision, petHash, updatedAt}` | `hunger`, `fatigue`는 `0~100`. 자율 이동은 매 이동마다 저장하지 않고 주요 이벤트 때 저장 권장. |
+| 내 펫 상태 업데이트 | 펫 | 로그인 사용자 | PATCH | `/pets/me/status` | Body: `satiety`, `vitality`, `isEgg`, `action`, `anchor` | 먹이, 휴식, 놀이, 알 부화 등으로 바뀐 펫 상태를 저장한다. | `pet{status, action, anchor, petRevision, petHash, updatedAt}` | `satiety`, `vitality`는 `0~100`. 자율 이동은 매 이동마다 저장하지 않고 주요 이벤트 때 저장 권장. |
 | 내 펫 치장 변경 | 펫 | 로그인 사용자 | PUT | `/pets/me/equipment` | Body: `equippedItemIds` | 펫이 착용 중인 치장 아이템 목록을 변경한다. | `equippedItemIds`, `petRevision`, `petHash`, `updatedAt` | 착용 아이템이 없으면 `[]`. 에러: `ITEM_NOT_OWNED`, `ITEM_NOT_EQUIPPABLE` |
-| 친구 신청 보내기 | 친구 | 로그인 사용자 | POST | `/friends/requests` | Body: `friendCode` | 상대방 친구 코드를 입력해 친구 신청을 보낸다. | `request{id, fromUser, toUser, status, createdAt}` | 에러: `SELF_CODE`, `USER_NOT_FOUND`, `ALREADY_FRIENDS`, `REQUEST_ALREADY_SENT` |
+| 친구 신청 보내기 | 친구 | 로그인 사용자 | POST | `/friends/requests` | Body: `friendCode` | 상대방 친구 코드를 입력해 친구 신청을 보낸다. | `request{id, fromUser, toUser, status, createdAt, respondedAt}` | 에러: `EMPTY_CODE`, `SELF_CODE`, `USER_NOT_FOUND`, `ALREADY_FRIENDS`, `REQUEST_ALREADY_SENT`, `REQUEST_ALREADY_RECEIVED`, `BLOCKED` |
 | 받은 친구 신청 목록 | 친구 | 로그인 사용자 | GET | `/friends/requests/received` | 없음 | 나에게 온 친구 신청 목록을 조회한다. | `requests[]` | 친구요청목록 탭에서 사용한다. |
 | 보낸 친구 신청 목록 | 친구 | 로그인 사용자 | GET | `/friends/requests/sent` | 없음 | 내가 보낸 친구 신청 목록을 조회한다. | `requests[]` | 보낸 요청 취소 UI가 생기면 사용한다. |
-| 친구 신청 수락 | 친구 | 요청 수신자 | POST | `/friends/requests/{requestId}/accept` | Path: `requestId` | 받은 친구 신청을 수락하고 친구 관계를 생성한다. | `request{status}`, `friendship{id, friend, createdAt}` | 에러: `REQUEST_NOT_FOUND`, `REQUEST_ALREADY_RESPONDED`, `NOT_REQUEST_RECEIVER` |
-| 친구 신청 거절 | 친구 | 요청 수신자 | POST | `/friends/requests/{requestId}/reject` | Path: `requestId` | 받은 친구 신청을 거절한다. | `request{id, status, respondedAt}` | 거절 후 재신청 가능 여부는 백엔드와 합의 필요. |
-| 보낸 친구 신청 취소 | 친구 | 요청 발신자 | POST | `/friends/requests/{requestId}/cancel` | Path: `requestId` | 내가 보낸 친구 신청을 취소한다. | `request{id, status, respondedAt}` | 에러: `NOT_REQUEST_SENDER` |
+| 친구 신청 수락 | 친구 | 요청 수신자 | POST | `/friends/requests/{requestId}/accept` | Path: `requestId` | 받은 친구 신청을 수락하고 친구 관계를 생성한다. | `request`, `friendship{friendshipId, friend, status, friendsSince}` | `request`는 full `FriendRequest` 형태. 에러: `REQUEST_NOT_FOUND`, `REQUEST_NOT_PENDING`, `BLOCKED` |
+| 친구 신청 거절 | 친구 | 요청 수신자 | POST | `/friends/requests/{requestId}/reject` | Path: `requestId` | 받은 친구 신청을 거절한다. | `request` | `request`는 full `FriendRequest` 형태. 에러: `REQUEST_NOT_FOUND`, `REQUEST_NOT_PENDING`, `BLOCKED` |
+| 보낸 친구 신청 취소 | 친구 | 요청 발신자 | POST | `/friends/requests/{requestId}/cancel` | Path: `requestId` | 내가 보낸 친구 신청을 취소한다. | `request` | `request`는 full `FriendRequest` 형태. 에러: `REQUEST_NOT_FOUND`, `REQUEST_NOT_PENDING`, `BLOCKED` |
 | 친구 목록 조회 | 친구 | 로그인 사용자 | GET | `/friends` | 없음 | 수락된 친구 목록을 조회한다. | `friends[]` | 친구 화면의 기본 목록 데이터다. |
-| 친구 삭제 | 친구 | 로그인 사용자 | DELETE | `/friends/{friendUserId}` | Path: `friendUserId` | 친구 관계를 삭제한다. | `204 No Content` | 에러: `FRIEND_NOT_FOUND` |
-| 친구 집 방문 정보 조회 | 친구 집 | 친구 관계 사용자 | GET | `/friends/{friendUserId}/home` | Path: `friendUserId` | 친구의 집 화면을 열 때 필요한 방 레이아웃과 펫 정보를 조회한다. | `owner`, `roomLayout`, `pet`, `visitedAt` | 친구가 아닌 유저는 `403` 또는 `404`. |
+| 친구 삭제 | 친구 | 로그인 사용자 | DELETE | `/friends/{friendUserId}` | Path: `friendUserId` | 친구 관계를 삭제한다. | `204 No Content` | 에러: `FRIEND_NOT_FOUND`, `NOT_FRIENDS` |
+| 친구 집 초대 보내기 | 친구 집 초대 | 집 주인 | POST | `/friends/home-invitations` | Body: `friendUserId`, `message?` | 친구에게 내 집 방문 초대를 보낸다. | `invitation` | 에러: `FRIEND_NOT_FOUND`, `NOT_FRIENDS`, `HOME_INVITATION_ALREADY_SENT`, `BLOCKED` |
+| 받은 집 초대 목록 | 친구 집 초대 | 초대 수신자 | GET | `/friends/home-invitations/received` | 없음 | 우편함에 표시할 받은 집 초대 목록을 조회한다. | `invitations[]` | 우편함에서 사용한다. |
+| 보낸 집 초대 목록 | 친구 집 초대 | 초대 발신자 | GET | `/friends/home-invitations/sent` | 없음 | 내가 보낸 집 초대 목록을 조회한다. | `invitations[]` | MVP에서는 선택 API다. |
+| 집 초대 수락 및 방문 | 친구 집 초대 | 초대 수신자 | POST | `/friends/home-invitations/{invitationId}/accept` | Path: `invitationId` | 받은 집 초대를 수락하고 친구 집 방문 데이터를 받는다. | `invitation`, `homeSnapshot{owner, room, petSnapshot, snapshotAt, visitedAt}` | 친구 집 화면 진입 API. 에러: `HOME_INVITATION_NOT_FOUND`, `HOME_INVITATION_NOT_PENDING`, `NOT_HOME_INVITATION_RECEIVER`, `NOT_FRIENDS`, `FRIEND_HOME_UNAVAILABLE`, `BLOCKED` |
+| 집 초대 거절 | 친구 집 초대 | 초대 수신자 | POST | `/friends/home-invitations/{invitationId}/reject` | Path: `invitationId` | 받은 집 초대를 거절한다. | `invitation` | 에러: `HOME_INVITATION_NOT_FOUND`, `HOME_INVITATION_NOT_PENDING`, `NOT_HOME_INVITATION_RECEIVER` |
+| 보낸 집 초대 취소 | 친구 집 초대 | 초대 발신자 | POST | `/friends/home-invitations/{invitationId}/cancel` | Path: `invitationId` | 아직 수락되지 않은 보낸 초대를 취소한다. | `invitation` | MVP에서는 선택 API다. 에러: `HOME_INVITATION_NOT_FOUND`, `HOME_INVITATION_NOT_PENDING`, `NOT_HOME_INVITATION_SENDER` |
 | 친구 메시지 목록 조회 | 친구 메시지 | 친구 관계 사용자 | GET | `/friends/{friendUserId}/messages` | Path: `friendUserId`<br>Query: `limit`, `before` | 친구와 주고받은 짧은 메시지 목록을 조회한다. | `messages[]`, `nextCursor` | MVP에서는 실시간 채팅 대신 REST 목록으로 시작한다. |
 | 친구 메시지 보내기 | 친구 메시지 | 친구 관계 사용자 | POST | `/friends/{friendUserId}/messages` | Path: `friendUserId`<br>Body: `text` | 친구에게 짧은 메시지를 보낸다. | `message{id, friendUserId, senderUserId, text, sentAt}` | 최대 120자. `senderUserId`를 현재 유저와 비교해 내 메시지 여부를 판단한다. |
 | 방 레이아웃 검증 | 방 | 로그인 사용자 | POST | `/rooms/me/layout/validate` | Body: `localLayoutRevision`, `localLayoutHash`, `localUpdatedAt` | 앱 접속 시 로컬 방 레이아웃과 서버 방 레이아웃이 같은지 검증한다. | `syncStatus`, `serverLayoutRevision`, `serverLayoutHash`, `serverUpdatedAt`, `roomLayout?` | `MATCH`면 로컬 유지, 서버가 최신이면 `roomLayout` 전체 반환. |
@@ -56,6 +61,7 @@
 |---|---|---|
 | 친구 요청 상태 | `PENDING`, `ACCEPTED`, `REJECTED`, `CANCELED` | 친구 신청 처리 상태 |
 | 친구 관계 상태 | `NONE`, `PENDING_SENT`, `PENDING_RECEIVED`, `ACCEPTED`, `REJECTED`, `CANCELED`, `BLOCKED` | 두 유저 간 관계 상태 |
+| 친구 집 초대 상태 | `PENDING`, `ACCEPTED`, `REJECTED`, `CANCELED`, `EXPIRED` | 집 초대 처리 상태 |
 | 펫 행동 | `IDLE`, `WALKING`, `RESTING`, `PLAYING`, `EATING` | 현재 펫 행동 |
 | 펫 성격 | `ACTIVE`, `CALM`, `LAZY` | 활발, 차분, 게으름 |
 | 방 레이아웃 동기화 | `MATCH`, `SERVER_NEWER`, `CLIENT_NEWER`, `CONFLICT` | 로컬/서버 방 상태 비교 결과 |

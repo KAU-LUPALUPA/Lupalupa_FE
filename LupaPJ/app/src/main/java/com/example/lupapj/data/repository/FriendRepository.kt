@@ -2,6 +2,7 @@ package com.example.lupapj.data.repository
 
 import com.example.lupapj.data.model.friend.FriendOperationResult
 import com.example.lupapj.data.model.friend.FriendHome
+import com.example.lupapj.data.model.friend.FriendHomeInvitation
 import com.example.lupapj.data.model.friend.FriendMessage
 import com.example.lupapj.data.model.friend.FriendRequest
 import com.example.lupapj.data.model.friend.FriendSummary
@@ -13,6 +14,7 @@ interface FriendRepository {
     val friends: StateFlow<List<FriendSummary>>
     val receivedRequests: StateFlow<List<FriendRequest>>
     val sentRequests: StateFlow<List<FriendRequest>>
+    val receivedHomeInvitations: StateFlow<List<FriendHomeInvitation>>
     val friendMessages: StateFlow<Map<String, List<FriendMessage>>>
 
     suspend fun refreshFriendOverview(): FriendOperationResult<Unit>
@@ -30,6 +32,12 @@ interface FriendRepository {
     suspend fun removeFriend(friendUserId: String): FriendOperationResult<FriendSummary>
 
     suspend fun getFriendHome(friendUserId: String): FriendOperationResult<FriendHome>
+
+    suspend fun acceptHomeInvitation(invitationId: String): FriendOperationResult<FriendHome>
+
+    suspend fun rejectHomeInvitation(
+        invitationId: String
+    ): FriendOperationResult<FriendHomeInvitation>
 
     suspend fun getFriendMessages(friendUserId: String): FriendOperationResult<List<FriendMessage>>
 
