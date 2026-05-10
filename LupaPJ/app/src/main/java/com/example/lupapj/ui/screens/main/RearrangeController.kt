@@ -82,17 +82,22 @@ object RearrangeController {
 
         val updatedAnchor = when (val anchor = obj.anchor) {
             is FloorAnchor -> {
+                val nextU = anchor.u + dx
+                val nextV = anchor.v + dy
+
+                if (!isSafeFloorPosition(nextU, nextV)) {
+                    return obj
+                }
+
                 anchor.copy(
-                    u = (anchor.u + dx).coerceIn(0f, 1f),
-                    v = (anchor.v + dy).coerceIn(0f, 1f)
+                    u = nextU,
+                    v = nextV
                 )
             }
 
             is WallAnchor -> {
-                anchor.copy(
-                    u = (anchor.u + dx).coerceIn(0.18f, 0.82f),
-                    v = (anchor.v + dy).coerceIn(0.22f, 0.78f)
-                )
+                // 벽에 붙은 오브젝트는 재배치로 움직이지 않게 막음
+                return obj
             }
         }
 
@@ -100,5 +105,19 @@ object RearrangeController {
             anchor = updatedAnchor,
             tilePlacement = null
         )
+    }
+    private fun isSafeFloorPosition(
+        u: Float,
+        v: Float
+    ): Boolean {
+        val minU = 0.20f
+        val maxU = 0.80f
+        val minV = 0.28f
+        val maxV = 0.70f
+
+        if (u < minU || u > maxU) return false
+        if (v < minV || v > maxV) return false
+
+        return true
     }
 }
