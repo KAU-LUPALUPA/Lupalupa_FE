@@ -113,21 +113,15 @@ fun LupaApp(deepLink: Uri? = null) {
     LaunchedEffect(uiState.phase, userId, isAppForeground) {
         val currentUserId = userId ?: return@LaunchedEffect
 
-        if (
-            uiState.phase == AppPhase.ROOM &&
-            isAppForeground &&
-            !hasShownOfflineDialog
-        ) {
+        if (uiState.phase == AppPhase.ROOM && isAppForeground) {
             val offlineSeconds = withContext(Dispatchers.IO) {
                 sendHeartbeatToServer(currentUserId)
             }
 
-            if (offlineSeconds != null && offlineSeconds > 0L) {
+            if (offlineSeconds != null) {
                 offlineDialogMessage = formatOfflineMessage(offlineSeconds)
                 showOfflineDialog = true
             }
-
-            hasShownOfflineDialog = true
         }
     }
 
