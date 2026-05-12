@@ -70,7 +70,6 @@ fun LupaApp(deepLink: Uri? = null) {
 
     val uiState by appViewModel.uiState.collectAsStateWithLifecycle()
 
-    var userId by remember { mutableStateOf<String?>(null) }
     var isAppForeground by remember { mutableStateOf(false) }
     var showOfflineDialog by remember { mutableStateOf(false) }
     var offlineDialogMessage by remember { mutableStateOf("") }
@@ -101,42 +100,37 @@ fun LupaApp(deepLink: Uri? = null) {
         val uid = deepLink?.getQueryParameter("uid")
 
         if (!token.isNullOrBlank()) {
-            userId = uid ?: nickname
-
+            // [수정됨(권)] 딥링크를 통한 로그인 시 ViewModel에 uid를 함께 전달하여 하트비트 식별자 일치시킴
             appViewModel.onKakaoLoginSuccess(
                 accessToken = token,
-                nickname = nickname
+                nickname = nickname,
+                uid = uid
             )
         }
     }
 
-    LaunchedEffect(uiState.phase, userId, isAppForeground) {
-        val currentUserId = userId ?: return@LaunchedEffect
+    // [수정됨(권)] 메인 브런치 기준 하트비트 및 오프라인 시간 계산 로직 통합
+    LaunchedEffect(uiState.phase, uiState.userId, isAppForeground) {
+        val currentUserId = uiState.userId ?: return@LaunchedEffect
 
         if (uiState.phase == AppPhase.ROOM && isAppForeground) {
+            // 초기 접속 시 오프라인 시간 계산
             val offlineSeconds = withContext(Dispatchers.IO) {
                 sendHeartbeatToServer(currentUserId)
             }
 
-            if (offlineSeconds != null) {
+            if (offlineSeconds != null && !hasShownOfflineDialog) {
                 offlineDialogMessage = formatOfflineMessage(offlineSeconds)
                 showOfflineDialog = true
+                hasShownOfflineDialog = true
             }
-        }
-    }
 
-    LaunchedEffect(uiState.phase, userId, isAppForeground) {
-        val currentUserId = userId ?: return@LaunchedEffect
-
-        if (uiState.phase != AppPhase.ROOM || !isAppForeground) {
-            return@LaunchedEffect
-        }
-
-        while (isActive && isAppForeground && uiState.phase == AppPhase.ROOM) {
-            delay(30_000)
-
-            withContext(Dispatchers.IO) {
-                sendHeartbeatToServer(currentUserId)
+            // [수정됨(권)] 30초마다 하트비트를 전송하여 실시간 접속 상태 유지 (메인 브런치 로직)
+            while (isActive && isAppForeground && uiState.phase == AppPhase.ROOM) {
+                delay(30_000)
+                withContext(Dispatchers.IO) {
+                    sendHeartbeatToServer(currentUserId)
+                }
             }
         }
     }

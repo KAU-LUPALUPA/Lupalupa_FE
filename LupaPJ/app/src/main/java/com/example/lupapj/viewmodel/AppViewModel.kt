@@ -34,6 +34,7 @@ import com.example.lupapj.data.model.advancePetCondition
 import com.example.lupapj.data.model.applyFeedRecovery
 import com.example.lupapj.data.model.scene.autonomousMovementProfileFor
 import com.example.lupapj.data.model.scene.chooseAutonomousPetTarget
+import com.example.lupapj.data.model.scene.updatePet
 import com.example.lupapj.data.repository.PlazaRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -177,7 +178,8 @@ class AppViewModel(
 
     fun onKakaoLoginSuccess(
         accessToken: String,
-        nickname: String?
+        nickname: String?,
+        uid: String? = null
     ) {
         if (accessToken.isBlank()) {
             _uiState.update {
@@ -197,7 +199,11 @@ class AppViewModel(
                 it.copy(isProcessingLogin = true)
             }
 
-            val room = roomRepository.getRoom()
+            var room = roomRepository.getRoom()
+            // [수정됨(권)] 초기 진입 시 이전 세션의 이동 상태가 남아있어 행동 로직이 멈추는 현상을 방지하기 위해 강제 해제
+            room = room.copy(
+                houseSceneState = room.houseSceneState.updatePet(isMoving = false)
+            )
             val displayName = nickname ?: "사용자"
 
             _uiState.update {
@@ -206,7 +212,8 @@ class AppViewModel(
                     authPopupVisible = false,
                     isProcessingLogin = false,
                     room = room,
-                    placeholderMessage = "${displayName}님 환영합니다!"
+                    placeholderMessage = "${displayName}님 환영합니다!",
+                    userId = uid ?: nickname // [수정됨(권)] 하트비트 로직을 위한 유저 식별자 저장 (Dev Login 대응)
                 )
             }
             startPetConditionTicker()
@@ -1043,19 +1050,20 @@ class AppViewModel(
             return
         }
 
+        // [수정됨(권)] 틱 증가를 로직 최상단으로 이동하여 UI와 실제 판정 시점을 동기화
         behaviorConsecutiveTicks++
 
-        // [수정됨(권)] 먹기/놀기 상태는 애니메이션 시퀀스가 종료될 때까지 상태 기계의 개입을 차단함
-        if (pet.action == PetAction.EATING || pet.action == PetAction.PLAYING) {
-            return
+        val isRestingState = pet.action == PetAction.RESTING || pet.action == PetAction.BED_RESTING
+        
+        // [수정됨(권)] 취침/휴식 중에는 10초(5틱) 단위로만 확률 계산 및 행동 전이 판정 수행
+        if (isRestingState) {
+            if (behaviorConsecutiveTicks % 5 != 0) return
         }
 
         val isCrisis = com.example.lupapj.data.model.BehaviorStateMachine.isCrisis(pet.status.satiety, pet.status.vitality)
-        val isRestingState = pet.action == PetAction.RESTING || pet.action == PetAction.BED_RESTING
-        if (isRestingState) {
-            if (isCrisis && pet.status.vitality < 30) return 
-            if (behaviorConsecutiveTicks % 5 != 0) return
-        }
+        
+        // [수정됨(권)] 위기 상황에서 휴식 중일 때 활력이 너무 낮으면 강제 기상 방지
+        if (isRestingState && isCrisis && pet.status.vitality < 30) return
 
         val (m, k) = if (isCrisis) {
             com.example.lupapj.data.model.BehaviorStateMachine.getCrisisTransitionParams(pet.personality)
@@ -1067,9 +1075,9 @@ class AppViewModel(
             }
         }
 
-        val shouldTransition = com.example.lupapj.data.model.BehaviorStateMachine.checkTransitionProbability(behaviorConsecutiveTicks, m, k)
         val currentProb = m * (1f - kotlin.math.exp(-k * behaviorConsecutiveTicks)).toFloat()
 
+        // [수정됨(권)] 디버그 정보 업데이트 (휴식 중일 경우 10초마다 계단식으로 갱신되도록 조정)
         _uiState.update { s -> 
             s.copy(behaviorDebugInfo = s.behaviorDebugInfo.copy(
                 consecutiveTicks = behaviorConsecutiveTicks,
@@ -1079,6 +1087,12 @@ class AppViewModel(
                 kValue = k
             ))
         }
+
+        if (pet.action == PetAction.EATING || pet.action == PetAction.PLAYING) {
+            return
+        }
+
+        val shouldTransition = com.example.lupapj.data.model.BehaviorStateMachine.checkTransitionProbability(behaviorConsecutiveTicks, m, k)
         
         if (shouldTransition || pet.action == PetAction.IDLE) {
             if (pet.action == PetAction.PLAYING) {

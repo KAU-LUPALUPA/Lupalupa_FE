@@ -74,7 +74,8 @@ fun advancePetCondition(
         val nextVitality = status.vitality + (restTick.steps * recoveryAmount)
         VitalityAdvanceResult(
             vitality = nextVitality,
-            vitalityDecaySeconds = 0L,
+            // [수정됨(권)] 상태 전환 시에도 기존 타이머 잔여 시간을 보존하여 포만감/활력 박자가 어긋나는 현상 방지
+            vitalityDecaySeconds = remainder.vitalityDecaySeconds,
             restRecoverySeconds = restTick.remainingSeconds
         )
     } else {
@@ -87,7 +88,8 @@ fun advancePetCondition(
         VitalityAdvanceResult(
             vitality = nextVitality,
             vitalityDecaySeconds = vitalityTick.remainingSeconds,
-            restRecoverySeconds = 0L
+            // [수정됨(권)] 일반 상태에서도 기존 휴식 회복 잔여 타이머를 보존함
+            restRecoverySeconds = remainder.restRecoverySeconds
         )
     }
 

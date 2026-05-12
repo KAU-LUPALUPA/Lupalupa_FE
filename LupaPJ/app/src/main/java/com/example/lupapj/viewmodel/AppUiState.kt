@@ -51,5 +51,6 @@ data class AppUiState(
     val selectedShopItem: ShopItem? = null, // [추가됨(권)] 상세 화면에서 보고 있는 선택된 아이템
     val isPurchasing: Boolean = false, // [추가됨(권)] 구매 진행 중 로딩 상태 표시
     val shopFeedbackMessage: String? = null, // [추가됨(권)] 상점 구매 성공/실패 메시지 팝업용
-    val behaviorDebugInfo: com.example.lupapj.data.model.BehaviorDebugInfo = com.example.lupapj.data.model.BehaviorDebugInfo() // [추가됨(권)]
+    val userId: String? = null, // [수정됨(권)] 하트비트 및 오프라인 계산용 유저 ID 통합 관리
+    val behaviorDebugInfo: com.example.lupapj.data.model.BehaviorDebugInfo = com.example.lupapj.data.model.BehaviorDebugInfo() // [추가됨(권)] 행동 엔진 디버그 정보
 )
