@@ -2,9 +2,12 @@ package com.example.lupapj.app
 
 import android.content.Context
 import com.example.lupapj.data.mock.MockAuthRepository
-import com.example.lupapj.data.mock.MockFriendRepository
+import com.example.lupapj.data.mock.DemoScenes
 import com.example.lupapj.data.mock.MockPlazaRepository
 import com.example.lupapj.data.mock.MockRoomRepository
+import com.example.lupapj.data.model.friend.FriendCode
+import com.example.lupapj.data.model.friend.FriendUser
+import com.example.lupapj.data.model.scene.RoomSceneId
 import com.example.lupapj.data.repository.AuthRepository
 import com.example.lupapj.data.repository.FriendRepository
 import com.example.lupapj.data.repository.GalleryRepository // [추가됨]
@@ -20,6 +23,9 @@ import com.example.lupapj.data.remote.CurrencyApiService // [추가됨(권)]
 import com.example.lupapj.data.remote.AuthInterceptor // [추가됨(권)]
 import com.example.lupapj.data.remote.CurrencyRemoteDataSource // [추가됨(권)]
 import com.example.lupapj.data.remote.ServerConfig
+import com.example.lupapj.data.remote.friend.FriendRetrofitService
+import com.example.lupapj.data.remote.friend.RemoteFriendRepository
+import com.example.lupapj.data.remote.friend.RetrofitFriendApiClient
 import okhttp3.OkHttpClient // [추가됨(권)]
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -45,6 +51,8 @@ class AppContainer(context: Context) {
         .build()
 
     private val currencyApiService: CurrencyApiService = retrofit.create(CurrencyApiService::class.java)
+    private val friendRetrofitService: FriendRetrofitService =
+        retrofit.create(FriendRetrofitService::class.java)
     
     // [수정됨(권)] DataSource 인스턴스화
     private val currencyRemoteDataSource = CurrencyRemoteDataSource(currencyApiService)
@@ -52,7 +60,15 @@ class AppContainer(context: Context) {
     val authRepository: AuthRepository = MockAuthRepository()
     private val roomLocalCache = com.example.lupapj.data.local.RoomLocalCache(appContext)
     val roomRepository: RoomRepository = MockRoomRepository(roomLocalCache)
-    val friendRepository: FriendRepository = MockFriendRepository()
+    val friendRepository: FriendRepository = RemoteFriendRepository(
+        apiClient = RetrofitFriendApiClient(friendRetrofitService),
+        initialCurrentUser = FriendUser(
+            userId = "unknown",
+            nickname = "나",
+            friendCode = FriendCode("LUPA00000")
+        ),
+        sceneResolver = { sceneId -> DemoScenes.sceneFor(RoomSceneId(sceneId)) }
+    )
     val plazaRepository: PlazaRepository = MockPlazaRepository() // [보존] 팀원 작업 내용
     val galleryRepository: GalleryRepository by lazy { GalleryRepository(appContext) } // [보존] 팀원 작업 내용
     

@@ -17,6 +17,8 @@ interface FriendRepository {
     val receivedHomeInvitations: StateFlow<List<FriendHomeInvitation>>
     val friendMessages: StateFlow<Map<String, List<FriendMessage>>>
 
+    fun updateCurrentUser(userId: String?, nickname: String?) = Unit
+
     suspend fun refreshFriendOverview(): FriendOperationResult<Unit>
 
     suspend fun findUserByFriendCode(friendCodeInput: String): FriendUser?

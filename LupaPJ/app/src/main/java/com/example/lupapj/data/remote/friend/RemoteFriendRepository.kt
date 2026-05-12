@@ -43,6 +43,15 @@ class RemoteFriendRepository(
     override val friendMessages: StateFlow<Map<String, List<FriendMessage>>> =
         _friendMessages.asStateFlow()
 
+    override fun updateCurrentUser(userId: String?, nickname: String?) {
+        _myProfile.update { current ->
+            current.copy(
+                userId = userId?.takeIf { it.isNotBlank() } ?: current.userId,
+                nickname = nickname?.takeIf { it.isNotBlank() } ?: current.nickname
+            )
+        }
+    }
+
     override suspend fun refreshFriendOverview(): FriendOperationResult<Unit> {
         return apiCall {
             val currentProfile = apiClient.getMyFriendCode().applyTo(_myProfile.value)

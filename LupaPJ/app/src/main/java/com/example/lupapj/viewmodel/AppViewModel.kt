@@ -193,6 +193,10 @@ class AppViewModel(
 
         // 실제 네트워크 통신을 위해 TokenManager에 저장
         com.example.lupapj.data.local.TokenManager.accessToken = accessToken
+        friendRepository.updateCurrentUser(
+            userId = uid ?: nickname,
+            nickname = nickname ?: "사용자"
+        )
 
         viewModelScope.launch {
             _uiState.update {
@@ -662,6 +666,7 @@ class AppViewModel(
     }
 
     fun openMailbox() {
+        refreshFriendOverview()
         _uiState.update { it.copy(mailboxVisible = true) }
     }
 
