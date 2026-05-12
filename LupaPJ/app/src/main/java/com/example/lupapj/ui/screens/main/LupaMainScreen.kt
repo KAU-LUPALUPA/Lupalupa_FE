@@ -77,7 +77,8 @@ private data class PopupMenuItem(
     val label: String,
     val iconRes: Int,
     val navItem: BottomNavItem? = null,
-    val opensPlayground: Boolean = false
+    val opensPlayground: Boolean = false,
+    val opensMinigame: Boolean = false // [수정됨(권)] 미니게임 진입 필드 추가
 )
 
 private val PopupMenuItems = listOf(
@@ -105,6 +106,12 @@ private val PopupMenuItems = listOf(
         label = "광장",
         iconRes = R.drawable.playground_trimmed,
         opensPlayground = true
+    ),
+    // [수정됨(권)] 미니게임 버튼 복구 (6번째 버튼으로 추가)
+    PopupMenuItem(
+        label = "미니게임",
+        iconRes = R.drawable.minigame_icon, // [수정됨(권)] 리소스명 규칙(소문자)에 맞춰 수정
+        opensMinigame = true
     )
 )
 
@@ -125,6 +132,7 @@ fun LupaMainScreen(
     onSettingClick: () -> Unit = {},
     onPopupMenuItemClick: (BottomNavItem) -> Unit = {},
     onPlaygroundClick: () -> Unit = {},
+    onMinigameClick: () -> Unit = {}, // [수정됨(권)] 미니게임 클릭 콜백 추가
     roomContent: @Composable BoxScope.() -> Unit = {
         Box(
             modifier = Modifier
@@ -166,6 +174,7 @@ fun LupaMainScreen(
                     isPopupVisible = false
                     when {
                         item.opensPlayground -> onPlaygroundClick()
+                        item.opensMinigame -> onMinigameClick() // [수정됨(권)] 미니게임 진입 처리
                         item.navItem != null -> onPopupMenuItemClick(item.navItem)
                     }
                 },

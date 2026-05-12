@@ -189,7 +189,8 @@ fun LupaApp(deepLink: Uri? = null) {
                 onAcceptHomeInvitation = appViewModel::acceptHomeInvitation,
                 onRejectHomeInvitation = appViewModel::rejectHomeInvitation,
                 behaviorDebugInfo = uiState.behaviorDebugInfo,
-                onToggleBehaviorDebugClick = appViewModel::toggleBehaviorDebugWindow
+                onToggleBehaviorDebugClick = appViewModel::toggleBehaviorDebugWindow,
+                onMinigameClick = appViewModel::openMinigame // [수정됨(권)] 미니게임 진입 연결
             )
 
             if (showOfflineDialog) {

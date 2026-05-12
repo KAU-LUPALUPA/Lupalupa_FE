@@ -95,7 +95,8 @@ fun RoomScreen(
     onAcceptHomeInvitation: (String) -> Unit, // [추가됨(권)] 복구됨
     onRejectHomeInvitation: (String) -> Unit,
     behaviorDebugInfo: com.example.lupapj.data.model.BehaviorDebugInfo,
-    onToggleBehaviorDebugClick: () -> Unit
+    onToggleBehaviorDebugClick: () -> Unit,
+    onMinigameClick: () -> Unit // [수정됨(권)] 미니게임 클릭 콜백 추가
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope() // [추가됨(권)]
@@ -158,6 +159,7 @@ fun RoomScreen(
                     onSettingClick = onSettingsClick,
                     onPopupMenuItemClick = onBottomNavItemClick,
                     onPlaygroundClick = onPlaygroundClick,
+                    onMinigameClick = onMinigameClick, // [수정됨(권)] 전달
                     roomContent = {
                         RoomViewport(
                             uiState = room,
@@ -464,7 +466,8 @@ private fun RoomScreenPreview() {
             onAcceptHomeInvitation = {},
             onRejectHomeInvitation = {},
             behaviorDebugInfo = com.example.lupapj.data.model.BehaviorDebugInfo(),
-            onToggleBehaviorDebugClick = {}
+            onToggleBehaviorDebugClick = {},
+            onMinigameClick = {} // [수정됨(권)] 프리뷰 파라미터 추가
         )
     }
 }
