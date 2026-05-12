@@ -8,7 +8,7 @@ import com.google.gson.annotations.SerializedName
  */
 data class CurrencyEarnRequest(
     @SerializedName("amount")
-    val amount: Long,
+    val amount: Int, // [수정됨(권)] Long -> Int
     @SerializedName("total")
-    val total: Long // [수정됨(권)] 서버 GoldRequest에 맞춰 amount, total만 유지하고 source 제거됨
+    val total: Long
 )

@@ -40,6 +40,7 @@ import androidx.core.view.drawToBitmap
 import com.example.lupapj.R
 import com.example.lupapj.data.model.BottomNavItem
 import com.example.lupapj.data.model.MainMenuAction
+import com.example.lupapj.data.model.iconRes
 import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.model.friend.FriendHomeInvitation
@@ -418,14 +419,7 @@ fun RoomScreen(
     }
 }
 
-private val MainMenuAction.iconRes: Int
-    get() = when (this) {
-        MainMenuAction.SCREENSHOT -> R.drawable.camera_trimmed
-        MainMenuAction.GALLERY -> R.drawable.gallery_trimmed
-        MainMenuAction.CONTACTS -> R.drawable.friends_trimmed
-        MainMenuAction.SHOP -> R.drawable.shop_trimmed
-        MainMenuAction.PLAYGROUND -> R.drawable.playground_trimmed
-    }
+// [수정됨(권)] 로컬 iconRes 제거하고 AppModels의 전역 확장 프로퍼티 사용
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable

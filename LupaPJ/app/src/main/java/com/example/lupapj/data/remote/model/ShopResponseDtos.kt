@@ -7,12 +7,14 @@ import com.google.gson.annotations.SerializedName
  */
 data class ShopItemsValidateResponse(
     @SerializedName("status") val status: String,
-    @SerializedName("fail_list") val failList: List<ShopItemFailDto>? = null
+    @SerializedName("message") val message: String? = null,
+    @SerializedName("mismatchedItems") val mismatchedItems: List<ShopItemFailDto>? = null // [수정됨(권)] 서버 필드명 일치
 )
 
 data class ShopItemFailDto(
-    @SerializedName("id") val id: String,
-    @SerializedName("price") val price: Int
+    @SerializedName("itemId") val itemId: Int, // [수정됨(권)] 서버 ItemResponse 필드명 일치
+    @SerializedName("itemName") val itemName: String,
+    @SerializedName("serverPrice") val serverPrice: Int
 )
 
 /**
@@ -20,13 +22,14 @@ data class ShopItemFailDto(
  */
 data class ShopPurchaseResponse(
     @SerializedName("status") val status: String,
-    @SerializedName("purchasedItemId") val purchasedItemId: String? = null,
+    @SerializedName("purchasedItemId") val purchasedItemId: Int? = null, // [수정됨(권)] String -> Int
     @SerializedName("balance") val balance: Long? = null,
     @SerializedName("inventory") val inventory: List<InventoryItemDto>? = null
 )
 
 data class InventoryItemDto(
     @SerializedName("instanceId") val instanceId: String,
-    @SerializedName("id") val masterId: String, // API 상에서는 "id"로 내려옴
+    @SerializedName("id") val id: Int, // [수정됨(권)] 서버 id(int)와 일치
+    @SerializedName("itemName") val itemName: String, // [수정됨(권)] 서버 필드 추가
     @SerializedName("count") val count: Int
 )
