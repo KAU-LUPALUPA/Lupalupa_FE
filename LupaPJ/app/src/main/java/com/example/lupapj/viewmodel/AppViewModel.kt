@@ -412,11 +412,30 @@ class AppViewModel(
     }
 
     fun exitCameraMode() {
-        updateRoom { it.copy(isCameraMode = false, cameraZoom = 1f) }
+        updateRoom { it.copy(isCameraMode = false, cameraZoom = 1f, cameraOffsetX = 0f, cameraOffsetY = 0f) }
     }
 
     fun setCameraZoom(zoom: Float) {
         updateRoom { it.copy(cameraZoom = zoom.coerceIn(1f, 3f)) } // 1x ~ 3x 제한
+    }
+
+    fun setCameraOffset(dx: Float, dy: Float) {
+        val room = _uiState.value.room ?: return
+        val zoom = room.cameraZoom
+        // zoom이 클수록 이동 범위도 넓어지도록 허용 (최대 절반 화면 이동)
+        val maxOffset = 500f * (zoom - 1f) / zoom
+        updateRoom {
+            it.copy(
+                cameraOffsetX = (it.cameraOffsetX + dx).coerceIn(-maxOffset, maxOffset),
+                cameraOffsetY = (it.cameraOffsetY + dy).coerceIn(-maxOffset, maxOffset)
+            )
+        }
+    }
+
+    // [추가됨] 카메라 오버레이 내 갤러리 버튼 클릭 시 카메라 종료 후 갤러리 화면 진입
+    fun exitCameraAndOpenGallery() {
+        exitCameraMode()
+        _uiState.update { it.copy(phase = AppPhase.GALLERY) }
     }
 
     fun captureScreen(bitmap: Bitmap) {

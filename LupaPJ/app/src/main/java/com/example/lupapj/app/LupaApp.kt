@@ -172,8 +172,10 @@ fun LupaApp(deepLink: Uri? = null) {
                 recentMainMenuAction = uiState.recentMainMenuAction,
                 onPlaceholderMessageConsumed = appViewModel::onPlaceholderMessageConsumed,
                 onSetCameraZoom = appViewModel::setCameraZoom,
+                onSetCameraOffset = appViewModel::setCameraOffset, // [추가됨] 한 손가락 드래그 Panning 연결
                 onCaptureClick = appViewModel::captureScreen,
                 onExitCameraMode = appViewModel::exitCameraMode,
+                onGalleryClick = appViewModel::exitCameraAndOpenGallery, // [추가됨] 카메라 내 갤러리 버튼 연결
                 currencyAmount = uiState.currencyAmount.toInt(), // Long -> Int 변환
                 purchasedShopItems = uiState.shopItems.filter { item ->
                     uiState.purchasedItems.any { it.masterId == item.id }

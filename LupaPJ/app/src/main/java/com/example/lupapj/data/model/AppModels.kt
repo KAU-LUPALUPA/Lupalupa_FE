@@ -120,6 +120,8 @@ data class RoomUiState(
     val inventoryVisible: Boolean = false,
     val isCameraMode: Boolean = false, // [추가됨] 스크린샷 카메라 모드 활성화 여부
     val cameraZoom: Float = 1f, // [추가됨] 카메라 줌 배율 (기본 1x)
+    val cameraOffsetX: Float = 0f, // [추가됨] 카메라 모드 X축 이동 (Panning)
+    val cameraOffsetY: Float = 0f, // [추가됨] 카메라 모드 Y축 이동 (Panning)
 
     val rearrangeMode: Boolean = false,
 

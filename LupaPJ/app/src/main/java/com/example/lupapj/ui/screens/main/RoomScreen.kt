@@ -24,12 +24,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
+import kotlinx.coroutines.launch
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -81,8 +83,10 @@ fun RoomScreen(
     recentMainMenuAction: MainMenuAction?,
     onPlaceholderMessageConsumed: () -> Unit,
     onSetCameraZoom: (Float) -> Unit,
+    onSetCameraOffset: (Float, Float) -> Unit, // [추가됨] 한 손가락 드래그 Panning 콜백
     onCaptureClick: (Bitmap) -> Unit,
     onExitCameraMode: () -> Unit,
+    onGalleryClick: () -> Unit, // [추가됨] 카메라 오버레이 내 갤러리 버튼 콜백
     currencyAmount: Int,
     purchasedShopItems: List<com.example.lupapj.data.model.ShopItem>,
     onPlaygroundClick: () -> Unit,
@@ -116,6 +120,14 @@ fun RoomScreen(
     val room = uiState ?: return
     val mailboxItemCount = friendRequests.size + homeInvitations.size
 
+    // [추가됨] 카메라 모드 진입 시 캐릭터를 중앙에 두도록 자동 확대
+    LaunchedEffect(room.isCameraMode) {
+        if (room.isCameraMode) {
+            // 캐릭터 위치를 기준으로 자동 2x 줌
+            onSetCameraZoom(2f)
+        }
+    }
+
     Scaffold(
         snackbarHost = {
             SnackbarHost(
@@ -132,15 +144,47 @@ fun RoomScreen(
                 .padding(innerPadding)
         ) {
             if (room.isCameraMode) {
+                // 1. 배경 레이어: 블러 처리된 비확대 뷰포트 (프레임 바깥 영역을 담당)
+                RoomViewport(
+                    uiState = room,
+                    onRoomObjectClick = {},
+                    onFloorTap = {},
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .blur(radiusX = 18.dp, radiusY = 18.dp)
+                )
+
+                // 2. 전경 레이어: 확대된 선명한 뷰포트 (중앙 프레임 내부만 보이도록 클리핑)
+                val density = androidx.compose.ui.platform.LocalDensity.current
+                val cornerRadiusPx = with(density) { 16.dp.toPx() }
+                
+                val frameShape = remember {
+                    androidx.compose.foundation.shape.GenericShape { size, _ ->
+                        val fw = size.width * CAMERA_FRAME_WIDTH_FRACTION
+                        val fh = size.height * CAMERA_FRAME_HEIGHT_FRACTION
+                        val left = (size.width - fw) / 2
+                        val top = (size.height - fh) / 2
+                        addRoundRect(
+                            androidx.compose.ui.geometry.RoundRect(
+                                rect = androidx.compose.ui.geometry.Rect(left, top, left + fw, top + fh),
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadiusPx)
+                            )
+                        )
+                    }
+                }
+
                 RoomViewport(
                     uiState = room,
                     onRoomObjectClick = onRoomObjectClick,
                     onFloorTap = onFloorTap,
                     modifier = Modifier
                         .fillMaxSize()
+                        .clip(frameShape) // 중앙 프레임 영역만 남기고 나머지는 아래의 블러 배경이 보이게 함
                         .graphicsLayer {
                             scaleX = room.cameraZoom
                             scaleY = room.cameraZoom
+                            translationX = room.cameraOffsetX
+                            translationY = room.cameraOffsetY
                             transformOrigin = TransformOrigin.Center
                         }
                 )
@@ -200,7 +244,7 @@ fun RoomScreen(
                 )
             }
 
-            if (!room.rearrangeMode) {
+            if (!room.rearrangeMode && !room.isCameraMode) {
                 Surface(
                     onClick = onRearrangeClick,
                     shape = RoundedCornerShape(18.dp),
@@ -216,7 +260,7 @@ fun RoomScreen(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
                     )
                 }
-            } else {
+            } else if (room.rearrangeMode) { // [수정됨] 카메라 모드일 땐 이 팝업 표시 안 함
                 Surface(
                     shape = RoundedCornerShape(18.dp),
                     color = Color(0xFFEADFD3),
@@ -359,6 +403,7 @@ fun RoomScreen(
                 CameraOverlay(
                     zoom = room.cameraZoom,
                     onZoomChange = onSetCameraZoom,
+                    onPan = onSetCameraOffset, // [추가됨] 한 손가락 드래그 Panning
                     onCapture = {
                         if (cameraOverlaySize.width > 0 && cameraOverlaySize.height > 0) {
                             val screenBitmap = rootView.drawToBitmap(Bitmap.Config.ARGB_8888)
@@ -388,6 +433,7 @@ fun RoomScreen(
                         }
                     },
                     onCancel = onExitCameraMode,
+                    onGalleryClick = onGalleryClick, // [추가됨] 갤러리 연결
                     modifier = Modifier
                         .fillMaxSize()
                         .onGloballyPositioned { coordinates ->
@@ -445,8 +491,10 @@ private fun RoomScreenPreview() {
             recentMainMenuAction = MainMenuAction.SHOP,
             onPlaceholderMessageConsumed = {},
             onSetCameraZoom = {},
+            onSetCameraOffset = { _, _ -> },
             onCaptureClick = {},
             onExitCameraMode = {},
+            onGalleryClick = {},
             currencyAmount = 100,
             purchasedShopItems = emptyList(),
             onPlaygroundClick = {},
