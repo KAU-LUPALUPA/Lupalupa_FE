@@ -15,8 +15,8 @@ class CurrencyRemoteDataSource(
 
     suspend fun earn(amount: Long, total: Long, source: String): CurrencyUpdateResult {
         return try {
-            // [수정됨(권)] 서버 GoldRequest 스펙에 맞춰 source 필드 제외
-            val request = CurrencyEarnRequest(amount = amount, total = total)
+            // [수정됨(권)] 서버 GoldRequest 스펙에 맞춰 source 필드 제외 및 타입 캐스팅(Int)
+            val request = CurrencyEarnRequest(amount = amount.toInt(), total = total)
             val response = apiService.earnCurrency(request)
 
             if (response.isSuccessful) {

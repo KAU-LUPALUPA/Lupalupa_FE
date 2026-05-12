@@ -189,7 +189,8 @@ fun LupaApp(deepLink: Uri? = null) {
                 onAcceptHomeInvitation = appViewModel::acceptHomeInvitation,
                 onRejectHomeInvitation = appViewModel::rejectHomeInvitation,
                 behaviorDebugInfo = uiState.behaviorDebugInfo,
-                onToggleBehaviorDebugClick = appViewModel::toggleBehaviorDebugWindow
+                onToggleBehaviorDebugClick = appViewModel::toggleBehaviorDebugWindow,
+                onMinigameClick = appViewModel::openMinigame // [수정됨(권)] 미니게임 진입 연결
             )
 
             if (showOfflineDialog) {
@@ -331,7 +332,7 @@ fun LupaApp(deepLink: Uri? = null) {
 }
 
 private fun sendHeartbeatToServer(userId: String): Long? {
-    val url = URL("http://15.164.49.236:8080/user/heartbeat")
+    val url = URL("${com.example.lupapj.data.remote.ServerSecrets.BASE_URL}user/heartbeat")
     val connection = url.openConnection() as HttpURLConnection
 
     return try {

@@ -40,6 +40,7 @@ import androidx.core.view.drawToBitmap
 import com.example.lupapj.R
 import com.example.lupapj.data.model.BottomNavItem
 import com.example.lupapj.data.model.MainMenuAction
+import com.example.lupapj.data.model.iconRes
 import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.model.friend.FriendHomeInvitation
@@ -95,7 +96,8 @@ fun RoomScreen(
     onAcceptHomeInvitation: (String) -> Unit, // [추가됨(권)] 복구됨
     onRejectHomeInvitation: (String) -> Unit,
     behaviorDebugInfo: com.example.lupapj.data.model.BehaviorDebugInfo,
-    onToggleBehaviorDebugClick: () -> Unit
+    onToggleBehaviorDebugClick: () -> Unit,
+    onMinigameClick: () -> Unit // [수정됨(권)] 미니게임 클릭 콜백 추가
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope() // [추가됨(권)]
@@ -158,6 +160,7 @@ fun RoomScreen(
                     onSettingClick = onSettingsClick,
                     onPopupMenuItemClick = onBottomNavItemClick,
                     onPlaygroundClick = onPlaygroundClick,
+                    onMinigameClick = onMinigameClick, // [수정됨(권)] 전달
                     roomContent = {
                         RoomViewport(
                             uiState = room,
@@ -416,14 +419,7 @@ fun RoomScreen(
     }
 }
 
-private val MainMenuAction.iconRes: Int
-    get() = when (this) {
-        MainMenuAction.SCREENSHOT -> R.drawable.camera_trimmed
-        MainMenuAction.GALLERY -> R.drawable.gallery_trimmed
-        MainMenuAction.CONTACTS -> R.drawable.friends_trimmed
-        MainMenuAction.SHOP -> R.drawable.shop_trimmed
-        MainMenuAction.PLAYGROUND -> R.drawable.playground_trimmed
-    }
+// [수정됨(권)] 로컬 iconRes 제거하고 AppModels의 전역 확장 프로퍼티 사용
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
@@ -464,7 +460,8 @@ private fun RoomScreenPreview() {
             onAcceptHomeInvitation = {},
             onRejectHomeInvitation = {},
             behaviorDebugInfo = com.example.lupapj.data.model.BehaviorDebugInfo(),
-            onToggleBehaviorDebugClick = {}
+            onToggleBehaviorDebugClick = {},
+            onMinigameClick = {} // [수정됨(권)] 프리뷰 파라미터 추가
         )
     }
 }

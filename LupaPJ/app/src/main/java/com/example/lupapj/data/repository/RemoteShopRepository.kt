@@ -43,19 +43,19 @@ class RemoteShopRepository(
         // 상점 목록 검증 API 호출
         val currentItems = _shopItems.value
         val request = ShopItemsValidateRequest(
-            items = currentItems.map { ShopItemDto(it.id, it.name, it.price) }
+            items = currentItems.map { ShopItemDto(it.id.toInt(), it.name, it.price) } // [수정됨(권)] String -> Int
         )
 
         try {
             val response = apiService.validateShopItems(request)
             if (response.isSuccessful) {
                 val body = response.body()
-                if (body?.status == "fail" && body.failList != null) {
-                    // [추가됨] 서버와 로컬 데이터(가격 등) 불일치 시 서버 기준으로 로컬 상태 동기화
+                // [수정됨(권)] 서버 필드명 mismatchedItems로 변경
+                if (body?.status == "fail" && body.mismatchedItems != null) {
                     val updatedItems = _shopItems.value.map { localItem ->
-                        val failedItem = body.failList.find { it.id == localItem.id }
-                        if (failedItem != null) {
-                            localItem.copy(price = failedItem.price)
+                        val mismatched = body.mismatchedItems.find { it.itemId.toString() == localItem.id }
+                        if (mismatched != null) {
+                            localItem.copy(price = mismatched.serverPrice)
                         } else {
                             localItem
                         }
@@ -75,7 +75,7 @@ class RemoteShopRepository(
         val currentBalance = currencyRepository.currencyState.value.amount
 
         val request = ShopPurchaseRequest(
-            itemId = itemId,
+            itemId = itemId.toInt(), // [수정됨(권)] String -> Int
             amount = 1,
             price = item.price,
             balance = currentBalance
@@ -93,11 +93,9 @@ class RemoteShopRepository(
 
                 // 2. 인벤토리 업데이트 (서버에서 내려준 전체 인벤토리 목록으로 동기화)
                 val newInventory = body.inventory?.map { 
-                    InventoryItem(instanceId = it.instanceId, masterId = it.masterId, count = it.count)
+                    InventoryItem(instanceId = it.instanceId, masterId = it.id.toString(), count = it.count) // [수정됨(권)] id(Int) -> masterId(String)
                 } ?: emptyList()
                 
-                // [수정됨] 단일 진실 공급원(SSOT) 유지를 위해 _inventory.value 직접 할당 제거. 
-                // 캐시에만 저장하면 StateFlow가 자동으로 감지해 UI를 업데이트함.
                 localCache.savePurchasedItems(newInventory)
 
                 Result.success(Unit)

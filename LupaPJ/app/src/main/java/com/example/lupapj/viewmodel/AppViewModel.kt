@@ -236,6 +236,7 @@ class AppViewModel(
             MainMenuAction.CONTACTS -> onBottomNavItemClick(BottomNavItem.CONTACTS)
             MainMenuAction.SHOP -> onBottomNavItemClick(BottomNavItem.SHOP)
             MainMenuAction.PLAYGROUND -> openPlaza()
+            MainMenuAction.MINIGAME -> openMinigame() // [수정됨(권)] 최근 활동 버튼 클릭 시 미니게임 진입 연결
             null -> _uiState.update {
                 it.copy(placeholderMessage = "최근 사용한 기능이 없습니다.")
             }
@@ -989,7 +990,7 @@ class AppViewModel(
         _uiState.update {
             it.copy(
                 phase = AppPhase.MINIGAME,
-                recentMainMenuAction = MainMenuAction.PLAYGROUND
+                recentMainMenuAction = MainMenuAction.MINIGAME // [수정됨(권)] PLAYGROUND에서 MINIGAME으로 정정
             )
         }
     }

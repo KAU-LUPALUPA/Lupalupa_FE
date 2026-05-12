@@ -10,7 +10,7 @@ data class ShopItemsValidateRequest(
 )
 
 data class ShopItemDto(
-    @SerializedName("itemId") val itemId: String,
+    @SerializedName("itemId") val itemId: Int, // [수정됨(권)] String -> Int
     @SerializedName("itemName") val itemName: String,
     @SerializedName("price") val price: Int
 )
@@ -19,7 +19,7 @@ data class ShopItemDto(
  * [추가됨(권)] 아이템 구매 요청 DTO
  */
 data class ShopPurchaseRequest(
-    @SerializedName("itemId") val itemId: String,
+    @SerializedName("itemId") val itemId: Int, // [수정됨(권)] String -> Int
     @SerializedName("amount") val amount: Int,
     @SerializedName("price") val price: Int,
     @SerializedName("balance") val balance: Long

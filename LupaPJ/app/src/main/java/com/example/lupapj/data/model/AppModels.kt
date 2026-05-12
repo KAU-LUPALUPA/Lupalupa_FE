@@ -174,7 +174,8 @@ enum class MainMenuAction {
     GALLERY,
     CONTACTS,
     SHOP,
-    PLAYGROUND
+    PLAYGROUND,
+    MINIGAME // [수정됨(권)] 최근 활동을 위해 미니게임 액션 추가
 }
 
 val PetAction.label: String
@@ -202,6 +203,18 @@ val MainMenuAction.label: String
         MainMenuAction.CONTACTS -> "친구"
         MainMenuAction.SHOP -> "상점"
         MainMenuAction.PLAYGROUND -> "광장"
+        MainMenuAction.MINIGAME -> "미니게임" // [수정됨(권)]
+    }
+
+// [수정됨(권)] 최근 활동 아이콘 매핑
+val MainMenuAction.iconRes: Int
+    get() = when (this) {
+        MainMenuAction.SCREENSHOT -> com.example.lupapj.R.drawable.camera_trimmed
+        MainMenuAction.GALLERY -> com.example.lupapj.R.drawable.gallery_trimmed
+        MainMenuAction.CONTACTS -> com.example.lupapj.R.drawable.friends_trimmed
+        MainMenuAction.SHOP -> com.example.lupapj.R.drawable.shop_trimmed
+        MainMenuAction.PLAYGROUND -> com.example.lupapj.R.drawable.playground_trimmed
+        MainMenuAction.MINIGAME -> com.example.lupapj.R.drawable.minigame_icon // [수정됨(권)] 전용 아이콘 사용
     }
 
 val RoomObjectType.label: String
