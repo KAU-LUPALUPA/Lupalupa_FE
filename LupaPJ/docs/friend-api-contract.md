@@ -19,7 +19,7 @@
 
 | 기능 | 카테고리 | 사용자 | Method | URL | param | 설명 | Response | 비고 |
 |---|---|---|---|---|---|---|---|---|
-| 내 친구 코드 조회 | 친구 코드 | 로그인 사용자 | GET | `/users/me/friend-code` | 없음 | 친구 화면 진입 시 내 친구 코드를 조회한다. | `friendCode`, `displayFriendCode` | 닉네임/프로필은 로그인 응답 또는 `/users/me` 응답을 사용한다. |
+| 내 친구 코드 조회 | 친구 코드 | 로그인 사용자 | GET | `/friends/users/me/friend-code` | 없음 | 친구 화면 진입 시 내 친구 코드를 조회한다. | `friendCode`, `displayFriendCode` | 닉네임/프로필은 로그인 응답 또는 `/users/me` 응답을 사용한다. |
 | 친구 코드로 유저 조회 | 친구 코드 | 로그인 사용자 | GET | `/friends/users/by-code` | Query: `friendCode` | 친구 신청 전 상대 유저가 존재하는지 확인한다. | `user{userId, nickname, friendCode, displayFriendCode, avatarAssetKey}`, `relationshipStatus` | 선택 API. MVP에서 바로 신청만 할 경우 생략 가능. |
 | 친구 신청 보내기 | 친구 요청 | 로그인 사용자 | POST | `/friends/requests` | Body: `friendCode` | 상대방 친구 코드를 입력해 친구 신청을 보낸다. | `request{id, fromUser, toUser, status, createdAt, respondedAt}` | 에러: `EMPTY_CODE`, `SELF_CODE`, `USER_NOT_FOUND`, `ALREADY_FRIENDS`, `REQUEST_ALREADY_SENT`, `REQUEST_ALREADY_RECEIVED`, `BLOCKED` |
 | 받은 친구 신청 목록 | 친구 요청 | 로그인 사용자 | GET | `/friends/requests/received` | 없음 | 나에게 온 친구 신청 목록을 조회한다. | `requests[]` | 친구요청목록 탭에서 사용한다. |

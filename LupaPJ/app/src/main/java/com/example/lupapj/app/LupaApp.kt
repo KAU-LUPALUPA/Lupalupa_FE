@@ -70,6 +70,7 @@ fun LupaApp(deepLink: Uri? = null) {
 
     val uiState by appViewModel.uiState.collectAsStateWithLifecycle()
 
+    var accessToken by remember { mutableStateOf<String?>(null) }
     var isAppForeground by remember { mutableStateOf(false) }
     var showOfflineDialog by remember { mutableStateOf(false) }
     var offlineDialogMessage by remember { mutableStateOf("") }
@@ -81,7 +82,6 @@ fun LupaApp(deepLink: Uri? = null) {
                 Lifecycle.Event.ON_START -> isAppForeground = true
                 Lifecycle.Event.ON_STOP -> {
                     isAppForeground = false
-                    hasShownOfflineDialog = false
                 }
                 else -> Unit
             }
@@ -100,6 +100,9 @@ fun LupaApp(deepLink: Uri? = null) {
         val uid = deepLink?.getQueryParameter("uid")
 
         if (!token.isNullOrBlank()) {
+
+            accessToken = token
+
             // [수정됨(권)] 딥링크를 통한 로그인 시 ViewModel에 uid를 함께 전달하여 하트비트 식별자 일치시킴
             appViewModel.onKakaoLoginSuccess(
                 accessToken = token,
@@ -116,20 +119,19 @@ fun LupaApp(deepLink: Uri? = null) {
         if (uiState.phase == AppPhase.ROOM && isAppForeground) {
             // 초기 접속 시 오프라인 시간 계산
             val offlineSeconds = withContext(Dispatchers.IO) {
-                sendHeartbeatToServer(currentUserId)
+                sendHeartbeatToServer(currentUserId,accessToken)
             }
 
-            if (offlineSeconds != null && !hasShownOfflineDialog) {
+            if (offlineSeconds != null) {
                 offlineDialogMessage = formatOfflineMessage(offlineSeconds)
                 showOfflineDialog = true
-                hasShownOfflineDialog = true
             }
 
             // [수정됨(권)] 30초마다 하트비트를 전송하여 실시간 접속 상태 유지 (메인 브런치 로직)
             while (isActive && isAppForeground && uiState.phase == AppPhase.ROOM) {
                 delay(30_000)
                 withContext(Dispatchers.IO) {
-                    sendHeartbeatToServer(currentUserId)
+                    sendHeartbeatToServer(currentUserId,accessToken)
                 }
             }
         }
@@ -333,7 +335,7 @@ fun LupaApp(deepLink: Uri? = null) {
     }
 }
 
-private fun sendHeartbeatToServer(userId: String): Long? {
+private fun sendHeartbeatToServer(userId: String,accessToken: String?): Long? {
     val url = URL("${com.example.lupapj.data.remote.ServerSecrets.BASE_URL}user/heartbeat")
     val connection = url.openConnection() as HttpURLConnection
 
@@ -341,6 +343,12 @@ private fun sendHeartbeatToServer(userId: String): Long? {
         connection.requestMethod = "POST"
         connection.instanceFollowRedirects = false
         connection.setRequestProperty("Content-Type", "application/json")
+        if (!accessToken.isNullOrBlank()) {
+            connection.setRequestProperty(
+                "Authorization",
+                "Bearer $accessToken"
+            )
+        }
         connection.connectTimeout = 5000
         connection.readTimeout = 5000
         connection.doOutput = true

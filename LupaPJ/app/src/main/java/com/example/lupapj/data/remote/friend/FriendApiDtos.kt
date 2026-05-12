@@ -83,7 +83,8 @@ data class FriendRequestDto(
 
 data class FriendshipDto(
     val friendshipId: String,
-    val friend: FriendUserDto,
+    val friend: FriendUserDto? = null,
+    val user: FriendUserDto? = null,
     val status: String,
     val friendsSince: String
 )

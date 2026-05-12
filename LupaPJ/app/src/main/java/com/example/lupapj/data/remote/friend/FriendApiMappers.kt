@@ -21,7 +21,9 @@ import com.example.lupapj.data.model.initialRoomUiState
 import com.example.lupapj.data.model.scene.FloorAnchor
 import com.example.lupapj.data.model.scene.RoomSceneDefinition
 import com.example.lupapj.data.model.scene.initialHouseSceneState
+import java.time.LocalDateTime
 import java.time.OffsetDateTime
+import java.time.ZoneId
 
 internal fun FriendUserDto.toDomain(): FriendUser {
     return FriendUser(
@@ -50,8 +52,11 @@ internal fun FriendRequestDto.toDomain(): FriendRequest {
 }
 
 internal fun FriendshipDto.toDomain(): FriendSummary {
+    val friendUser = friend ?: user
+        ?: throw IllegalArgumentException("Friendship response is missing friend user.")
+
     return FriendSummary(
-        user = friend.toDomain(),
+        user = friendUser.toDomain(),
         status = enumValueOrDefault(status, FriendshipStatus.ACCEPTED),
         friendsSinceMillis = friendsSince.toEpochMillis()
     )
@@ -239,5 +244,12 @@ private inline fun <reified T : Enum<T>> enumValueOrDefault(
 private fun String.toEpochMillis(): Long {
     return runCatching {
         OffsetDateTime.parse(this).toInstant().toEpochMilli()
-    }.getOrDefault(0L)
+    }.getOrElse {
+        runCatching {
+            LocalDateTime.parse(this)
+                .atZone(ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli()
+        }.getOrDefault(0L)
+    }
 }
