@@ -200,7 +200,7 @@ Response:
 ### 4.2 내 친구 코드 조회
 
 ```http
-GET /users/me/friend-code
+GET /friends/users/me/friend-code
 ```
 
 Response:
