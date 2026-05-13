@@ -3,62 +3,28 @@ package com.example.lupapj.ui.screens.friends
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.lupapj.R
 import com.example.lupapj.data.mock.DemoFriendUsers
-import com.example.lupapj.data.model.friend.FriendCode
-import com.example.lupapj.data.model.friend.FriendHomeInvitation
-import com.example.lupapj.data.model.friend.FriendHomeInvitationStatus
-import com.example.lupapj.data.model.friend.FriendRequest
-import com.example.lupapj.data.model.friend.FriendRequestStatus
-import com.example.lupapj.data.model.friend.FriendSummary
-import com.example.lupapj.data.model.friend.FriendUser
+import com.example.lupapj.data.model.friend.*
 import com.example.lupapj.ui.theme.LupaPJTheme
 import kotlinx.coroutines.launch
 
@@ -69,150 +35,8 @@ private enum class FriendTab(val title: String) {
     Sent("보낸 요청")
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FriendScreen(
-    myProfile: FriendUser?,
-    friends: List<FriendSummary>,
-    receivedRequests: List<FriendRequest>,
-    sentRequests: List<FriendRequest>,
-    receivedHomeInvitations: List<FriendHomeInvitation>,
-    friendCodeInput: String,
-    isSendingFriendRequest: Boolean,
-    feedbackMessage: String?,
-    onFriendCodeChange: (String) -> Unit,
-    onSendFriendRequest: () -> Unit,
-    onAcceptRequest: (String) -> Unit,
-    onRejectRequest: (String) -> Unit,
-    onCancelRequest: (String) -> Unit,
-    onAcceptHomeInvitation: (String) -> Unit,
-    onRejectHomeInvitation: (String) -> Unit,
-    onRemoveFriend: (String) -> Unit,
-    onBackClick: () -> Unit,
-    onFeedbackConsumed: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
-    var friendPendingRemoval by remember { mutableStateOf<FriendUser?>(null) }
-
-    LaunchedEffect(feedbackMessage) {
-        feedbackMessage?.let {
-            snackbarHostState.showSnackbar(it)
-            onFeedbackConsumed()
-        }
-    }
-
-    friendPendingRemoval?.let { friend ->
-        AlertDialog(
-            onDismissRequest = { friendPendingRemoval = null },
-            title = { Text("친구 삭제") },
-            text = { Text("${friend.nickname}님을 친구 목록에서 삭제할까요?") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onRemoveFriend(friend.userId)
-                        friendPendingRemoval = null
-                    }
-                ) {
-                    Text("삭제")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { friendPendingRemoval = null }) {
-                    Text("취소")
-                }
-            }
-        )
-    }
-
-    Scaffold(
-        modifier = modifier,
-        topBar = {
-            TopAppBar(
-                title = { Text("친구") },
-                navigationIcon = {
-                    TextButton(onClick = onBackClick) {
-                        Text("뒤로")
-                    }
-                }
-            )
-        },
-        snackbarHost = {
-            SnackbarHost(hostState = snackbarHostState)
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            FriendCodePanel(
-                myProfile = myProfile,
-                friendCodeInput = friendCodeInput,
-                isSendingFriendRequest = isSendingFriendRequest,
-                onFriendCodeChange = onFriendCodeChange,
-                onSendFriendRequest = onSendFriendRequest,
-                onCopyCode = { code ->
-                    copyToClipboard(context, code)
-                    coroutineScope.launch {
-                        snackbarHostState.showSnackbar("친구 코드를 복사했어요.")
-                    }
-                },
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-            )
-
-            PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
-                FriendTab.entries.forEachIndexed { index, tab ->
-                    val count = when (tab) {
-                        FriendTab.Friends -> friends.size
-                        FriendTab.HomeInvites -> receivedHomeInvitations.size
-                        FriendTab.Received -> receivedRequests.size
-                        FriendTab.Sent -> sentRequests.size
-                    }
-                    Tab(
-                        selected = selectedTabIndex == index,
-                        onClick = { selectedTabIndex = index },
-                        text = { Text("${tab.title} $count") }
-                    )
-                }
-            }
-
-            when (FriendTab.entries[selectedTabIndex]) {
-                FriendTab.Friends -> FriendList(
-                    friends = friends,
-                    onRemoveFriendClick = { friendPendingRemoval = it }
-                )
-
-                FriendTab.HomeInvites -> HomeInvitationList(
-                    invitations = receivedHomeInvitations,
-                    onAcceptHomeInvitation = onAcceptHomeInvitation,
-                    onRejectHomeInvitation = onRejectHomeInvitation
-                )
-
-                FriendTab.Received -> ReceivedRequestList(
-                    requests = receivedRequests,
-                    onAcceptRequest = { requestId ->
-                        selectedTabIndex = FriendTab.Friends.ordinal
-                        onAcceptRequest(requestId)
-                    },
-                    onRejectRequest = onRejectRequest
-                )
-
-                FriendTab.Sent -> SentRequestList(
-                    requests = sentRequests,
-                    onCancelRequest = onCancelRequest
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun FriendCodePanel(
+fun FriendCodePanel(
     myProfile: FriendUser?,
     friendCodeInput: String,
     isSendingFriendRequest: Boolean,
@@ -289,134 +113,7 @@ private fun FriendCodePanel(
 }
 
 @Composable
-private fun FriendList(
-    friends: List<FriendSummary>,
-    onRemoveFriendClick: (FriendUser) -> Unit
-) {
-    if (friends.isEmpty()) {
-        EmptyState(text = "친구가 없습니다.")
-        return
-    }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        items(friends, key = { it.user.userId }) { friend ->
-            UserRow(
-                user = friend.user,
-                trailingContent = {
-                    TextButton(onClick = { onRemoveFriendClick(friend.user) }) {
-                        Text("삭제")
-                    }
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun HomeInvitationList(
-    invitations: List<FriendHomeInvitation>,
-    onAcceptHomeInvitation: (String) -> Unit,
-    onRejectHomeInvitation: (String) -> Unit
-) {
-    if (invitations.isEmpty()) {
-        EmptyState(text = "받은 집 초대가 없습니다.")
-        return
-    }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        items(invitations, key = { it.id }) { invitation ->
-            UserRow(
-                user = invitation.fromUser,
-                supportingText = invitation.message ?: invitation.status.displayText,
-                trailingContent = {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { onRejectHomeInvitation(invitation.id) }) {
-                            Text("거절")
-                        }
-                        Button(onClick = { onAcceptHomeInvitation(invitation.id) }) {
-                            Text("수락")
-                        }
-                    }
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun ReceivedRequestList(
-    requests: List<FriendRequest>,
-    onAcceptRequest: (String) -> Unit,
-    onRejectRequest: (String) -> Unit
-) {
-    if (requests.isEmpty()) {
-        EmptyState(text = "받은 요청이 없습니다.")
-        return
-    }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        items(requests, key = { it.id }) { request ->
-            UserRow(
-                user = request.fromUser,
-                supportingText = "친구 요청",
-                trailingContent = {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { onRejectRequest(request.id) }) {
-                            Text("거절")
-                        }
-                        Button(onClick = { onAcceptRequest(request.id) }) {
-                            Text("수락")
-                        }
-                    }
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun SentRequestList(
-    requests: List<FriendRequest>,
-    onCancelRequest: (String) -> Unit
-) {
-    if (requests.isEmpty()) {
-        EmptyState(text = "보낸 요청이 없습니다.")
-        return
-    }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        items(requests, key = { it.id }) { request ->
-            UserRow(
-                user = request.toUser,
-                supportingText = request.status.displayText,
-                trailingContent = {
-                    OutlinedButton(onClick = { onCancelRequest(request.id) }) {
-                        Text("취소")
-                    }
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun UserRow(
+fun UserRow(
     user: FriendUser,
     modifier: Modifier = Modifier,
     supportingText: String = user.displayFriendCode,
@@ -460,7 +157,7 @@ private fun UserRow(
 }
 
 @Composable
-private fun AvatarInitial(
+fun AvatarInitial(
     nickname: String,
     modifier: Modifier = Modifier
 ) {
@@ -479,7 +176,7 @@ private fun AvatarInitial(
 }
 
 @Composable
-private fun EmptyState(text: String) {
+fun EmptyState(text: String) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -489,6 +186,291 @@ private fun EmptyState(text: String) {
             onClick = {},
             label = { Text(text) }
         )
+    }
+}
+
+@Composable
+fun FriendList(
+    friends: List<FriendSummary>,
+    onRemoveFriendClick: (FriendUser) -> Unit
+) {
+    if (friends.isEmpty()) {
+        EmptyState(text = "친구가 없습니다.")
+        return
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        items(friends, key = { it.user.userId }) { friend ->
+            UserRow(
+                user = friend.user,
+                trailingContent = {
+                    TextButton(onClick = { onRemoveFriendClick(friend.user) }) {
+                        Text("삭제")
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun HomeInvitationList(
+    invitations: List<FriendHomeInvitation>,
+    onAcceptHomeInvitation: (String) -> Unit,
+    onRejectHomeInvitation: (String) -> Unit
+) {
+    if (invitations.isEmpty()) {
+        EmptyState(text = "받은 집 초대가 없습니다.")
+        return
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        items(invitations, key = { it.id }) { invitation ->
+            UserRow(
+                user = invitation.fromUser,
+                supportingText = invitation.message ?: invitation.status.displayText,
+                trailingContent = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onRejectHomeInvitation(invitation.id) }) {
+                            Text("거절")
+                        }
+                        Button(onClick = { onAcceptHomeInvitation(invitation.id) }) {
+                            Text("수락")
+                        }
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun ReceivedRequestList(
+    requests: List<FriendRequest>,
+    onAcceptRequest: (String) -> Unit,
+    onRejectRequest: (String) -> Unit
+) {
+    if (requests.isEmpty()) {
+        EmptyState(text = "받은 요청이 없습니다.")
+        return
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        items(requests, key = { it.id }) { request ->
+            UserRow(
+                user = request.fromUser,
+                supportingText = "친구 요청",
+                trailingContent = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onRejectRequest(request.id) }) {
+                            Text("거절")
+                        }
+                        Button(onClick = { onAcceptRequest(request.id) }) {
+                            Text("수락")
+                        }
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun SentRequestList(
+    requests: List<FriendRequest>,
+    onCancelRequest: (String) -> Unit
+) {
+    if (requests.isEmpty()) {
+        EmptyState(text = "보낸 요청이 없습니다.")
+        return
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        items(requests, key = { it.id }) { request ->
+            UserRow(
+                user = request.toUser,
+                supportingText = request.status.displayText,
+                trailingContent = {
+                    OutlinedButton(onClick = { onCancelRequest(request.id) }) {
+                        Text("취소")
+                    }
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FriendScreen(
+    myProfile: FriendUser?,
+    friends: List<FriendSummary>,
+    receivedRequests: List<FriendRequest>,
+    sentRequests: List<FriendRequest>,
+    receivedHomeInvitations: List<FriendHomeInvitation>,
+    friendCodeInput: String,
+    isSendingFriendRequest: Boolean,
+    feedbackMessage: String?,
+    onFriendCodeChange: (String) -> Unit,
+    onSendFriendRequest: () -> Unit,
+    onAcceptRequest: (String) -> Unit,
+    onRejectRequest: (String) -> Unit,
+    onCancelRequest: (String) -> Unit,
+    onAcceptHomeInvitation: (String) -> Unit,
+    onRejectHomeInvitation: (String) -> Unit,
+    onRemoveFriend: (String) -> Unit,
+    onBackClick: () -> Unit,
+    onFeedbackConsumed: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    var friendPendingRemoval by remember { mutableStateOf<FriendUser?>(null) }
+
+    LaunchedEffect(feedbackMessage) {
+        feedbackMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            onFeedbackConsumed()
+        }
+    }
+
+    friendPendingRemoval?.let { friend ->
+        AlertDialog(
+            onDismissRequest = { friendPendingRemoval = null },
+            title = { Text("친구 삭제") },
+            text = { Text("${friend.nickname}님을 친구 목록에서 삭제할까요?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onRemoveFriend(friend.userId)
+                        friendPendingRemoval = null
+                    }
+                ) {
+                    Text("삭제")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { friendPendingRemoval = null }) {
+                    Text("취소")
+                }
+            }
+        )
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Image(
+            painter = painterResource(id = R.drawable.background_1),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+        Scaffold(
+            modifier = modifier,
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = { Text("친구") },
+                    navigationIcon = {
+                        TextButton(onClick = onBackClick) {
+                            Text("뒤로")
+                        }
+                    }
+                )
+            },
+            snackbarHost = {
+                SnackbarHost(hostState = snackbarHostState)
+            }
+        ) { paddingValues ->
+            Surface(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(16.dp),
+                color = Color(0xFFFFFBF0).copy(alpha = 0.75f),
+                shape = RoundedCornerShape(32.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.6f))
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    FriendCodePanel(
+                        myProfile = myProfile,
+                        friendCodeInput = friendCodeInput,
+                        isSendingFriendRequest = isSendingFriendRequest,
+                        onFriendCodeChange = onFriendCodeChange,
+                        onSendFriendRequest = onSendFriendRequest,
+                        onCopyCode = { code ->
+                            copyToClipboard(context, code)
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("친구 코드를 복사했어요.")
+                            }
+                        },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                    )
+
+                    PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
+                        FriendTab.entries.forEachIndexed { index, tab ->
+                            val count = when (tab) {
+                                FriendTab.Friends -> friends.size
+                                FriendTab.HomeInvites -> receivedHomeInvitations.size
+                                FriendTab.Received -> receivedRequests.size
+                                FriendTab.Sent -> sentRequests.size
+                            }
+                            Tab(
+                                selected = selectedTabIndex == index,
+                                onClick = { selectedTabIndex = index },
+                                text = { Text("${tab.title} $count") }
+                            )
+                        }
+                    }
+
+                    when (FriendTab.entries[selectedTabIndex]) {
+                        FriendTab.Friends -> FriendList(
+                            friends = friends,
+                            onRemoveFriendClick = { friendPendingRemoval = it }
+                        )
+
+                        FriendTab.HomeInvites -> HomeInvitationList(
+                            invitations = receivedHomeInvitations,
+                            onAcceptHomeInvitation = onAcceptHomeInvitation,
+                            onRejectHomeInvitation = onRejectHomeInvitation
+                        )
+
+                        FriendTab.Received -> ReceivedRequestList(
+                            requests = receivedRequests,
+                            onAcceptRequest = { requestId ->
+                                selectedTabIndex = FriendTab.Friends.ordinal
+                                onAcceptRequest(requestId)
+                            },
+                            onRejectRequest = onRejectRequest
+                        )
+
+                        FriendTab.Sent -> SentRequestList(
+                            requests = sentRequests,
+                            onCancelRequest = onCancelRequest
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -518,7 +500,7 @@ private fun copyToClipboard(context: Context, text: String) {
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun FriendScreenPreview() {
+fun FriendScreenPreview() {
     val receivedRequest = FriendRequest(
         id = "preview-request",
         fromUser = DemoFriendUsers.incomingRequester,

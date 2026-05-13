@@ -1,16 +1,21 @@
 package com.example.lupapj.ui.screens.shop
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.example.lupapj.R
 import com.example.lupapj.data.model.ShopItem
 import com.example.lupapj.data.model.label
 
@@ -24,43 +29,60 @@ fun ShopScreen(
     onItemClick: (ShopItem) -> Unit,
     onBackClick: () -> Unit
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("상점") },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Text("←")
+    Box(modifier = Modifier.fillMaxSize()) {
+        Image(
+            painter = painterResource(id = R.drawable.background_1),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = { Text("상점") },
+                    navigationIcon = {
+                        IconButton(onClick = onBackClick) {
+                            Text("←")
+                        }
+                    },
+                    actions = {
+                        Text(
+                            text = "💰 $currencyAmount",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(end = 16.dp)
+                        )
                     }
-                },
-                actions = {
-                    Text(
-                        text = "💰 $currencyAmount",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(end = 16.dp)
+                )
+            }
+        ) { padding ->
+            Surface(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(16.dp),
+                color = Color(0xFFFFFBF0).copy(alpha = 0.75f),
+                shape = RoundedCornerShape(32.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.6f))
+            ) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    contentPadding = PaddingValues(16.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                items(shopItems) { item ->
+                    ShopItemCard(
+                        item = item,
+                        isPurchased = purchasedItemIds.contains(item.id),
+                        onClick = { onItemClick(item) }
                     )
                 }
-            )
-        }
-    ) { padding ->
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            contentPadding = PaddingValues(16.dp),
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(shopItems) { item ->
-                ShopItemCard(
-                    item = item,
-                    isPurchased = purchasedItemIds.contains(item.id),
-                    onClick = { onItemClick(item) }
-                )
             }
         }
     }
+}
 }
 
 // [추가됨(권)] 상점 목록의 개별 아이템을 표시하는 카드 컴포넌트
@@ -77,7 +99,7 @@ fun ShopItemCard(
             .clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isPurchased) Color.LightGray else MaterialTheme.colorScheme.surface
+            containerColor = if (isPurchased) Color.LightGray else MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
         )
     ) {
         Column(

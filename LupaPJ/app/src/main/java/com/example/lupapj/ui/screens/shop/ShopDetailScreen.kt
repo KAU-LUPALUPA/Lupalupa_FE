@@ -15,6 +15,11 @@ import androidx.compose.ui.unit.dp
 import com.example.lupapj.data.model.ShopItem
 import com.example.lupapj.data.model.label
 
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import com.example.lupapj.R
+
 // [추가됨(권)] 상점 아이템의 세부 스펙을 보고 구매할 수 있는 상세 화면 컴포저블
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,40 +42,56 @@ fun ShopDetailScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(item.name) },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Text("←")
+    Box(modifier = Modifier.fillMaxSize()) {
+        Image(
+            painter = painterResource(id = R.drawable.background_1),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = { Text(item.name) },
+                    navigationIcon = {
+                        IconButton(onClick = onBackClick) {
+                            Text("←")
+                        }
+                    },
+                    actions = {
+                        Text(
+                            text = "💰 $currencyAmount",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(end = 16.dp)
+                        )
                     }
-                },
-                actions = {
-                    Text(
-                        text = "💰 $currencyAmount",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(end = 16.dp)
-                    )
-                }
-            )
-        },
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+                )
+            },
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+        ) { padding ->
+            Surface(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(16.dp),
+                color = Color(0xFFFFFBF0).copy(alpha = 0.75f),
+                shape = RoundedCornerShape(32.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.6f))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
             // [추가됨(권)] 치장 미리보기 영역. 현재는 실제 펫/아이템 에셋이 없으므로 빈 공간(회색 박스)로 대체.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(300.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFFE0E0E0)),
+                    .background(Color(0xFFE0E0E0).copy(alpha = 0.8f)),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -122,6 +143,8 @@ fun ShopDetailScreen(
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
+                }
+            }
         }
     }
 }
