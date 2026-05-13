@@ -387,15 +387,6 @@ fun RoomScreen(
                         }
                     }
                 }
-
-                    RearrangeCircleButton(
-                        onClick = onRearrangeMoveDown
-                    ) {
-                        Text(
-                            text = "↙",
-                            color = Color.White
-                        )
-                    }
                 }
             }
 

@@ -74,15 +74,20 @@ fun LupaApp(deepLink: Uri? = null) {
     var isAppForeground by remember { mutableStateOf(false) }
     var showOfflineDialog by remember { mutableStateOf(false) }
     var offlineDialogMessage by remember { mutableStateOf("") }
-    var hasShownOfflineDialog by remember { mutableStateOf(false) }
+    var shouldCheckOfflineTime by remember { mutableStateOf(true) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> isAppForeground = true
+                Lifecycle.Event.ON_START -> {
+                    isAppForeground = true
+                    shouldCheckOfflineTime = true
+                }
+
                 Lifecycle.Event.ON_STOP -> {
                     isAppForeground = false
                 }
+
                 else -> Unit
             }
         }
@@ -116,24 +121,32 @@ fun LupaApp(deepLink: Uri? = null) {
     LaunchedEffect(uiState.phase, uiState.userId, isAppForeground) {
         val currentUserId = uiState.userId ?: return@LaunchedEffect
 
-        if (uiState.phase == AppPhase.ROOM && isAppForeground) {
-            // 초기 접속 시 오프라인 시간 계산
+        if (
+            uiState.phase == AppPhase.ROOM &&
+            isAppForeground &&
+            shouldCheckOfflineTime
+        ) {
             val offlineSeconds = withContext(Dispatchers.IO) {
-                sendHeartbeatToServer(currentUserId,accessToken)
+                sendHeartbeatToServer(currentUserId, accessToken)
             }
 
-            if (offlineSeconds != null) {
-                offlineDialogMessage = formatOfflineMessage(offlineSeconds)
-                showOfflineDialog = true
-            }
+            offlineDialogMessage = formatOfflineMessage(offlineSeconds ?: 0L)
+            showOfflineDialog = true
 
-            // [수정됨(권)] 30초마다 하트비트를 전송하여 실시간 접속 상태 유지 (메인 브런치 로직)
-            while (isActive && isAppForeground && uiState.phase == AppPhase.ROOM) {
-                delay(30_000)
+            shouldCheckOfflineTime = false
+        }
+    }
+    LaunchedEffect(uiState.userId, isAppForeground) {
+        val currentUserId = uiState.userId ?: return@LaunchedEffect
+
+        while (isActive) {
+            if (isAppForeground && uiState.phase == AppPhase.ROOM) {
                 withContext(Dispatchers.IO) {
-                    sendHeartbeatToServer(currentUserId,accessToken)
+                    sendHeartbeatToServer(currentUserId, accessToken)
                 }
             }
+
+            delay(30_000)
         }
     }
 
@@ -169,64 +182,34 @@ fun LupaApp(deepLink: Uri? = null) {
                     onRearrangeConfirm = appViewModel::onRearrangeConfirm,
                     onRearrangeCancel = appViewModel::onRearrangeCancel,
 
-                onFloorTap = appViewModel::onFloorTap,
-                onBottomNavItemClick = appViewModel::onBottomNavItemClick,
-                recentMainMenuAction = uiState.recentMainMenuAction,
-                onPlaceholderMessageConsumed = appViewModel::onPlaceholderMessageConsumed,
-                onSetCameraZoom = appViewModel::setCameraZoom,
-                onSetCameraOffset = appViewModel::setCameraOffset, // [추가됨] 한 손가락 드래그 Panning 연결
-                onCaptureClick = appViewModel::captureScreen,
-                onExitCameraMode = appViewModel::exitCameraMode,
-                onGalleryClick = appViewModel::exitCameraAndOpenGallery, // [추가됨] 카메라 내 갤러리 버튼 연결
-                currencyAmount = uiState.currencyAmount.toInt(), // Long -> Int 변환
-                purchasedShopItems = uiState.shopItems.filter { item ->
-                    uiState.purchasedItems.any { it.masterId == item.id }
-                },
-                onPlaygroundClick = appViewModel::openPlaza,
-                mailboxVisible = uiState.mailboxVisible,
-                friendRequests = uiState.receivedFriendRequests,
-                homeInvitations = uiState.receivedHomeInvitations,
-                onMailboxClick = appViewModel::openMailbox,
-                onMailboxDismiss = appViewModel::closeMailbox,
-                onAcceptFriendRequest = appViewModel::acceptFriendRequest,
-                onRejectFriendRequest = appViewModel::rejectFriendRequest,
-                onAcceptHomeInvitation = appViewModel::acceptHomeInvitation,
-                onRejectHomeInvitation = appViewModel::rejectHomeInvitation,
-                behaviorDebugInfo = uiState.behaviorDebugInfo,
-                onToggleBehaviorDebugClick = appViewModel::toggleBehaviorDebugWindow,
-                onMinigameClick = appViewModel::openMinigame // [수정됨(권)] 미니게임 진입 연결
-            )
-
-            if (showOfflineDialog) {
-                Dialog(
-                    onDismissRequest = { showOfflineDialog = false }
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .background(
-                                color = Color(0xFFE6A64A),
-                                shape = RoundedCornerShape(18.dp)
-                            )
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = offlineDialogMessage,
-                            color = Color.White,
-                            fontSize = 18.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Button(
-                            onClick = { showOfflineDialog = false }
-                        ) {
-                            Text("확인")
-                        }
-                    }
-                }
+                    onFloorTap = appViewModel::onFloorTap,
+                    onBottomNavItemClick = appViewModel::onBottomNavItemClick,
+                    recentMainMenuAction = uiState.recentMainMenuAction,
+                    onPlaceholderMessageConsumed = appViewModel::onPlaceholderMessageConsumed,
+                    onSetCameraZoom = appViewModel::setCameraZoom,
+                    onSetCameraOffset = appViewModel::setCameraOffset, // [추가됨] 한 손가락 드래그 Panning 연결
+                    onCaptureClick = appViewModel::captureScreen,
+                    onExitCameraMode = appViewModel::exitCameraMode,
+                    onGalleryClick = appViewModel::exitCameraAndOpenGallery, // [추가됨] 카메라 내 갤러리 버튼 연결
+                    currencyAmount = uiState.currencyAmount.toInt(), // Long -> Int 변환
+                    purchasedShopItems = uiState.shopItems.filter { item ->
+                        uiState.purchasedItems.any { it.masterId == item.id }
+                    },
+                    onPlaygroundClick = appViewModel::openPlaza,
+                    mailboxVisible = uiState.mailboxVisible,
+                    friendRequests = uiState.receivedFriendRequests,
+                    homeInvitations = uiState.receivedHomeInvitations,
+                    onMailboxClick = appViewModel::openMailbox,
+                    onMailboxDismiss = appViewModel::closeMailbox,
+                    onAcceptFriendRequest = appViewModel::acceptFriendRequest,
+                    onRejectFriendRequest = appViewModel::rejectFriendRequest,
+                    onAcceptHomeInvitation = appViewModel::acceptHomeInvitation,
+                    onRejectHomeInvitation = appViewModel::rejectHomeInvitation,
+                    behaviorDebugInfo = uiState.behaviorDebugInfo,
+                    onToggleBehaviorDebugClick = appViewModel::toggleBehaviorDebugWindow,
+                    onMinigameClick = appViewModel::openMinigame // [수정됨(권)] 미니게임 진입 연결
+                )
             }
-        }
         }
 
         AppPhase.GALLERY -> {
@@ -331,6 +314,35 @@ fun LupaApp(deepLink: Uri? = null) {
                 onBackClick = appViewModel::exitMinigame,
                 onFeedbackConsumed = appViewModel::consumeShopFeedback
             )
+        }
+    }
+    if (showOfflineDialog) {
+        Dialog(
+            onDismissRequest = { showOfflineDialog = false }
+        ) {
+            Column(
+                modifier = Modifier
+                    .background(
+                        color = Color(0xFFE6A64A),
+                        shape = RoundedCornerShape(18.dp)
+                    )
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = offlineDialogMessage,
+                    color = Color.White,
+                    fontSize = 18.sp
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = { showOfflineDialog = false }
+                ) {
+                    Text("확인")
+                }
+            }
         }
     }
 }
