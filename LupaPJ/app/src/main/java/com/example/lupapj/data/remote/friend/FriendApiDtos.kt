@@ -91,8 +91,11 @@ data class FriendshipDto(
 
 data class FriendHomeInvitationDto(
     val id: String,
-    val fromUser: FriendUserDto,
-    val toUser: FriendUserDto,
+    val fromUser: FriendUserDto? = null,
+    val toUser: FriendUserDto? = null,
+    val senderId: Long? = null,
+    val receiverId: Long? = null,
+    val roomId: Long? = null,
     val status: String,
     val message: String? = null,
     val createdAt: String,
@@ -109,7 +112,7 @@ data class FriendMessageDto(
 )
 
 data class FriendRoomDto(
-    val sceneId: String,
+    val sceneId: String = "main_room",
     val wallAssetKey: String? = null,
     val floorAssetKey: String? = null,
     val placedItems: List<FriendPlacedItemDto> = emptyList(),
@@ -152,11 +155,11 @@ data class FriendPetDto(
 )
 
 data class FriendHomeSnapshotDto(
-    val owner: FriendUserDto,
-    val room: FriendRoomDto,
+    val owner: FriendUserDto? = null,
+    val room: FriendRoomDto = FriendRoomDto(),
     val petSnapshot: FriendPetSnapshotDto? = null,
     val snapshotAt: String? = null,
-    val visitedAt: String
+    val visitedAt: String? = null
 )
 
 data class FriendPetSnapshotDto(

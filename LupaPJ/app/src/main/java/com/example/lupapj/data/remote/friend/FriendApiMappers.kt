@@ -65,8 +65,8 @@ internal fun FriendshipDto.toDomain(): FriendSummary {
 internal fun FriendHomeInvitationDto.toDomain(): FriendHomeInvitation {
     return FriendHomeInvitation(
         id = id,
-        fromUser = fromUser.toDomain(),
-        toUser = toUser.toDomain(),
+        fromUser = fromUserOrFallback().toDomain(),
+        toUser = toUserOrFallback().toDomain(),
         status = enumValueOrDefault(status, FriendHomeInvitationStatus.PENDING),
         message = message,
         createdAtMillis = createdAt.toEpochMillis(),
@@ -107,20 +107,29 @@ internal fun FriendHomeResponseDto.toDomain(
 internal fun AcceptHomeInvitationResponseDto.toDomain(
     sceneResolver: (String) -> RoomSceneDefinition
 ): FriendHome {
-    return homeSnapshot.toDomain(sceneResolver = sceneResolver)
+    return homeSnapshot.toDomain(
+        sceneResolver = sceneResolver,
+        fallbackOwner = invitation.fromUserOrFallback(),
+        fallbackVisitedAt = invitation.respondedAt ?: invitation.createdAt
+    )
 }
 
 private fun FriendHomeSnapshotDto.toDomain(
-    sceneResolver: (String) -> RoomSceneDefinition
+    sceneResolver: (String) -> RoomSceneDefinition,
+    fallbackOwner: FriendUserDto? = null,
+    fallbackVisitedAt: String? = null
 ): FriendHome {
     val sceneDefinition = sceneResolver(room.sceneId)
+    val ownerDto = owner ?: fallbackOwner ?: fallbackFriendUserDto()
     return FriendHome(
-        owner = owner.toDomain(),
+        owner = ownerDto.toDomain(),
         room = room.toDomainRoomState(
             sceneDefinition = sceneDefinition,
             petSnapshot = petSnapshot
         ),
-        visitedAtMillis = visitedAt.toEpochMillis(),
+        visitedAtMillis = visitedAt?.toEpochMillis()
+            ?: fallbackVisitedAt?.toEpochMillis()
+            ?: System.currentTimeMillis(),
         snapshotAtMillis = snapshotAt?.toEpochMillis()
     )
 }
@@ -231,6 +240,34 @@ private fun FriendAnchorDto.toFloorAnchor(): FloorAnchor {
     return FloorAnchor(
         u = u.coerceIn(0f, 1f),
         v = v.coerceIn(0f, 1f)
+    )
+}
+
+private fun FriendHomeInvitationDto.fromUserOrFallback(): FriendUserDto {
+    return fromUser ?: senderId?.toFallbackFriendUserDto(nickname = "친구")
+        ?: fallbackFriendUserDto()
+}
+
+private fun FriendHomeInvitationDto.toUserOrFallback(): FriendUserDto {
+    return toUser ?: receiverId?.toFallbackFriendUserDto(nickname = "나")
+        ?: fallbackFriendUserDto(userId = "me", nickname = "나")
+}
+
+private fun Long.toFallbackFriendUserDto(nickname: String): FriendUserDto {
+    return fallbackFriendUserDto(
+        userId = "user_$this",
+        nickname = nickname
+    )
+}
+
+private fun fallbackFriendUserDto(
+    userId: String = "friend_user",
+    nickname: String = "친구"
+): FriendUserDto {
+    return FriendUserDto(
+        userId = userId,
+        nickname = nickname,
+        friendCode = "LUPA00000"
     )
 }
 

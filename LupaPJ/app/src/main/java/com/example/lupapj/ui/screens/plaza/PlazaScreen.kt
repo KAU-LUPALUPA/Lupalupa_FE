@@ -3,10 +3,18 @@ package com.example.lupapj.ui.screens.plaza
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.RectF
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -18,9 +26,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,11 +39,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -57,15 +69,22 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.example.lupapj.R
 import com.example.lupapj.data.model.plaza.PLAZA_MESSAGE_MAX_LENGTH
 import com.example.lupapj.data.model.plaza.PlazaChatMessage
 import com.example.lupapj.data.model.plaza.PlazaCode
@@ -118,6 +137,20 @@ private const val PLAZA_PLAY_OFFSET_X = 0.08f
 private const val PLAZA_PLAY_OFFSET_Y = 0.045f
 private const val PLAZA_REST_OFFSET_X = 0.065f
 private const val PLAZA_REST_OFFSET_Y = 0.02f
+private const val PLAZA_FOUNTAIN_SIZE_DP = 136f
+private const val PLAZA_FOUNTAIN_ANCHOR_X = 0.50f
+private const val PLAZA_FOUNTAIN_ANCHOR_Y = 0.58f
+private const val PLAZA_FOUNTAIN_ANCHOR_TO_TOP_RATIO = 0.72f
+
+private val PlazaIntroBackground = Color(0xFFFFF7EA)
+private val PlazaIntroCardBackground = Color(0xFFFFFCF7)
+private val PlazaIntroMainText = Color(0xFF6B5548)
+private val PlazaIntroSubText = Color(0xFF9A7B68)
+private val PlazaIntroPrimaryGreen = Color(0xFF4F765C)
+private val PlazaIntroInactiveGreen = Color(0xFF9EB89E)
+private val PlazaIntroDisabledButton = Color(0xFFEFECE7)
+private val PlazaIntroDisabledText = Color(0xFFC9BDB4)
+private val PlazaIntroInputBorder = Color(0xFFD7C7B8)
 
 private data class PlazaChatBubble(
     val text: String,
@@ -165,27 +198,32 @@ fun PlazaScreen(
 
     Scaffold(
         modifier = modifier,
+        containerColor = if (activePlaza == null) {
+            PlazaIntroBackground
+        } else {
+            MaterialTheme.colorScheme.background
+        },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = activePlaza?.let { "광장 ${it.displayCode}" } ?: "광장"
-                    )
-                },
-                navigationIcon = {
-                    TextButton(onClick = onBackHome) {
-                        Text("내 방")
-                    }
-                },
-                actions = {
-                    if (activePlaza != null) {
+            if (activePlaza == null) {
+                PlazaEntryTopTabs(onBackHome = onBackHome)
+            } else {
+                TopAppBar(
+                    title = {
+                        Text(text = "광장 ${activePlaza.displayCode}")
+                    },
+                    navigationIcon = {
+                        TextButton(onClick = onBackHome) {
+                            Text("내 방")
+                        }
+                    },
+                    actions = {
                         TextButton(onClick = onLeavePlaza) {
                             Text("나가기")
                         }
                     }
-                }
-            )
+                )
+            }
         }
     ) { paddingValues ->
         Box(
@@ -202,7 +240,6 @@ fun PlazaScreen(
                     onCodeJoin = onCodeJoin,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(20.dp)
                 )
             } else {
                 PlazaRoomContent(
@@ -225,6 +262,70 @@ fun PlazaScreen(
 }
 
 @Composable
+private fun PlazaEntryTopTabs(
+    onBackHome: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = PlazaIntroBackground
+    ) {
+        Row(
+            modifier = Modifier
+                .statusBarsPadding()
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            PlazaEntryTab(
+                text = "내 방",
+                selected = false,
+                onClick = onBackHome
+            )
+            Spacer(modifier = Modifier.width(18.dp))
+            PlazaEntryTab(
+                text = "광장",
+                selected = true,
+                onClick = {}
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlazaEntryTab(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .width(82.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .clickable(enabled = !selected, onClick = onClick)
+            .padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold,
+            color = if (selected) PlazaIntroMainText else PlazaIntroInactiveGreen
+        )
+        Spacer(modifier = Modifier.height(5.dp))
+        Surface(
+            modifier = Modifier
+                .width(30.dp)
+                .height(4.dp),
+            shape = RoundedCornerShape(999.dp),
+            color = if (selected) PlazaIntroPrimaryGreen else Color.Transparent
+        ) {}
+    }
+}
+
+@Composable
 private fun PlazaEntryContent(
     codeInput: String,
     isJoining: Boolean,
@@ -233,76 +334,185 @@ private fun PlazaEntryContent(
     onCodeJoin: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isCodeJoinEnabled = !isJoining && PlazaCode.fromInput(codeInput) != null
+
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
+            .navigationBarsPadding()
             .imePadding(),
-        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+        verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.elevatedCardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
+        Image(
+            painter = painterResource(id = R.drawable.plaza_intro_background),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(310.dp)
+        )
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        PlazaIntroCard(
+            iconResId = R.drawable.icon_friends,
+            title = "오늘은 어떤 광장으로 갈까요?",
+            description = "랜덤으로 열린 작은 광장에서\n최대 4명의 루파루파들과 함께 머물러요.",
+            iconSize = 64.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+            Button(
+                onClick = onRandomJoin,
+                enabled = !isJoining,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(28.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = PlazaIntroPrimaryGreen,
+                    contentColor = Color.White,
+                    disabledContainerColor = PlazaIntroDisabledButton,
+                    disabledContentColor = PlazaIntroDisabledText
+                )
             ) {
                 Text(
-                    text = "어느 광장으로 갈까요?",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "최대 4명이 함께 머무는 작은 광장에 입장합니다.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Button(
-                    onClick = onRandomJoin,
-                    enabled = !isJoining,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(if (isJoining) "입장 중" else "랜덤 광장 입장")
-                }
-            }
-        }
-
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.elevatedCardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = "광장 코드",
+                    text = if (isJoining) "입장 중" else "광장으로 가기",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-                OutlinedTextField(
-                    value = codeInput,
-                    onValueChange = onCodeInputChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    placeholder = { Text("PZ-0000") }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(22.dp))
+
+        PlazaIntroCard(
+            iconResId = R.drawable.icon_card,
+            title = "친구 광장에 입장",
+            description = "초대 코드를 입력해\n친구와 같은 광장으로 이동해요.",
+            iconSize = 60.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+        ) {
+            OutlinedTextField(
+                value = codeInput,
+                onValueChange = onCodeInputChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(62.dp),
+                singleLine = true,
+                shape = RoundedCornerShape(18.dp),
+                placeholder = {
+                    Text(
+                        text = "PZ-0000",
+                        color = PlazaIntroDisabledText
+                    )
+                },
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    color = PlazaIntroMainText,
+                    fontWeight = FontWeight.SemiBold
+                ),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = PlazaIntroMainText,
+                    unfocusedTextColor = PlazaIntroMainText,
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    disabledContainerColor = Color.White,
+                    focusedBorderColor = PlazaIntroPrimaryGreen,
+                    unfocusedBorderColor = PlazaIntroInputBorder,
+                    cursorColor = PlazaIntroPrimaryGreen
                 )
-                Button(
-                    onClick = onCodeJoin,
-                    enabled = !isJoining && codeInput.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = onCodeJoin,
+                enabled = isCodeJoinEnabled,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(28.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = PlazaIntroPrimaryGreen,
+                    contentColor = Color.White,
+                    disabledContainerColor = PlazaIntroDisabledButton,
+                    disabledContentColor = PlazaIntroDisabledText
+                )
+            ) {
+                Text(
+                    text = if (isJoining) "입장 중" else "코드로 입장",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Image(
+            painter = painterResource(id = R.drawable.plaza_intro_bottom),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(128.dp)
+        )
+    }
+}
+
+@Composable
+private fun PlazaIntroCard(
+    iconResId: Int,
+    title: String,
+    description: String,
+    iconSize: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    ElevatedCard(
+        modifier = modifier,
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = PlazaIntroCardBackground
+        ),
+        elevation = CardDefaults.elevatedCardElevation(
+            defaultElevation = 5.dp
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(22.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Image(
+                    painter = painterResource(id = iconResId),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(iconSize)
+                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(if (isJoining) "입장 중" else "코드로 입장")
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = PlazaIntroMainText
+                    )
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = PlazaIntroSubText
+                    )
                 }
             }
+            content()
         }
     }
 }
@@ -574,6 +784,7 @@ private fun PlazaScene(
                 .clip(RoundedCornerShape(8.dp))
         ) {
             PlazaSceneBackground(modifier = Modifier.fillMaxSize())
+            PlazaFountain(modifier = Modifier.fillMaxSize())
 
             val activeInteraction = activeRemoteInteraction ?: localInteraction
             val interactionPresentation = remember(
@@ -665,21 +876,41 @@ private fun PlazaScene(
 private fun PlazaSceneBackground(
     modifier: Modifier = Modifier
 ) {
+    val resources = LocalContext.current.resources
+    val plazaSky = remember(resources) {
+        BitmapFactory.decodeResource(resources, R.drawable.plaza_sky)
+    }
+    val plazaTile = remember(resources) {
+        BitmapFactory.decodeResource(resources, R.drawable.plaza_tile)
+    }
+    val grassBase = remember(resources) {
+        BitmapFactory.decodeResource(resources, R.drawable.grass_base)
+    }
+    val plazaTilePaint = remember {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            isFilterBitmap = true
+            isDither = true
+        }
+    }
+
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
 
-        drawRect(
-            color = Color(0xFFDDF1F2),
+        drawBitmapFitWidthClippedRect(
+            bitmap = plazaSky,
+            paint = plazaTilePaint,
+            topLeft = Offset.Zero,
             size = Size(w, h * 0.34f)
         )
-        drawRect(
-            color = Color(0xFF92BE73),
+        drawBitmapClippedTileRect(
+            bitmap = grassBase,
+            paint = plazaTilePaint,
             topLeft = Offset(0f, h * 0.34f),
             size = Size(w, h * 0.66f)
         )
         drawRect(
-            color = Color(0xFF7BA461),
+            color = Color(0x337BA461),
             topLeft = Offset(0f, h * 0.34f),
             size = Size(w, h * 0.08f)
         )
@@ -695,34 +926,20 @@ private fun PlazaSceneBackground(
             path = path,
             color = Color(0xFFE9D5A8)
         )
+        drawProjectedPlazaFloorTile(
+            floorPath = path,
+            bitmap = plazaTile,
+            paint = plazaTilePaint,
+            topLeft = Offset(w * 0.18f, h * 0.44f),
+            topRight = Offset(w * 0.82f, h * 0.44f),
+            bottomRight = Offset(w * 0.96f, h * 0.96f),
+            bottomLeft = Offset(w * 0.04f, h * 0.96f)
+        )
         drawPath(
             path = path,
             color = Color(0x553A2B1F),
             style = Stroke(width = 2.dp.toPx())
         )
-
-        val tileColor = Color(0x339A6B3B)
-        repeat(5) { lineIndex ->
-            val progress = (lineIndex + 1) / 6f
-            val y = h * (0.44f + 0.52f * progress)
-            val leftX = w * (0.18f - 0.14f * progress)
-            val rightX = w * (0.82f + 0.14f * progress)
-            drawLine(
-                color = tileColor,
-                start = Offset(leftX, y),
-                end = Offset(rightX, y),
-                strokeWidth = 1.5.dp.toPx()
-            )
-        }
-        repeat(4) { lineIndex ->
-            val progress = (lineIndex + 1) / 5f
-            drawLine(
-                color = tileColor,
-                start = Offset(w * (0.18f + 0.64f * progress), h * 0.44f),
-                end = Offset(w * (0.04f + 0.92f * progress), h * 0.96f),
-                strokeWidth = 1.2.dp.toPx()
-            )
-        }
 
         drawLine(
             color = Color(0xFF5D7A4B),
@@ -741,6 +958,153 @@ private fun PlazaSceneBackground(
             start = Offset(w * 0.88f, h * 0.34f),
             end = Offset(w * 0.88f, h * 0.43f),
             strokeWidth = 5.dp.toPx()
+        )
+    }
+}
+
+private fun DrawScope.drawBitmapFitWidthClippedRect(
+    bitmap: Bitmap,
+    paint: Paint,
+    topLeft: Offset,
+    size: Size
+) {
+    val scaledHeight = size.width * bitmap.height / bitmap.width
+    val drawTop = topLeft.y + size.height - scaledHeight
+    val destinationRect = RectF(
+        topLeft.x,
+        drawTop,
+        topLeft.x + size.width,
+        drawTop + scaledHeight
+    )
+
+    drawIntoCanvas { canvas ->
+        val nativeCanvas = canvas.nativeCanvas
+        val checkpoint = nativeCanvas.save()
+        nativeCanvas.clipRect(
+            topLeft.x,
+            topLeft.y,
+            topLeft.x + size.width,
+            topLeft.y + size.height
+        )
+        nativeCanvas.drawBitmap(
+            bitmap,
+            Rect(0, 0, bitmap.width, bitmap.height),
+            destinationRect,
+            paint
+        )
+        nativeCanvas.restoreToCount(checkpoint)
+    }
+}
+
+private fun DrawScope.drawBitmapClippedTileRect(
+    bitmap: Bitmap,
+    paint: Paint,
+    topLeft: Offset,
+    size: Size
+) {
+    val tileSize = size.height
+    val sourceRect = Rect(0, 0, bitmap.width, bitmap.height)
+
+    drawIntoCanvas { canvas ->
+        val nativeCanvas = canvas.nativeCanvas
+        val checkpoint = nativeCanvas.save()
+        nativeCanvas.clipRect(
+            topLeft.x,
+            topLeft.y,
+            topLeft.x + size.width,
+            topLeft.y + size.height
+        )
+
+        var tileLeft = topLeft.x
+        while (tileLeft < topLeft.x + size.width) {
+            nativeCanvas.drawBitmap(
+                bitmap,
+                sourceRect,
+                RectF(
+                    tileLeft,
+                    topLeft.y,
+                    tileLeft + tileSize,
+                    topLeft.y + tileSize
+                ),
+                paint
+            )
+            tileLeft += tileSize
+        }
+        nativeCanvas.restoreToCount(checkpoint)
+    }
+}
+
+private fun DrawScope.drawProjectedPlazaFloorTile(
+    floorPath: Path,
+    bitmap: Bitmap,
+    paint: Paint,
+    topLeft: Offset,
+    topRight: Offset,
+    bottomRight: Offset,
+    bottomLeft: Offset
+) {
+    val src = floatArrayOf(
+        0f,
+        0f,
+        bitmap.width.toFloat(),
+        0f,
+        bitmap.width.toFloat(),
+        bitmap.height.toFloat(),
+        0f,
+        bitmap.height.toFloat()
+    )
+    val dst = floatArrayOf(
+        topLeft.x,
+        topLeft.y,
+        topRight.x,
+        topRight.y,
+        bottomRight.x,
+        bottomRight.y,
+        bottomLeft.x,
+        bottomLeft.y
+    )
+    val matrix = Matrix().apply {
+        setPolyToPoly(src, 0, dst, 0, 4)
+    }
+
+    clipPath(floorPath) {
+        drawIntoCanvas { canvas ->
+            val nativeCanvas = canvas.nativeCanvas
+            val checkpoint = nativeCanvas.save()
+            nativeCanvas.concat(matrix)
+            nativeCanvas.drawBitmap(bitmap, 0f, 0f, paint)
+            nativeCanvas.restoreToCount(checkpoint)
+        }
+    }
+}
+
+@Composable
+private fun PlazaFountain(
+    modifier: Modifier = Modifier
+) {
+    BoxWithConstraints(modifier = modifier) {
+        val density = LocalDensity.current
+        val fountainSize = PLAZA_FOUNTAIN_SIZE_DP.dp
+        val viewportWidthPx = with(density) { maxWidth.toPx() }
+        val viewportHeightPx = with(density) { maxHeight.toPx() }
+        val fountainSizePx = with(density) { fountainSize.toPx() }
+        val offsetX = (viewportWidthPx * PLAZA_FOUNTAIN_ANCHOR_X - fountainSizePx * 0.5f)
+            .roundToInt()
+            .coerceIn(0, maxOf(0, (viewportWidthPx - fountainSizePx).roundToInt()))
+        val offsetY = (
+            viewportHeightPx * PLAZA_FOUNTAIN_ANCHOR_Y -
+                fountainSizePx * PLAZA_FOUNTAIN_ANCHOR_TO_TOP_RATIO
+            )
+            .roundToInt()
+            .coerceIn(0, maxOf(0, (viewportHeightPx - fountainSizePx).roundToInt()))
+
+        Image(
+            painter = painterResource(id = R.drawable.fountain),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .offset { IntOffset(offsetX, offsetY) }
+                .size(fountainSize)
         )
     }
 }

@@ -1,0 +1,4 @@
+.idea/
+.kotlin/
+*.log
+.DS_Store

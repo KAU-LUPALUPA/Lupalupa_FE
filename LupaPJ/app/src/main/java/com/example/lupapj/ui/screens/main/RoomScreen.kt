@@ -294,7 +294,7 @@ fun RoomScreen(
                 }
             }
 
-            if (!room.isCameraMode && !room.rearrangeMode && mailboxItemCount > 0) {
+            if (!room.isCameraMode && !room.rearrangeMode) {
                 FloatingMailboxButton(
                     itemCount = mailboxItemCount,
                     onClick = onMailboxClick,
