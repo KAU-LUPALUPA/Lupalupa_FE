@@ -197,6 +197,10 @@ class AppViewModel(
             userId = uid ?: nickname,
             nickname = nickname ?: "사용자"
         )
+        plazaRepository.updateCurrentUser(
+            userId = uid ?: nickname,
+            nickname = nickname ?: "사용자"
+        )
 
         viewModelScope.launch {
             _uiState.update {
@@ -471,6 +475,14 @@ class AppViewModel(
                 recentMainMenuAction = MainMenuAction.PLAYGROUND,
                 plazaFeedbackMessage = null
             )
+        }
+        viewModelScope.launch {
+            val result = plazaRepository.refreshActivePlaza()
+            if (result is PlazaOperationResult.Failure) {
+                _uiState.update {
+                    it.copy(plazaFeedbackMessage = result.reason.message)
+                }
+            }
         }
     }
 
@@ -1642,5 +1654,6 @@ private val PlazaOperationFailure.message: String
         PlazaOperationFailure.EMPTY_MESSAGE -> "메시지를 입력해주세요."
         PlazaOperationFailure.MESSAGE_TOO_LONG -> "메시지는 ${PLAZA_MESSAGE_MAX_LENGTH}자까지 보낼 수 있어요."
         PlazaOperationFailure.NOT_IN_PLAZA -> "입장한 광장이 없어요."
+        PlazaOperationFailure.UNAUTHORIZED -> "로그인이 필요해요."
         PlazaOperationFailure.UNKNOWN -> "광장 기능을 잠시 사용할 수 없어요."
     }

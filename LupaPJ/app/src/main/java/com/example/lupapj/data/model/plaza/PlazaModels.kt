@@ -153,6 +153,7 @@ enum class PlazaOperationFailure {
     EMPTY_MESSAGE,
     MESSAGE_TOO_LONG,
     NOT_IN_PLAZA,
+    UNAUTHORIZED,
     UNKNOWN
 }
 

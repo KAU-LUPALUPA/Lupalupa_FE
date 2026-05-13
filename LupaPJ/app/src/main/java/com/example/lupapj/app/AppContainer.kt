@@ -3,7 +3,6 @@ package com.example.lupapj.app
 import android.content.Context
 import com.example.lupapj.data.mock.MockAuthRepository
 import com.example.lupapj.data.mock.DemoScenes
-import com.example.lupapj.data.mock.MockPlazaRepository
 import com.example.lupapj.data.mock.MockRoomRepository
 import com.example.lupapj.data.model.friend.FriendCode
 import com.example.lupapj.data.model.friend.FriendUser
@@ -26,6 +25,9 @@ import com.example.lupapj.data.remote.ServerConfig
 import com.example.lupapj.data.remote.friend.FriendRetrofitService
 import com.example.lupapj.data.remote.friend.RemoteFriendRepository
 import com.example.lupapj.data.remote.friend.RetrofitFriendApiClient
+import com.example.lupapj.data.remote.plaza.PlazaRetrofitService
+import com.example.lupapj.data.remote.plaza.RemotePlazaRepository
+import com.example.lupapj.data.remote.plaza.RetrofitPlazaApiClient
 import okhttp3.OkHttpClient // [추가됨(권)]
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -53,6 +55,8 @@ class AppContainer(context: Context) {
     private val currencyApiService: CurrencyApiService = retrofit.create(CurrencyApiService::class.java)
     private val friendRetrofitService: FriendRetrofitService =
         retrofit.create(FriendRetrofitService::class.java)
+    private val plazaRetrofitService: PlazaRetrofitService =
+        retrofit.create(PlazaRetrofitService::class.java)
     
     // [수정됨(권)] DataSource 인스턴스화
     private val currencyRemoteDataSource = CurrencyRemoteDataSource(currencyApiService)
@@ -69,7 +73,9 @@ class AppContainer(context: Context) {
         ),
         sceneResolver = { sceneId -> DemoScenes.sceneFor(RoomSceneId(sceneId)) }
     )
-    val plazaRepository: PlazaRepository = MockPlazaRepository() // [보존] 팀원 작업 내용
+    val plazaRepository: PlazaRepository = RemotePlazaRepository(
+        apiClient = RetrofitPlazaApiClient(plazaRetrofitService)
+    )
     val galleryRepository: GalleryRepository by lazy { GalleryRepository(appContext) } // [보존] 팀원 작업 내용
     
     // [수정됨(권)] 로컬 캐시 인스턴스
