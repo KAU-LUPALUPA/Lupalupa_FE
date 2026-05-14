@@ -10,6 +10,7 @@ import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -148,7 +149,25 @@ fun AuthPopup(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(28.dp))
+                if (isDevLoginEnabled) {
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    TextButton(
+                        onClick = onDevLoginClick,
+                        enabled = !isProcessingLogin
+                    ) {
+                        Text(
+                            text = "개발자 모드로 입장",
+                            color = KakaoBlack,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                } else {
+                    Spacer(modifier = Modifier.height(28.dp))
+                }
 
                 Text(
                     text = "카카오 로그인 시, 이용약관 및 개인정보 처리방침에 동의하게 됩니다.",

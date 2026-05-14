@@ -30,6 +30,7 @@ data class AppUiState(
     val receivedHomeInvitations: List<FriendHomeInvitation> = emptyList(),
     val friendCodeInput: String = "",
     val isSendingFriendRequest: Boolean = false,
+    val pendingHomeInvitationFriendId: String? = null,
     val isLoadingFriendHome: Boolean = false,
     val visitingFriendHome: FriendHome? = null,
     val friendRoomMessages: List<FriendMessage> = emptyList(),

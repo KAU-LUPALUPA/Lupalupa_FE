@@ -33,6 +33,11 @@ interface FriendRepository {
 
     suspend fun removeFriend(friendUserId: String): FriendOperationResult<FriendSummary>
 
+    suspend fun sendHomeInvitation(
+        friendUserId: String,
+        message: String? = null
+    ): FriendOperationResult<FriendHomeInvitation>
+
     suspend fun getFriendHome(friendUserId: String): FriendOperationResult<FriendHome>
 
     suspend fun acceptHomeInvitation(invitationId: String): FriendOperationResult<FriendHome>

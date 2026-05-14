@@ -14,6 +14,11 @@ data class SendFriendRequestDto(
     val friendCode: String
 )
 
+data class SendHomeInvitationRequestDto(
+    val friendUserId: String,
+    val message: String? = null
+)
+
 data class FriendRequestResponseDto(
     val request: FriendRequestDto
 )

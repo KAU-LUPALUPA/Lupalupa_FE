@@ -64,6 +64,7 @@ class AppContainer(context: Context) {
     val authRepository: AuthRepository = MockAuthRepository()
     private val roomLocalCache = com.example.lupapj.data.local.RoomLocalCache(appContext)
     val roomRepository: RoomRepository = MockRoomRepository(roomLocalCache)
+
     val friendRepository: FriendRepository = RemoteFriendRepository(
         apiClient = RetrofitFriendApiClient(friendRetrofitService),
         initialCurrentUser = FriendUser(

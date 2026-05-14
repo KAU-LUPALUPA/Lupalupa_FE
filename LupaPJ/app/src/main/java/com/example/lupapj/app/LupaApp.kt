@@ -183,6 +183,7 @@ fun LupaApp(deepLink: Uri? = null) {
                     onRearrangeCancel = appViewModel::onRearrangeCancel,
 
                     onFloorTap = appViewModel::onFloorTap,
+                    onDroppedToyClick = appViewModel::onDroppedToyClick,
                     onBottomNavItemClick = appViewModel::onBottomNavItemClick,
                     recentMainMenuAction = uiState.recentMainMenuAction,
                     onPlaceholderMessageConsumed = appViewModel::onPlaceholderMessageConsumed,
@@ -227,17 +228,16 @@ fun LupaApp(deepLink: Uri? = null) {
                 friends = uiState.friends,
                 receivedRequests = uiState.receivedFriendRequests,
                 sentRequests = uiState.sentFriendRequests,
-                receivedHomeInvitations = uiState.receivedHomeInvitations,
                 friendCodeInput = uiState.friendCodeInput,
                 isSendingFriendRequest = uiState.isSendingFriendRequest,
+                pendingHomeInvitationFriendId = uiState.pendingHomeInvitationFriendId,
                 feedbackMessage = uiState.friendFeedbackMessage,
                 onFriendCodeChange = appViewModel::onFriendCodeChange,
                 onSendFriendRequest = appViewModel::sendFriendRequest,
                 onAcceptRequest = appViewModel::acceptFriendRequest,
                 onRejectRequest = appViewModel::rejectFriendRequest,
                 onCancelRequest = appViewModel::cancelFriendRequest,
-                onAcceptHomeInvitation = appViewModel::acceptHomeInvitation,
-                onRejectHomeInvitation = appViewModel::rejectHomeInvitation,
+                onSendHomeInvitation = appViewModel::sendHomeInvitation,
                 onRemoveFriend = appViewModel::removeFriend,
                 onBackClick = appViewModel::exitFriends,
                 onFeedbackConsumed = appViewModel::onFriendFeedbackConsumed
@@ -247,6 +247,7 @@ fun LupaApp(deepLink: Uri? = null) {
         AppPhase.FRIEND_ROOM -> {
             FriendRoomScreen(
                 friendHome = uiState.visitingFriendHome,
+                visitorPet = uiState.room?.houseSceneState?.pet,
                 isLoading = uiState.isLoadingFriendHome,
                 messages = uiState.friendRoomMessages,
                 messageInput = uiState.friendMessageInput,

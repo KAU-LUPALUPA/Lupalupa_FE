@@ -137,6 +137,25 @@ class RemoteFriendRepository(
         }
     }
 
+    override suspend fun sendHomeInvitation(
+        friendUserId: String,
+        message: String?
+    ): FriendOperationResult<FriendHomeInvitation> {
+        val trimmedMessage = message?.trim()?.takeIf { it.isNotEmpty() }
+
+        return apiCall {
+            apiClient
+                .sendHomeInvitation(
+                    SendHomeInvitationRequestDto(
+                        friendUserId = friendUserId,
+                        message = trimmedMessage
+                    )
+                )
+                .invitation
+                .toDomain()
+        }
+    }
+
     override suspend fun getFriendHome(
         friendUserId: String
     ): FriendOperationResult<FriendHome> {

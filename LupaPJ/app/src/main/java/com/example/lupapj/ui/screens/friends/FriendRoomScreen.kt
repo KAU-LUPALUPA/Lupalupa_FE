@@ -23,6 +23,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -40,8 +42,12 @@ import com.example.lupapj.data.model.friend.FriendMessage
 import com.example.lupapj.data.model.friend.FriendMessageSender
 import com.example.lupapj.data.model.friend.FriendHome
 import com.example.lupapj.data.model.initialRoomUiState
+import com.example.lupapj.data.model.PetAction
+import com.example.lupapj.data.model.scene.FloorAnchor
+import com.example.lupapj.data.model.scene.PetSceneState
 import com.example.lupapj.ui.components.RoomViewport
 import com.example.lupapj.ui.theme.LupaPJTheme
+import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -51,6 +57,7 @@ import java.util.Locale
 @Composable
 fun FriendRoomScreen(
     friendHome: FriendHome?,
+    visitorPet: PetSceneState?,
     isLoading: Boolean,
     messages: List<FriendMessage>,
     messageInput: String,
@@ -93,8 +100,65 @@ fun FriendRoomScreen(
                     modifier = Modifier.align(Alignment.Center)
                 )
             } else {
+                var movementStep by remember(room.houseSceneState.pet.petId, visitorPet?.petId) {
+                    mutableIntStateOf(0)
+                }
+                LaunchedEffect(room.houseSceneState.pet.petId, visitorPet?.petId) {
+                    while (true) {
+                        delay(1_800L)
+                        movementStep += 1
+                    }
+                }
+
+                val friendPetPath = remember(room.houseSceneState.pet.anchor) {
+                    listOf(
+                        room.houseSceneState.pet.anchor,
+                        FloorAnchor(u = 0.38f, v = 0.56f),
+                        FloorAnchor(u = 0.66f, v = 0.48f),
+                        FloorAnchor(u = 0.54f, v = 0.72f)
+                    )
+                }
+                val visitorPetPath = remember {
+                    listOf(
+                        FloorAnchor(u = 0.30f, v = 0.70f),
+                        FloorAnchor(u = 0.46f, v = 0.58f),
+                        FloorAnchor(u = 0.70f, v = 0.66f),
+                        FloorAnchor(u = 0.52f, v = 0.44f)
+                    )
+                }
+                val friendPetAnchor = friendPetPath[movementStep % friendPetPath.size]
+                val visitorPetAnchor = visitorPetPath[(movementStep + 1) % visitorPetPath.size]
+                val displayFriendPet = room.houseSceneState.pet.copy(
+                    action = PetAction.WALKING,
+                    anchor = friendPetAnchor,
+                    movement = room.houseSceneState.pet.movement.copy(
+                        targetAnchor = friendPetAnchor,
+                        isMoving = true,
+                        speedMultiplier = 1f,
+                        bouncePx = 8f
+                    ),
+                    isLyingSide = false
+                )
+                val displayVisitorPet = visitorPet?.copy(
+                    petId = "${visitorPet.petId}_visitor",
+                    action = PetAction.WALKING,
+                    anchor = visitorPetAnchor,
+                    movement = visitorPet.movement.copy(
+                        targetAnchor = visitorPetAnchor,
+                        isMoving = true,
+                        speedMultiplier = 1f,
+                        bouncePx = 8f
+                    ),
+                    isLyingSide = false
+                )
+                val displayRoom = room.copy(
+                    houseSceneState = room.houseSceneState.copy(
+                        pet = displayFriendPet
+                    )
+                )
+
                 RoomViewport(
-                    uiState = room.copy(
+                    uiState = displayRoom.copy(
                         feedMode = false,
                         toyMode = false,
                         navBarVisible = false,
@@ -102,6 +166,7 @@ fun FriendRoomScreen(
                         isCameraMode = false,
                         cameraZoom = 1f
                     ),
+                    companionPets = listOfNotNull(displayVisitorPet),
                     onRoomObjectClick = {},
                     onFloorTap = {},
                     modifier = Modifier.fillMaxSize()
@@ -284,6 +349,7 @@ private fun FriendRoomScreenPreview() {
                 room = initialRoomUiState(DemoScenes.mainRoom),
                 visitedAtMillis = 1_000L
             ),
+            visitorPet = initialRoomUiState(DemoScenes.mainRoom).houseSceneState.pet,
             isLoading = false,
             messages = listOf(
                 FriendMessage(

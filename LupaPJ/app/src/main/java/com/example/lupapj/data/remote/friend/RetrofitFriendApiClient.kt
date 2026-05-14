@@ -59,6 +59,12 @@ class RetrofitFriendApiClient(
         service.deleteFriend(friendUserId).throwIfFailed()
     }
 
+    override suspend fun sendHomeInvitation(
+        request: SendHomeInvitationRequestDto
+    ): FriendHomeInvitationResponseDto {
+        return service.sendHomeInvitation(request).bodyOrThrow()
+    }
+
     override suspend fun getReceivedHomeInvitations(): FriendHomeInvitationsResponseDto {
         return service.getReceivedHomeInvitations().bodyOrThrow()
     }

@@ -54,7 +54,7 @@ private const val FRIEND_MESSAGE_POLL_INTERVAL_MS = 3_000L
 
 // [수정됨(권)] 성격별 행동 엔진 밸런스를 위해 2초 틱 유지
 private const val PET_CONDITION_TICK_INTERVAL_MS = 2_000L 
-private const val DEV_LOGIN_ACCESS_TOKEN = "dev-access-token"
+private const val DEV_LOGIN_USER_ID = "dev_local_user"
 private const val DEV_LOGIN_NICKNAME = "개발자"
 
 class AppViewModel(
@@ -191,14 +191,17 @@ class AppViewModel(
             return
         }
 
+        val resolvedUserId = uid?.takeIf { it.isNotBlank() }
+            ?: nickname?.takeIf { it.isNotBlank() }
+
         // 실제 네트워크 통신을 위해 TokenManager에 저장
         com.example.lupapj.data.local.TokenManager.accessToken = accessToken
         friendRepository.updateCurrentUser(
-            userId = uid ?: nickname,
+            userId = resolvedUserId,
             nickname = nickname ?: "사용자"
         )
         plazaRepository.updateCurrentUser(
-            userId = uid ?: nickname,
+            userId = resolvedUserId,
             nickname = nickname ?: "사용자"
         )
 
@@ -221,7 +224,7 @@ class AppViewModel(
                     isProcessingLogin = false,
                     room = room,
                     placeholderMessage = "${displayName}님 환영합니다!",
-                    userId = uid ?: nickname // [수정됨(권)] 하트비트 로직을 위한 유저 식별자 저장 (Dev Login 대응)
+                    userId = resolvedUserId // [수정됨(권)] 하트비트 로직을 위한 유저 식별자 저장
                 )
             }
             startPetConditionTicker()
@@ -231,10 +234,40 @@ class AppViewModel(
     fun onDevLoginClick() {
         if (_uiState.value.isProcessingLogin) return
 
-        onKakaoLoginSuccess(
-            accessToken = DEV_LOGIN_ACCESS_TOKEN,
+        com.example.lupapj.data.local.TokenManager.accessToken = null
+        friendRepository.updateCurrentUser(
+            userId = DEV_LOGIN_USER_ID,
             nickname = DEV_LOGIN_NICKNAME
         )
+        plazaRepository.updateCurrentUser(
+            userId = DEV_LOGIN_USER_ID,
+            nickname = DEV_LOGIN_NICKNAME
+        )
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(isProcessingLogin = true)
+            }
+
+            var room = roomRepository.getRoom()
+            room = room.copy(
+                houseSceneState = room.houseSceneState.updatePet(isMoving = false)
+            )
+
+            _uiState.update {
+                it.copy(
+                    phase = AppPhase.ROOM,
+                    authPopupVisible = false,
+                    isProcessingLogin = false,
+                    room = room,
+                    placeholderMessage = "개발자 모드로 입장했습니다.",
+                    userId = null,
+                    friendFeedbackMessage = null,
+                    plazaFeedbackMessage = null
+                )
+            }
+            startPetConditionTicker()
+        }
     }
 
     fun onButtonAClick() {
@@ -392,6 +425,25 @@ class AppViewModel(
                 _uiState.update { it.copy(placeholderMessage = "바닥에 사료를 놓았습니다.") }
             }
         }
+    }
+
+    fun onDroppedToyClick() {
+        val room = _uiState.value.room ?: return
+        val runtime = room.houseSceneState.currentSceneRuntime
+        val pet = room.houseSceneState.pet
+        val droppedToyAnchor = runtime.droppedToyAnchor ?: return
+        val toyBoxAnchor = room.sceneDefinition.objects
+            .firstOrNull { it.type == RoomObjectType.TOY_BOX }
+            ?.anchor as? FloorAnchor ?: return
+
+        if (!runtime.isToyKnockedOver) return
+        if (room.feedMode || room.toyMode || room.rearrangeMode || room.isCameraMode) return
+        if (pet.movement.isMoving || pet.action == PetAction.CLEANING) return
+
+        startToyCleanupSequence(
+            droppedToyAnchor = droppedToyAnchor,
+            toyBoxAnchor = toyBoxAnchor
+        )
     }
 
     fun onBottomNavItemClick(item: BottomNavItem) {
@@ -966,6 +1018,40 @@ class AppViewModel(
         }
     }
 
+    fun sendHomeInvitation(friendUserId: String) {
+        if (_uiState.value.pendingHomeInvitationFriendId != null) return
+
+        viewModelScope.launch {
+            val friendName = _uiState.value.friends
+                .firstOrNull { it.user.userId == friendUserId }
+                ?.user
+                ?.nickname
+
+            _uiState.update {
+                it.copy(pendingHomeInvitationFriendId = friendUserId)
+            }
+
+            val result = friendRepository.sendHomeInvitation(
+                friendUserId = friendUserId,
+                message = "우리 집 구경하러 올래?"
+            )
+            val successMessage = if (friendName.isNullOrBlank()) {
+                "집 초대를 보냈어요."
+            } else {
+                "${friendName}님에게 집 초대를 보냈어요."
+            }
+
+            _uiState.update {
+                it.copy(
+                    pendingHomeInvitationFriendId = null,
+                    friendFeedbackMessage = result.feedbackMessage(
+                        successMessage = successMessage
+                    )
+                )
+            }
+        }
+    }
+
     fun onFriendFeedbackConsumed() {
         _uiState.update { it.copy(friendFeedbackMessage = null) }
     }
@@ -1083,7 +1169,15 @@ class AppViewModel(
         val room = state.room ?: return
         val pet = room.houseSceneState.pet
 
-        if (state.phase != AppPhase.ROOM || room.feedMode || room.toyMode || room.isCameraMode || pet.status.isEgg || pet.movement.isMoving) {
+        if (
+            state.phase != AppPhase.ROOM ||
+            room.feedMode ||
+            room.toyMode ||
+            room.isCameraMode ||
+            pet.status.isEgg ||
+            pet.movement.isMoving ||
+            pet.action == PetAction.CLEANING
+        ) {
             return
         }
 
@@ -1502,6 +1596,67 @@ class AppViewModel(
                 applyRepositoryRoom(nextRoom)
                 setPetAction(PetAction.IDLE)
             }
+        }
+    }
+
+    private fun startToyCleanupSequence(
+        droppedToyAnchor: FloorAnchor,
+        toyBoxAnchor: FloorAnchor
+    ) {
+        pendingFoodConsumeJob?.cancel()
+        pendingFoodConsumeJob = viewModelScope.launch {
+            var pet = _uiState.value.room?.houseSceneState?.pet ?: return@launch
+            val profile = autonomousMovementProfileFor(pet.personality)
+
+            if (pet.isLyingSide) {
+                setPetAction(PetAction.IDLE)
+                delay(600L)
+                pet = _uiState.value.room?.houseSceneState?.pet ?: return@launch
+            }
+
+            _uiState.update { it.copy(placeholderMessage = "장난감을 정리하러 갑니다.") }
+
+            val moveToToyDelayMs = calculateMovementDelay(pet.anchor, droppedToyAnchor, profile)
+            movePetAutonomously(
+                targetAnchor = droppedToyAnchor,
+                movementState = PetMovementState(
+                    targetAnchor = droppedToyAnchor,
+                    isMoving = true,
+                    style = profile.style,
+                    isAutonomous = false,
+                    speedMultiplier = profile.speedMultiplier,
+                    bouncePx = profile.bouncePx
+                )
+            )
+            delay(moveToToyDelayMs)
+            finishAutonomousPetMovement(droppedToyAnchor)
+
+            setPetAction(PetAction.CLEANING)
+            delay(450L)
+
+            val pickedUpRoom = roomRepository.cleanupToy()
+            applyRepositoryRoom(pickedUpRoom)
+
+            val petAtToy = _uiState.value.room?.houseSceneState?.pet ?: return@launch
+            val moveToBoxDelayMs = calculateMovementDelay(petAtToy.anchor, toyBoxAnchor, profile)
+            movePetAutonomously(
+                targetAnchor = toyBoxAnchor,
+                movementState = PetMovementState(
+                    targetAnchor = toyBoxAnchor,
+                    isMoving = true,
+                    style = profile.style,
+                    isAutonomous = false,
+                    speedMultiplier = profile.speedMultiplier,
+                    bouncePx = profile.bouncePx
+                )
+            )
+            delay(moveToBoxDelayMs)
+            finishAutonomousPetMovement(toyBoxAnchor)
+
+            setPetAction(PetAction.CLEANING)
+            delay(350L)
+            setPetAction(PetAction.IDLE)
+            _uiState.update { it.copy(placeholderMessage = "장난감을 장난감 상자에 정리했어요.") }
         }
     }
 

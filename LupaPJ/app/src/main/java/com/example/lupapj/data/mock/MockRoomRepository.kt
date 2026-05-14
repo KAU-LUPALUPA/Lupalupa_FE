@@ -185,6 +185,19 @@ class MockRoomRepository(
         localCache.saveToyKnockedOver(isKnockedOver)
         return roomState
     }
+
+    override suspend fun cleanupToy(): RoomUiState {
+        roomState = roomState.copy(
+            houseSceneState = roomState.houseSceneState.updateCurrentSceneRuntime {
+                it.copy(
+                    droppedToyAnchor = null,
+                    isToyKnockedOver = false
+                )
+            }
+        )
+        localCache.saveDroppedToy(null, null)
+        return roomState
+    }
 }
 
 private fun HouseSceneState.updatePet(

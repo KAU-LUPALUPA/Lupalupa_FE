@@ -27,6 +27,10 @@ interface FriendApiClient {
 
     suspend fun deleteFriend(friendUserId: String)
 
+    suspend fun sendHomeInvitation(
+        request: SendHomeInvitationRequestDto
+    ): FriendHomeInvitationResponseDto
+
     suspend fun getReceivedHomeInvitations(): FriendHomeInvitationsResponseDto
 
     suspend fun acceptHomeInvitation(invitationId: String): AcceptHomeInvitationResponseDto

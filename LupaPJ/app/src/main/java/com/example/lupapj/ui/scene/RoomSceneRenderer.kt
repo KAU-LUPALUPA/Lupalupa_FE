@@ -57,6 +57,7 @@ import com.example.lupapj.data.model.scene.HouseSceneState
 import com.example.lupapj.data.model.scene.IsoRoomProjectionSpec
 import com.example.lupapj.data.model.scene.PET_AUTONOMOUS_MOVE_DURATION_MS
 import com.example.lupapj.data.model.scene.PetMovementStyle
+import com.example.lupapj.data.model.scene.PetSceneState
 import com.example.lupapj.data.model.scene.RoomSceneDefinition
 import com.example.lupapj.data.model.scene.SceneObjectDefinition
 import com.example.lupapj.data.model.scene.ScenePivot
@@ -122,8 +123,10 @@ fun RoomSceneRenderer(
     sceneDefinition: RoomSceneDefinition,
     houseSceneState: HouseSceneState,
     feedMode: Boolean,
+    companionPets: List<PetSceneState> = emptyList(),
     onFloorTap: (FloorAnchor) -> Unit,
     onSceneObjectClick: (SceneObjectDefinition) -> Unit,
+    onDroppedToyClick: () -> Unit = {},
     modifier: Modifier = Modifier,
     uiOverlay: @Composable BoxScope.() -> Unit = {}
 ) {
@@ -136,41 +139,56 @@ fun RoomSceneRenderer(
         val viewportWidthPx = with(density) { maxWidth.toPx() }
         val viewportHeightPx = with(density) { maxHeight.toPx() }
 
-        val petMovementDuration = (PET_MOVE_DURATION_MS / houseSceneState.pet.movement.speedMultiplier).toInt()
-
-        val animatedPetU by animateFloatAsState(
-            targetValue = houseSceneState.pet.anchor.u,
-            animationSpec = tween(
-                durationMillis = petMovementDuration,
-                easing = FastOutSlowInEasing
-            ),
-            label = "PetAnchorU"
-        )
-        val animatedPetV by animateFloatAsState(
-            targetValue = houseSceneState.pet.anchor.v,
-            animationSpec = tween(
-                durationMillis = petMovementDuration,
-                easing = FastOutSlowInEasing
-            ),
-            label = "PetAnchorV"
-        )
-        val animatedPetAnchor = FloorAnchor(
-            u = animatedPetU,
-            v = animatedPetV
-        )
-        val isPetMoving =
-            abs(animatedPetU - houseSceneState.pet.anchor.u) > 0.0005f ||
-                abs(animatedPetV - houseSceneState.pet.anchor.v) > 0.0005f
-        var lockedPetAnimation by remember { mutableStateOf(CharacterAnimation.Row3) }
-        LaunchedEffect(houseSceneState.pet.anchor) {
-            lockedPetAnimation = resolveCharacterAnimationForMovement(
-                projectionSpec = sceneDefinition.projectionSpec,
-                currentAnchor = animatedPetAnchor,
-                targetAnchor = houseSceneState.pet.anchor,
-                fallbackAnimation = lockedPetAnimation
-            )
+        val animatedPets = mutableListOf<AnimatedPetRenderState>()
+        (listOf(houseSceneState.pet) + companionPets).forEachIndexed { index, pet ->
+            key("${pet.petId}-$index") {
+                val petMovementDuration = (
+                    PET_MOVE_DURATION_MS / pet.movement.speedMultiplier.coerceAtLeast(0.1f)
+                    ).toInt()
+                val animatedPetU by animateFloatAsState(
+                    targetValue = pet.anchor.u,
+                    animationSpec = tween(
+                        durationMillis = petMovementDuration,
+                        easing = FastOutSlowInEasing
+                    ),
+                    label = "PetAnchorU-${pet.petId}-$index"
+                )
+                val animatedPetV by animateFloatAsState(
+                    targetValue = pet.anchor.v,
+                    animationSpec = tween(
+                        durationMillis = petMovementDuration,
+                        easing = FastOutSlowInEasing
+                    ),
+                    label = "PetAnchorV-${pet.petId}-$index"
+                )
+                val animatedPetAnchor = FloorAnchor(
+                    u = animatedPetU,
+                    v = animatedPetV
+                )
+                val isPetMoving =
+                    abs(animatedPetU - pet.anchor.u) > 0.0005f ||
+                        abs(animatedPetV - pet.anchor.v) > 0.0005f
+                var lockedPetAnimation by remember(pet.petId, index) {
+                    mutableStateOf(CharacterAnimation.Row3)
+                }
+                LaunchedEffect(pet.anchor) {
+                    lockedPetAnimation = resolveCharacterAnimationForMovement(
+                        projectionSpec = sceneDefinition.projectionSpec,
+                        currentAnchor = animatedPetAnchor,
+                        targetAnchor = pet.anchor,
+                        fallbackAnimation = lockedPetAnimation
+                    )
+                }
+                animatedPets += AnimatedPetRenderState(
+                    key = "pet-${pet.petId}-$index",
+                    pet = pet,
+                    anchor = animatedPetAnchor,
+                    isMoving = isPetMoving,
+                    animation = lockedPetAnimation,
+                    movementDurationMillis = petMovementDuration
+                )
+            }
         }
-        val petAnimation = lockedPetAnimation
 
         Box(modifier = Modifier.fillMaxSize()) {
             RoomBackground(
@@ -222,7 +240,7 @@ fun RoomSceneRenderer(
                 sceneObjects = sceneDefinition.objects,
                 projectionSpec = sceneDefinition.projectionSpec,
                 houseSceneState = houseSceneState,
-                petAnchor = animatedPetAnchor,
+                pets = animatedPets,
                 viewportWidthPx = viewportWidthPx,
                 viewportHeightPx = viewportHeightPx,
                 density = density
@@ -262,22 +280,22 @@ fun RoomSceneRenderer(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .petMovementStyle(
-                                            style = houseSceneState.pet.movement.style,
-                                            isMoving = isPetMoving,
-                                            bouncePx = houseSceneState.pet.movement.bouncePx,
-                                            durationMillis = petMovementDuration
+                                            style = renderable.pet.movement.style,
+                                            isMoving = renderable.isMoving,
+                                            bouncePx = renderable.pet.movement.bouncePx,
+                                            durationMillis = renderable.movementDurationMillis
                                         )
                                         // [수정됨(권)] 옆으로 눕기 플래그가 활성화된 경우에만 회전 애니메이션 적용
                                         .petRestingStyle(
-                                            isResting = houseSceneState.pet.isLyingSide
+                                            isResting = renderable.pet.isLyingSide
                                         ),
-                                    animation = petAnimation,
-                                    appearance = houseSceneState.pet.appearance,
-                                    equippedItemIds = houseSceneState.pet.equippedItemIds,
-                                    isEgg = houseSceneState.pet.status.isEgg,
+                                    animation = renderable.animation,
+                                    appearance = renderable.pet.appearance,
+                                    equippedItemIds = renderable.pet.equippedItemIds,
+                                    isEgg = renderable.pet.status.isEgg,
                                     frameDurationMillis = 150L,
-                                    isPlaying = isPetMoving,
-                                    contentDescription = houseSceneState.pet.name.ifBlank {
+                                    isPlaying = renderable.isMoving,
+                                    contentDescription = renderable.pet.name.ifBlank {
                                         PetSprite.fallbackLabel
                                     }
                                 )
@@ -311,9 +329,17 @@ fun RoomSceneRenderer(
 
                                 val finalRotation = rotation + if (isPlaying || isKnocked) shakeValue else 0f
 
-                                Box(modifier = Modifier.graphicsLayer {
-                                    rotationZ = finalRotation
-                                }) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .graphicsLayer {
+                                            rotationZ = finalRotation
+                                        }
+                                        .clickable(
+                                            enabled = isKnocked && !feedMode,
+                                            onClick = onDroppedToyClick
+                                        )
+                                ) {
                                     ToyPlaceholder()
                                 }
                             }
@@ -345,6 +371,15 @@ fun RoomSceneRenderer(
     }
 }
 
+private data class AnimatedPetRenderState(
+    val key: String,
+    val pet: PetSceneState,
+    val anchor: FloorAnchor,
+    val isMoving: Boolean,
+    val animation: CharacterAnimation,
+    val movementDurationMillis: Int
+)
+
 private sealed interface FloorRenderableModel {
     val key: String
     val node: ProjectedNode
@@ -357,9 +392,13 @@ private sealed interface FloorRenderableModel {
     }
 
     data class PetRenderable(
+        val pet: PetSceneState,
+        val isMoving: Boolean,
+        val animation: CharacterAnimation,
+        val movementDurationMillis: Int,
         override val node: ProjectedNode
     ) : FloorRenderableModel {
-        override val key: String = "pet"
+        override val key: String = "pet-${pet.petId}"
     }
 
     data class FoodRenderable(
@@ -379,7 +418,7 @@ private fun buildFloorRenderables(
     sceneObjects: List<SceneObjectDefinition>,
     projectionSpec: IsoRoomProjectionSpec,
     houseSceneState: HouseSceneState,
-    petAnchor: FloorAnchor,
+    pets: List<AnimatedPetRenderState>,
     viewportWidthPx: Float,
     viewportHeightPx: Float,
     density: Density
@@ -453,24 +492,32 @@ private fun buildFloorRenderables(
         )
     }
 
-    val petNode = projectFloorAnchor(
-        anchor = petAnchor,
-        projectionSpec = projectionSpec,
-        viewportWidthPx = viewportWidthPx,
-        viewportHeightPx = viewportHeightPx,
-        spriteSizePx = resolvePetSpriteSizePx(
-            sprite = PetSprite,
-            minWidthPx = with(density) { PetSprite.minWidthDp.dp.toPx() },
-            maxWidthPx = with(density) { PetSprite.maxWidthDp.dp.toPx() },
-            metrics = metrics
-        ),
-        pivot = PetSprite.pivot ?: DefaultFloorPivot
-    )
-    renderables += DepthSortable(
-        key = "pet",
-        sortDepth = petNode.sortDepth,
-        value = FloorRenderableModel.PetRenderable(node = petNode)
-    )
+    pets.forEach { petState ->
+        val petNode = projectFloorAnchor(
+            anchor = petState.anchor,
+            projectionSpec = projectionSpec,
+            viewportWidthPx = viewportWidthPx,
+            viewportHeightPx = viewportHeightPx,
+            spriteSizePx = resolvePetSpriteSizePx(
+                sprite = PetSprite,
+                minWidthPx = with(density) { PetSprite.minWidthDp.dp.toPx() },
+                maxWidthPx = with(density) { PetSprite.maxWidthDp.dp.toPx() },
+                metrics = metrics
+            ),
+            pivot = PetSprite.pivot ?: DefaultFloorPivot
+        )
+        renderables += DepthSortable(
+            key = petState.key,
+            sortDepth = petNode.sortDepth,
+            value = FloorRenderableModel.PetRenderable(
+                pet = petState.pet,
+                isMoving = petState.isMoving,
+                animation = petState.animation,
+                movementDurationMillis = petState.movementDurationMillis,
+                node = petNode
+            )
+        )
+    }
 
     return renderables
 }

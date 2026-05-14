@@ -251,6 +251,24 @@ class MockFriendRepository(
         return FriendOperationResult.Success(friend)
     }
 
+    override suspend fun sendHomeInvitation(
+        friendUserId: String,
+        message: String?
+    ): FriendOperationResult<FriendHomeInvitation> {
+        simulateLatency()
+
+        val friend = _friends.value.firstOrNull { it.user.userId == friendUserId }
+            ?: return FriendOperationResult.Failure(FriendOperationFailure.NOT_FRIENDS)
+
+        return FriendOperationResult.Success(
+            createHomeInvitation(
+                fromUser = _myProfile.value,
+                toUser = friend.user,
+                message = message ?: "우리 집 구경하러 올래?"
+            )
+        )
+    }
+
     override suspend fun getFriendHome(
         friendUserId: String
     ): FriendOperationResult<FriendHome> {

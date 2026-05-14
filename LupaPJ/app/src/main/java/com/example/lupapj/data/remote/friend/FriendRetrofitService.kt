@@ -51,6 +51,11 @@ interface FriendRetrofitService {
         @Path("friendUserId") friendUserId: String
     ): Response<Unit>
 
+    @POST("friends/home-invitations")
+    suspend fun sendHomeInvitation(
+        @Body request: SendHomeInvitationRequestDto
+    ): Response<FriendHomeInvitationResponseDto>
+
     @GET("friends/home-invitations/received")
     suspend fun getReceivedHomeInvitations(): Response<FriendHomeInvitationsResponseDto>
 

@@ -12,4 +12,5 @@ interface RoomRepository {
     suspend fun placeToy(position: FloorAnchor): RoomUiState
     suspend fun saveRoomLayout(room: RoomUiState): RoomUiState
     suspend fun updateToyKnockedOver(isKnockedOver: Boolean): RoomUiState
+    suspend fun cleanupToy(): RoomUiState
 }

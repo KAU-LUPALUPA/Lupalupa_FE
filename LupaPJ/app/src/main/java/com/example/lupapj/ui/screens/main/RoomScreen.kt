@@ -79,6 +79,7 @@ fun RoomScreen(
     onRearrangeConfirm: () -> Unit,
     onRearrangeCancel: () -> Unit,
     onFloorTap: (FloorAnchor) -> Unit,
+    onDroppedToyClick: () -> Unit,
     onBottomNavItemClick: (BottomNavItem) -> Unit,
     recentMainMenuAction: MainMenuAction?,
     onPlaceholderMessageConsumed: () -> Unit,
@@ -210,6 +211,7 @@ fun RoomScreen(
                             uiState = room,
                             onRoomObjectClick = onRoomObjectClick,
                             onFloorTap = onFloorTap,
+                            onDroppedToyClick = onDroppedToyClick,
                             modifier = Modifier.fillMaxSize()
                         )
                         
@@ -252,7 +254,7 @@ fun RoomScreen(
                     shadowElevation = 6.dp,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 90.dp, end = 16.dp)
+                        .padding(top = 112.dp, end = 16.dp)
                 ) {
                     Text(
                         text = "재배치",
@@ -478,6 +480,7 @@ private fun RoomScreenPreview() {
             onRearrangeConfirm = {},
             onRearrangeCancel = {},
             onFloorTap = {},
+            onDroppedToyClick = {},
             onBottomNavItemClick = {},
             recentMainMenuAction = MainMenuAction.SHOP,
             onPlaceholderMessageConsumed = {},

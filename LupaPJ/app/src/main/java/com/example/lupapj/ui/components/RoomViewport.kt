@@ -5,13 +5,16 @@ import androidx.compose.ui.Modifier
 import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.model.scene.FloorAnchor
+import com.example.lupapj.data.model.scene.PetSceneState
 import com.example.lupapj.ui.scene.RoomSceneRenderer
 
 @Composable
 fun RoomViewport(
     uiState: RoomUiState,
+    companionPets: List<PetSceneState> = emptyList(),
     onRoomObjectClick: (RoomObjectType) -> Unit,
     onFloorTap: (FloorAnchor) -> Unit,
+    onDroppedToyClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
 
@@ -19,6 +22,7 @@ fun RoomViewport(
         sceneDefinition = uiState.sceneDefinition,
         houseSceneState = uiState.houseSceneState,
         feedMode = uiState.feedMode || uiState.toyMode,
+        companionPets = companionPets,
 
         onFloorTap = onFloorTap,
 
@@ -28,6 +32,8 @@ fun RoomViewport(
                 onRoomObjectClick(sceneObject.type)
             }
         },
+
+        onDroppedToyClick = onDroppedToyClick,
 
         modifier = modifier
     )

@@ -60,7 +60,8 @@ enum class PetAction {
     RESTING,
     BED_RESTING, // [추가됨(권)] 침대 휴식
     PLAYING,
-    EATING
+    EATING,
+    CLEANING
 }
 
 enum class PetPersonality {
@@ -188,6 +189,7 @@ val PetAction.label: String
         PetAction.BED_RESTING -> "침대에서 휴식 중" // [추가됨(권)]
         PetAction.PLAYING -> "노는 중"
         PetAction.EATING -> "먹는 중"
+        PetAction.CLEANING -> "정리 중"
     }
 
 val BottomNavItem.label: String
