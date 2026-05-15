@@ -85,6 +85,29 @@ class RetrofitFriendApiClient(
             .bodyOrThrow()
     }
 
+    override suspend fun getActiveHomeVisits(): ActiveHomeVisitsResponseDto {
+        return service.getActiveHomeVisits().bodyOrThrow()
+    }
+
+    override suspend fun leaveHomeVisit(
+        visitSessionId: String
+    ): FriendHomeVisitSessionResponseDto {
+        return service.leaveHomeVisit(visitSessionId).bodyOrThrow()
+    }
+
+    override suspend fun getHomeVisitMessages(
+        visitSessionId: String
+    ): HomeVisitMessagesResponseDto {
+        return service.getHomeVisitMessages(visitSessionId).bodyOrThrow()
+    }
+
+    override suspend fun sendHomeVisitMessage(
+        visitSessionId: String,
+        request: SendHomeVisitMessageRequestDto
+    ): HomeVisitMessageResponseDto {
+        return service.sendHomeVisitMessage(visitSessionId, request).bodyOrThrow()
+    }
+
     @Deprecated(
         message = "Direct friend home visits are blocked by policy. Use home invitation accept flow.",
         replaceWith = ReplaceWith("acceptHomeInvitation(invitationId)")

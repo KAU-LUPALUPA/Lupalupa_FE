@@ -51,6 +51,8 @@ private const val FOOD_CONSUME_AFTER_TRAVEL_DELAY_MS = 900L
 private const val FOOD_CONSUME_PAUSE_MS = 650L
 private const val AUTONOMOUS_MOVEMENT_RETRY_DELAY_MS = 800L
 private const val FRIEND_MESSAGE_POLL_INTERVAL_MS = 3_000L
+private const val HOME_VISIT_POLL_INTERVAL_MS = 3_000L
+private const val PLAZA_SNAPSHOT_POLL_INTERVAL_MS = 2_000L
 
 // [수정됨(권)] 성격별 행동 엔진 밸런스를 위해 2초 틱 유지
 private const val PET_CONDITION_TICK_INTERVAL_MS = 2_000L 
@@ -78,7 +80,9 @@ class AppViewModel(
     private var pendingFoodConsumeJob: Job? = null
     private var autonomousPetMovementJob: Job? = null
     private var friendMessagePollingJob: Job? = null
+    private var homeVisitPollingJob: Job? = null
     private var petConditionJob: Job? = null
+    private var plazaSnapshotPollingJob: Job? = null
     
     // [보존] 팀원 작업 로직용 잡
     private var plazaJoinJob: Job? = null
@@ -122,12 +126,109 @@ class AppViewModel(
         viewModelScope.launch {
             friendRepository.friendMessages.collect { messagesByFriend ->
                 _uiState.update { state ->
-                    val friendUserId = state.visitingFriendHome?.owner?.userId
+                    val friendUserId = if (state.activeHomeVisitSession == null) {
+                        state.visitingFriendHome?.owner?.userId
+                    } else {
+                        null
+                    }
                     if (friendUserId == null) {
                         state
                     } else {
                         state.copy(
                             friendRoomMessages = messagesByFriend[friendUserId].orEmpty()
+                        )
+                    }
+                }
+            }
+        }
+        viewModelScope.launch {
+            friendRepository.activeHomeVisits.collect { visits ->
+                var sessionToPoll: String? = null
+                var shouldStopPolling = false
+                _uiState.update { state ->
+                    val activeSessions = visits.hosting + visits.visiting
+                    val currentSession = state.activeHomeVisitSession
+                    val refreshedActiveSession = state.activeHomeVisitSession?.let { activeSession ->
+                        activeSessions.firstOrNull { it.id == activeSession.id }
+                    }
+                    val currentSessionEnded = currentSession != null && refreshedActiveSession == null
+                    val canSelectHostingSession = state.phase == AppPhase.ROOM ||
+                        (currentSessionEnded && state.phase == AppPhase.FRIEND_ROOM)
+                    val nextActiveSession = refreshedActiveSession
+                        ?: if (canSelectHostingSession) visits.hosting.firstOrNull() else null
+                    val activeSessionChanged = nextActiveSession?.id != currentSession?.id
+
+                    if (nextActiveSession != null && activeSessionChanged) {
+                        sessionToPoll = nextActiveSession.id
+                    }
+                    if (currentSessionEnded || nextActiveSession == null) {
+                        shouldStopPolling = true
+                    }
+
+                    if (currentSessionEnded && state.phase == AppPhase.FRIEND_ROOM) {
+                        state.copy(
+                            phase = AppPhase.ROOM,
+                            hostingHomeVisitSessions = visits.hosting,
+                            visitingFriendHome = null,
+                            activeHomeVisitSession = nextActiveSession,
+                            friendRoomMessages = emptyList(),
+                            friendMessageInput = "",
+                            isSendingFriendMessage = false,
+                            placeholderMessage = "친구 집 방문이 종료됐어요."
+                        )
+                    } else {
+                        state.copy(
+                            hostingHomeVisitSessions = visits.hosting,
+                            visitingFriendHome = if (
+                                state.phase == AppPhase.FRIEND_ROOM &&
+                                nextActiveSession != null
+                            ) {
+                                nextActiveSession.hostHome ?: state.visitingFriendHome
+                            } else {
+                                state.visitingFriendHome
+                            },
+                            activeHomeVisitSession = nextActiveSession,
+                            friendRoomMessages = if (nextActiveSession == null || activeSessionChanged) {
+                                emptyList()
+                            } else {
+                                state.friendRoomMessages
+                            },
+                            friendMessageInput = if (nextActiveSession == null || activeSessionChanged) {
+                                ""
+                            } else {
+                                state.friendMessageInput
+                            },
+                            isSendingFriendMessage = if (nextActiveSession == null || activeSessionChanged) {
+                                false
+                            } else {
+                                state.isSendingFriendMessage
+                            },
+                            placeholderMessage = if (currentSessionEnded && state.phase == AppPhase.ROOM) {
+                                "친구 집 방문이 종료됐어요."
+                            } else {
+                                state.placeholderMessage
+                            }
+                        )
+                    }
+                }
+                val visitSessionId = sessionToPoll
+                if (visitSessionId != null) {
+                    friendRepository.getHomeVisitMessages(visitSessionId)
+                    startFriendMessagePolling(visitSessionId)
+                } else if (shouldStopPolling) {
+                    stopFriendMessagePolling()
+                }
+            }
+        }
+        viewModelScope.launch {
+            friendRepository.homeVisitMessages.collect { messagesByVisit ->
+                _uiState.update { state ->
+                    val visitSessionId = state.activeHomeVisitSession?.id
+                    if (visitSessionId == null) {
+                        state
+                    } else {
+                        state.copy(
+                            friendRoomMessages = messagesByVisit[visitSessionId].orEmpty()
                         )
                     }
                 }
@@ -228,6 +329,7 @@ class AppViewModel(
                 )
             }
             startPetConditionTicker()
+            startHomeVisitPolling()
         }
     }
 
@@ -267,6 +369,7 @@ class AppViewModel(
                 )
             }
             startPetConditionTicker()
+            startHomeVisitPolling()
         }
     }
 
@@ -530,9 +633,15 @@ class AppViewModel(
         }
         viewModelScope.launch {
             val result = plazaRepository.refreshActivePlaza()
-            if (result is PlazaOperationResult.Failure) {
-                _uiState.update {
-                    it.copy(plazaFeedbackMessage = result.reason.message)
+            when (result) {
+                is PlazaOperationResult.Success -> {
+                    result.value?.plazaId?.let(::startPlazaSnapshotPolling)
+                }
+
+                is PlazaOperationResult.Failure -> {
+                    _uiState.update {
+                        it.copy(plazaFeedbackMessage = result.reason.message)
+                    }
                 }
             }
         }
@@ -543,6 +652,7 @@ class AppViewModel(
         plazaJoinJob?.cancel()
         plazaJoinJob = null
         cancelPlazaMessageSend()
+        stopPlazaSnapshotPolling()
         val shouldLeavePlaza = _uiState.value.activePlaza != null
 
         _uiState.update {
@@ -611,6 +721,9 @@ class AppViewModel(
                     )
                 }
             }
+            if (result is PlazaOperationResult.Success) {
+                startPlazaSnapshotPolling(result.value.plazaId)
+            }
         }
     }
 
@@ -658,6 +771,9 @@ class AppViewModel(
                     )
                 }
             }
+            if (result is PlazaOperationResult.Success) {
+                startPlazaSnapshotPolling(result.value.plazaId)
+            }
         }
     }
 
@@ -666,6 +782,7 @@ class AppViewModel(
         plazaJoinJob?.cancel()
         plazaJoinJob = null
         cancelPlazaMessageSend()
+        stopPlazaSnapshotPolling()
         val leavingPlaza = _uiState.value.activePlaza
 
         _uiState.update {
@@ -748,6 +865,42 @@ class AppViewModel(
         plazaMessageSendJob = null
     }
 
+    private fun startPlazaSnapshotPolling(plazaId: String) {
+        if (plazaSnapshotPollingJob?.isActive == true) {
+            plazaSnapshotPollingJob?.cancel()
+        }
+        plazaSnapshotPollingJob = viewModelScope.launch {
+            while (isActive) {
+                delay(PLAZA_SNAPSHOT_POLL_INTERVAL_MS)
+                val state = _uiState.value
+                if (state.phase != AppPhase.PLAZA || state.activePlaza?.plazaId != plazaId) {
+                    break
+                }
+                when (val result = plazaRepository.refreshPlazaSnapshot(plazaId)) {
+                    is PlazaOperationResult.Success -> Unit
+                    is PlazaOperationResult.Failure -> {
+                        if (result.reason == PlazaOperationFailure.NOT_IN_PLAZA ||
+                            result.reason == PlazaOperationFailure.PLAZA_NOT_FOUND
+                        ) {
+                            _uiState.update {
+                                it.copy(
+                                    activePlaza = null,
+                                    plazaFeedbackMessage = result.reason.message
+                                )
+                            }
+                            break
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun stopPlazaSnapshotPolling() {
+        plazaSnapshotPollingJob?.cancel()
+        plazaSnapshotPollingJob = null
+    }
+
     fun openMailbox() {
         refreshFriendOverview()
         _uiState.update { it.copy(mailboxVisible = true) }
@@ -770,25 +923,72 @@ class AppViewModel(
 
     fun backToFriendsFromFriendRoom() {
         stopFriendMessagePolling()
+        val visitSessionId = _uiState.value.activeHomeVisitSession?.id
         _uiState.update {
             it.copy(
                 phase = AppPhase.FRIENDS,
-                isLoadingFriendHome = false
+                isLoadingFriendHome = false,
+                visitingFriendHome = null,
+                activeHomeVisitSession = null,
+                friendRoomMessages = emptyList(),
+                friendMessageInput = "",
+                isSendingFriendMessage = false
             )
+        }
+        if (visitSessionId != null) {
+            viewModelScope.launch {
+                friendRepository.leaveHomeVisit(visitSessionId)
+                friendRepository.refreshActiveHomeVisits()
+            }
         }
     }
 
     fun returnHomeFromFriendRoom() {
         stopFriendMessagePolling()
+        val visitSessionId = _uiState.value.activeHomeVisitSession?.id
         _uiState.update {
             it.copy(
                 phase = AppPhase.ROOM,
                 isLoadingFriendHome = false,
                 visitingFriendHome = null,
+                activeHomeVisitSession = null,
                 friendRoomMessages = emptyList(),
                 friendMessageInput = "",
                 isSendingFriendMessage = false
             )
+        }
+        if (visitSessionId != null) {
+            viewModelScope.launch {
+                friendRepository.leaveHomeVisit(visitSessionId)
+                friendRepository.refreshActiveHomeVisits()
+            }
+        }
+    }
+
+    fun endActiveHomeVisit() {
+        val visitSessionId = _uiState.value.activeHomeVisitSession?.id ?: return
+        stopFriendMessagePolling()
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    hostingHomeVisitSessions = it.hostingHomeVisitSessions.filterNot { session ->
+                        session.id == visitSessionId
+                    },
+                    activeHomeVisitSession = null,
+                    friendRoomMessages = emptyList(),
+                    friendMessageInput = "",
+                    isSendingFriendMessage = false
+                )
+            }
+            val result = friendRepository.leaveHomeVisit(visitSessionId)
+            friendRepository.refreshActiveHomeVisits()
+            _uiState.update {
+                it.copy(
+                    placeholderMessage = result.feedbackMessage(
+                        successMessage = "친구 집 방문을 종료했어요."
+                    )
+                )
+            }
         }
     }
 
@@ -800,6 +1000,7 @@ class AppViewModel(
                     phase = AppPhase.FRIEND_ROOM,
                     isLoadingFriendHome = true,
                     visitingFriendHome = null,
+                    activeHomeVisitSession = null,
                     friendRoomMessages = emptyList(),
                     friendMessageInput = "",
                     isSendingFriendMessage = false
@@ -808,7 +1009,7 @@ class AppViewModel(
 
             val result = friendRepository.acceptHomeInvitation(invitationId)
             val messagesResult = if (result is FriendOperationResult.Success) {
-                friendRepository.getFriendMessages(result.value.owner.userId)
+                friendRepository.getHomeVisitMessages(result.value.id)
             } else {
                 null
             }
@@ -817,7 +1018,8 @@ class AppViewModel(
                     is FriendOperationResult.Success -> it.copy(
                         isLoadingFriendHome = false,
                         mailboxVisible = false,
-                        visitingFriendHome = result.value,
+                        visitingFriendHome = result.value.hostHome,
+                        activeHomeVisitSession = result.value,
                         friendRoomMessages = when (messagesResult) {
                             is FriendOperationResult.Success -> messagesResult.value
                             else -> emptyList()
@@ -842,7 +1044,7 @@ class AppViewModel(
                 }
             }
             if (result is FriendOperationResult.Success) {
-                startFriendMessagePolling(result.value.owner.userId)
+                startFriendMessagePolling(result.value.id)
             }
         }
     }
@@ -870,17 +1072,20 @@ class AppViewModel(
         }
     }
 
-    private fun startFriendMessagePolling(friendUserId: String) {
+    private fun startFriendMessagePolling(visitSessionId: String) {
         friendMessagePollingJob?.cancel()
         friendMessagePollingJob = viewModelScope.launch {
             while (isActive) {
                 delay(FRIEND_MESSAGE_POLL_INTERVAL_MS)
                 val state = _uiState.value
-                val activeFriendUserId = state.visitingFriendHome?.owner?.userId
-                if (state.phase != AppPhase.FRIEND_ROOM || activeFriendUserId != friendUserId) {
+                val activeVisitSessionId = state.activeHomeVisitSession?.id
+                if (
+                    (state.phase != AppPhase.FRIEND_ROOM && state.phase != AppPhase.ROOM) ||
+                    activeVisitSessionId != visitSessionId
+                ) {
                     break
                 }
-                friendRepository.getFriendMessages(friendUserId)
+                friendRepository.getHomeVisitMessages(visitSessionId)
             }
         }
     }
@@ -888,6 +1093,19 @@ class AppViewModel(
     private fun stopFriendMessagePolling() {
         friendMessagePollingJob?.cancel()
         friendMessagePollingJob = null
+    }
+
+    private fun startHomeVisitPolling() {
+        if (homeVisitPollingJob?.isActive == true) return
+        homeVisitPollingJob = viewModelScope.launch {
+            while (isActive) {
+                val phase = _uiState.value.phase
+                if (phase == AppPhase.ROOM || phase == AppPhase.FRIEND_ROOM) {
+                    friendRepository.refreshActiveHomeVisits()
+                }
+                delay(HOME_VISIT_POLL_INTERVAL_MS)
+            }
+        }
     }
 
     fun onFriendMessageChange(input: String) {
@@ -898,13 +1116,13 @@ class AppViewModel(
 
     fun sendFriendMessage() {
         val state = _uiState.value
-        val friendUserId = state.visitingFriendHome?.owner?.userId ?: return
+        val visitSessionId = state.activeHomeVisitSession?.id ?: return
         if (state.isSendingFriendMessage) return
 
         viewModelScope.launch {
             _uiState.update { it.copy(isSendingFriendMessage = true) }
-            val result = friendRepository.sendFriendMessage(
-                friendUserId = friendUserId,
+            val result = friendRepository.sendHomeVisitMessage(
+                visitSessionId = visitSessionId,
                 message = state.friendMessageInput
             )
             _uiState.update {
@@ -1717,9 +1935,11 @@ class AppViewModel(
         pendingFoodConsumeJob?.cancel()
         autonomousPetMovementJob?.cancel()
         friendMessagePollingJob?.cancel()
+        homeVisitPollingJob?.cancel()
         petConditionJob?.cancel()
         plazaJoinJob?.cancel()
         plazaMessageSendJob?.cancel()
+        plazaSnapshotPollingJob?.cancel()
         super.onCleared()
     }
 
@@ -1796,6 +2016,10 @@ private val FriendOperationFailure.message: String
         FriendOperationFailure.NOT_HOME_INVITATION_RECEIVER -> "내가 받은 집 초대만 수락할 수 있어요."
         FriendOperationFailure.NOT_HOME_INVITATION_SENDER -> "내가 보낸 집 초대만 취소할 수 있어요."
         FriendOperationFailure.FRIEND_HOME_UNAVAILABLE -> "친구 집을 불러올 수 없어요."
+        FriendOperationFailure.HOME_VISIT_ALREADY_ACTIVE -> "이미 진행 중인 친구 집 방문이 있어요."
+        FriendOperationFailure.HOME_VISIT_NOT_FOUND -> "친구 집 방문을 찾을 수 없어요."
+        FriendOperationFailure.HOME_VISIT_NOT_ACTIVE -> "이미 종료된 친구 집 방문이에요."
+        FriendOperationFailure.NOT_HOME_VISIT_PARTICIPANT -> "해당 친구 집 방문에 참여 중이 아니에요."
         FriendOperationFailure.BLOCKED -> "초대를 수락해야 친구 집에 방문할 수 있어요."
         FriendOperationFailure.UNKNOWN -> "친구 기능을 잠시 사용할 수 없어요."
     }

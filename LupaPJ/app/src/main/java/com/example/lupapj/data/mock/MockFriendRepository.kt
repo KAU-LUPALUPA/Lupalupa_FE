@@ -5,10 +5,13 @@ import com.example.lupapj.data.model.PetAppearance
 import com.example.lupapj.data.model.PetPersonality
 import com.example.lupapj.data.model.PetStatus
 import com.example.lupapj.data.model.friend.FRIEND_MESSAGE_MAX_LENGTH
+import com.example.lupapj.data.model.friend.ActiveFriendHomeVisits
 import com.example.lupapj.data.model.friend.FriendCode
 import com.example.lupapj.data.model.friend.FriendHome
 import com.example.lupapj.data.model.friend.FriendHomeInvitation
 import com.example.lupapj.data.model.friend.FriendHomeInvitationStatus
+import com.example.lupapj.data.model.friend.FriendHomeVisitSession
+import com.example.lupapj.data.model.friend.FriendHomeVisitStatus
 import com.example.lupapj.data.model.friend.FriendMessage
 import com.example.lupapj.data.model.friend.FriendMessageSender
 import com.example.lupapj.data.model.friend.FriendOperationFailure
@@ -78,6 +81,7 @@ class MockFriendRepository(
     }
     private var nextRequestSequence = 1
     private var nextInvitationSequence = 1
+    private var nextVisitSequence = 1
     private var nextMessageSequence = 1
 
     private val _friends = MutableStateFlow(
@@ -119,9 +123,17 @@ class MockFriendRepository(
     override val receivedHomeInvitations: StateFlow<List<FriendHomeInvitation>> =
         _receivedHomeInvitations.asStateFlow()
 
+    private val _activeHomeVisits = MutableStateFlow(ActiveFriendHomeVisits())
+    override val activeHomeVisits: StateFlow<ActiveFriendHomeVisits> =
+        _activeHomeVisits.asStateFlow()
+
     private val _friendMessages = MutableStateFlow(createInitialMessages(remoteUsers))
     override val friendMessages: StateFlow<Map<String, List<FriendMessage>>> =
         _friendMessages.asStateFlow()
+
+    private val _homeVisitMessages = MutableStateFlow<Map<String, List<FriendMessage>>>(emptyMap())
+    override val homeVisitMessages: StateFlow<Map<String, List<FriendMessage>>> =
+        _homeVisitMessages.asStateFlow()
 
     override suspend fun refreshFriendOverview(): FriendOperationResult<Unit> {
         simulateLatency()
@@ -283,7 +295,7 @@ class MockFriendRepository(
 
     override suspend fun acceptHomeInvitation(
         invitationId: String
-    ): FriendOperationResult<FriendHome> {
+    ): FriendOperationResult<FriendHomeVisitSession> {
         simulateLatency()
 
         val invitation = _receivedHomeInvitations.value.firstOrNull { it.id == invitationId }
@@ -302,13 +314,105 @@ class MockFriendRepository(
             invitations.filterNot { it.id == invitationId }
         }
 
-        return FriendOperationResult.Success(
-            FriendHome(
-                owner = friend.user,
-                room = room,
-                visitedAtMillis = nowProvider()
+        val home = FriendHome(
+            owner = friend.user,
+            room = room,
+            visitedAtMillis = nowProvider()
+        )
+        val session = FriendHomeVisitSession(
+            id = "home-visit-${nextVisitSequence++}",
+            hostUser = friend.user,
+            visitorUser = _myProfile.value,
+            status = FriendHomeVisitStatus.ACTIVE,
+            startedAtMillis = nowProvider(),
+            expiresAtMillis = nowProvider() + 2 * 60 * 60 * 1000L,
+            hostHome = home,
+            visitorPet = initialRoomUiState(DemoScenes.mainRoom).houseSceneState.pet.copy(
+                ownerUserId = _myProfile.value.userId
             )
         )
+        _activeHomeVisits.update { visits ->
+            visits.copy(visiting = listOf(session) + visits.visiting.filterNot { it.id == session.id })
+        }
+
+        return FriendOperationResult.Success(session)
+    }
+
+    override suspend fun refreshActiveHomeVisits(): FriendOperationResult<ActiveFriendHomeVisits> {
+        simulateLatency()
+        return FriendOperationResult.Success(_activeHomeVisits.value)
+    }
+
+    override suspend fun leaveHomeVisit(
+        visitSessionId: String
+    ): FriendOperationResult<FriendHomeVisitSession> {
+        simulateLatency()
+
+        val session = findHomeVisitSession(visitSessionId)
+            ?: return FriendOperationResult.Failure(FriendOperationFailure.HOME_VISIT_NOT_FOUND)
+        val endedSession = session.copy(
+            status = FriendHomeVisitStatus.ENDED,
+            endedAtMillis = nowProvider()
+        )
+        _activeHomeVisits.update { visits ->
+            visits.copy(
+                hosting = visits.hosting.filterNot { it.id == visitSessionId },
+                visiting = visits.visiting.filterNot { it.id == visitSessionId }
+            )
+        }
+        _homeVisitMessages.update { it - visitSessionId }
+        return FriendOperationResult.Success(endedSession)
+    }
+
+    override suspend fun getHomeVisitMessages(
+        visitSessionId: String
+    ): FriendOperationResult<List<FriendMessage>> {
+        simulateLatency()
+
+        findHomeVisitSession(visitSessionId)
+            ?: return FriendOperationResult.Failure(FriendOperationFailure.HOME_VISIT_NOT_FOUND)
+        return FriendOperationResult.Success(_homeVisitMessages.value[visitSessionId].orEmpty())
+    }
+
+    override suspend fun sendHomeVisitMessage(
+        visitSessionId: String,
+        message: String
+    ): FriendOperationResult<FriendMessage> {
+        simulateLatency()
+
+        val trimmedMessage = message.trim()
+        if (trimmedMessage.isEmpty()) {
+            return FriendOperationResult.Failure(FriendOperationFailure.EMPTY_MESSAGE)
+        }
+        if (trimmedMessage.length > FRIEND_MESSAGE_MAX_LENGTH) {
+            return FriendOperationResult.Failure(FriendOperationFailure.MESSAGE_TOO_LONG)
+        }
+
+        val session = findHomeVisitSession(visitSessionId)
+            ?: return FriendOperationResult.Failure(FriendOperationFailure.HOME_VISIT_NOT_FOUND)
+        if (session.status != FriendHomeVisitStatus.ACTIVE) {
+            return FriendOperationResult.Failure(FriendOperationFailure.HOME_VISIT_NOT_ACTIVE)
+        }
+
+        val sentMessage = createVisitMessage(
+            visitSessionId = visitSessionId,
+            friendUserId = session.counterpartUserId(),
+            sender = FriendMessageSender.ME,
+            text = trimmedMessage
+        )
+        val replyMessage = createVisitMessage(
+            visitSessionId = visitSessionId,
+            friendUserId = session.counterpartUserId(),
+            sender = FriendMessageSender.FRIEND,
+            text = "같이 있으니까 더 재밌다."
+        )
+
+        _homeVisitMessages.update { messagesByVisit ->
+            val currentMessages = messagesByVisit[visitSessionId].orEmpty()
+            messagesByVisit + (visitSessionId to (currentMessages + sentMessage + replyMessage))
+        }
+
+        return FriendOperationResult.Success(sentMessage)
     }
 
     override suspend fun rejectHomeInvitation(
@@ -451,6 +555,41 @@ class MockFriendRepository(
             text = text,
             sentAtMillis = nowProvider()
         )
+    }
+
+    private fun createVisitMessage(
+        visitSessionId: String,
+        friendUserId: String,
+        sender: FriendMessageSender,
+        text: String
+    ): FriendMessage {
+        val senderUserId = when (sender) {
+            FriendMessageSender.ME -> myProfile.value.userId
+            FriendMessageSender.FRIEND -> friendUserId
+        }
+
+        return FriendMessage(
+            id = "$visitSessionId-message-${nextMessageSequence++}",
+            friendUserId = friendUserId,
+            senderUserId = senderUserId,
+            sender = sender,
+            text = text,
+            sentAtMillis = nowProvider()
+        )
+    }
+
+    private fun findHomeVisitSession(visitSessionId: String): FriendHomeVisitSession? {
+        val visits = _activeHomeVisits.value
+        return (visits.hosting + visits.visiting).firstOrNull { it.id == visitSessionId }
+    }
+
+    private fun FriendHomeVisitSession.counterpartUserId(): String {
+        val currentUserId = myProfile.value.userId
+        return if (hostUser.userId == currentUserId) {
+            visitorUser.userId
+        } else {
+            hostUser.userId
+        }
     }
 
     private suspend fun simulateLatency() {

@@ -1,9 +1,11 @@
 package com.example.lupapj.data.remote.friend
 
 import com.example.lupapj.data.model.friend.FRIEND_MESSAGE_MAX_LENGTH
+import com.example.lupapj.data.model.friend.ActiveFriendHomeVisits
 import com.example.lupapj.data.model.friend.FriendCode
 import com.example.lupapj.data.model.friend.FriendHome
 import com.example.lupapj.data.model.friend.FriendHomeInvitation
+import com.example.lupapj.data.model.friend.FriendHomeVisitSession
 import com.example.lupapj.data.model.friend.FriendMessage
 import com.example.lupapj.data.model.friend.FriendOperationFailure
 import com.example.lupapj.data.model.friend.FriendOperationResult
@@ -39,9 +41,17 @@ class RemoteFriendRepository(
     override val receivedHomeInvitations: StateFlow<List<FriendHomeInvitation>> =
         _receivedHomeInvitations.asStateFlow()
 
+    private val _activeHomeVisits = MutableStateFlow(ActiveFriendHomeVisits())
+    override val activeHomeVisits: StateFlow<ActiveFriendHomeVisits> =
+        _activeHomeVisits.asStateFlow()
+
     private val _friendMessages = MutableStateFlow<Map<String, List<FriendMessage>>>(emptyMap())
     override val friendMessages: StateFlow<Map<String, List<FriendMessage>>> =
         _friendMessages.asStateFlow()
+
+    private val _homeVisitMessages = MutableStateFlow<Map<String, List<FriendMessage>>>(emptyMap())
+    override val homeVisitMessages: StateFlow<Map<String, List<FriendMessage>>> =
+        _homeVisitMessages.asStateFlow()
 
     override fun updateCurrentUser(userId: String?, nickname: String?) {
         _myProfile.update { current ->
@@ -59,12 +69,14 @@ class RemoteFriendRepository(
             val receivedRequests = apiClient.getReceivedFriendRequests().requests.map { it.toDomain() }
             val sentRequests = apiClient.getSentFriendRequests().requests.map { it.toDomain() }
             val receivedHomeInvitations = loadReceivedHomeInvitationsOrNull()
+            val activeHomeVisits = loadActiveHomeVisitsOrNull()
 
             _myProfile.value = currentProfile
             _friends.value = friends
             _receivedRequests.value = receivedRequests
             _sentRequests.value = sentRequests
             receivedHomeInvitations?.let { _receivedHomeInvitations.value = it }
+            activeHomeVisits?.let { _activeHomeVisits.value = it }
         }
     }
 
@@ -164,15 +176,20 @@ class RemoteFriendRepository(
 
     override suspend fun acceptHomeInvitation(
         invitationId: String
-    ): FriendOperationResult<FriendHome> {
+    ): FriendOperationResult<FriendHomeVisitSession> {
         return apiCall {
-            val home = apiClient
+            val visitSession = apiClient
                 .acceptHomeInvitation(invitationId)
-                .toDomain(sceneResolver = sceneResolver)
+                .toHomeVisitSession(sceneResolver = sceneResolver)
             _receivedHomeInvitations.update { invitations ->
                 invitations.filterNot { it.id == invitationId }
             }
-            home
+            _activeHomeVisits.update { visits ->
+                visits.copy(
+                    visiting = listOf(visitSession) + visits.visiting.filterNot { it.id == visitSession.id }
+                )
+            }
+            visitSession
         }
     }
 
@@ -185,6 +202,90 @@ class RemoteFriendRepository(
                 invitations.filterNot { it.id == invitationId }
             }
             invitation
+        }
+    }
+
+    override suspend fun refreshActiveHomeVisits(): FriendOperationResult<ActiveFriendHomeVisits> {
+        return apiCall {
+            val activeHomeVisits = apiClient
+                .getActiveHomeVisits()
+                .toDomain(sceneResolver = sceneResolver)
+            _activeHomeVisits.value = activeHomeVisits
+            activeHomeVisits
+        }
+    }
+
+    override suspend fun leaveHomeVisit(
+        visitSessionId: String
+    ): FriendOperationResult<FriendHomeVisitSession> {
+        return apiCall {
+            val session = apiClient
+                .leaveHomeVisit(visitSessionId)
+                .visitSession
+                .toDomain(sceneResolver = sceneResolver)
+            _activeHomeVisits.update { visits ->
+                visits.copy(
+                    hosting = visits.hosting.filterNot { it.id == visitSessionId },
+                    visiting = visits.visiting.filterNot { it.id == visitSessionId }
+                )
+            }
+            _homeVisitMessages.update { it - visitSessionId }
+            session
+        }
+    }
+
+    override suspend fun getHomeVisitMessages(
+        visitSessionId: String
+    ): FriendOperationResult<List<FriendMessage>> {
+        return apiCall {
+            val friendUserId = findHomeVisitSession(visitSessionId)
+                ?.counterpartUserId()
+                ?: "friend_user"
+            val messages = apiClient
+                .getHomeVisitMessages(visitSessionId)
+                .messages
+                .map {
+                    it.toDomain(
+                        currentUserId = _myProfile.value.userId,
+                        friendUserId = friendUserId
+                    )
+                }
+            _homeVisitMessages.update { it + (visitSessionId to messages) }
+            messages
+        }
+    }
+
+    override suspend fun sendHomeVisitMessage(
+        visitSessionId: String,
+        message: String
+    ): FriendOperationResult<FriendMessage> {
+        val trimmedMessage = message.trim()
+        if (trimmedMessage.isEmpty()) {
+            return FriendOperationResult.Failure(FriendOperationFailure.EMPTY_MESSAGE)
+        }
+        if (trimmedMessage.length > FRIEND_MESSAGE_MAX_LENGTH) {
+            return FriendOperationResult.Failure(FriendOperationFailure.MESSAGE_TOO_LONG)
+        }
+
+        return apiCall {
+            val friendUserId = findHomeVisitSession(visitSessionId)
+                ?.counterpartUserId()
+                ?: "friend_user"
+            val sentMessage = apiClient
+                .sendHomeVisitMessage(
+                    visitSessionId = visitSessionId,
+                    request = SendHomeVisitMessageRequestDto(text = trimmedMessage)
+                )
+                .message
+                .toDomain(
+                    currentUserId = _myProfile.value.userId,
+                    friendUserId = friendUserId
+                )
+            _homeVisitMessages.update { messagesByVisit ->
+                val currentMessages = messagesByVisit[visitSessionId].orEmpty()
+                messagesByVisit + (visitSessionId to (currentMessages + sentMessage))
+            }
+            sentMessage
         }
     }
 
@@ -251,6 +352,32 @@ class RemoteFriendRepository(
             throw exception
         } catch (_: Exception) {
             null
+        }
+    }
+
+    private suspend fun loadActiveHomeVisitsOrNull(): ActiveFriendHomeVisits? {
+        return try {
+            apiClient
+                .getActiveHomeVisits()
+                .toDomain(sceneResolver = sceneResolver)
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun findHomeVisitSession(visitSessionId: String): FriendHomeVisitSession? {
+        val visits = _activeHomeVisits.value
+        return (visits.hosting + visits.visiting).firstOrNull { it.id == visitSessionId }
+    }
+
+    private fun FriendHomeVisitSession.counterpartUserId(): String {
+        val currentUserId = _myProfile.value.userId
+        return if (hostUser.userId == currentUserId) {
+            visitorUser.userId
+        } else {
+            hostUser.userId
         }
     }
 }

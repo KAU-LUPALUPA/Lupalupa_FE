@@ -1,6 +1,7 @@
 package com.example.lupapj.data.model.friend
 
 import com.example.lupapj.data.model.RoomUiState
+import com.example.lupapj.data.model.scene.PetSceneState
 
 const val FRIEND_MESSAGE_MAX_LENGTH = 120
 
@@ -67,6 +68,12 @@ enum class FriendHomeInvitationStatus {
     EXPIRED
 }
 
+enum class FriendHomeVisitStatus {
+    ACTIVE,
+    ENDED,
+    EXPIRED
+}
+
 enum class FriendshipStatus {
     NONE,
     PENDING_SENT,
@@ -110,6 +117,23 @@ data class FriendHome(
     val snapshotAtMillis: Long? = null
 )
 
+data class FriendHomeVisitSession(
+    val id: String,
+    val hostUser: FriendUser,
+    val visitorUser: FriendUser,
+    val status: FriendHomeVisitStatus,
+    val startedAtMillis: Long,
+    val endedAtMillis: Long? = null,
+    val expiresAtMillis: Long? = null,
+    val hostHome: FriendHome? = null,
+    val visitorPet: PetSceneState? = null
+)
+
+data class ActiveFriendHomeVisits(
+    val hosting: List<FriendHomeVisitSession> = emptyList(),
+    val visiting: List<FriendHomeVisitSession> = emptyList()
+)
+
 enum class FriendMessageSender {
     ME,
     FRIEND
@@ -143,6 +167,10 @@ enum class FriendOperationFailure {
     NOT_HOME_INVITATION_RECEIVER,
     NOT_HOME_INVITATION_SENDER,
     FRIEND_HOME_UNAVAILABLE,
+    HOME_VISIT_ALREADY_ACTIVE,
+    HOME_VISIT_NOT_FOUND,
+    HOME_VISIT_NOT_ACTIVE,
+    NOT_HOME_VISIT_PARTICIPANT,
     BLOCKED,
     UNKNOWN
 }

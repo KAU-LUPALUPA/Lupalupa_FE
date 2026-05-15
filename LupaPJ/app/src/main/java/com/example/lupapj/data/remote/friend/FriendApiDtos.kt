@@ -46,7 +46,8 @@ data class FriendHomeInvitationResponseDto(
 
 data class AcceptHomeInvitationResponseDto(
     val invitation: FriendHomeInvitationDto,
-    val homeSnapshot: FriendHomeSnapshotDto
+    val homeSnapshot: FriendHomeSnapshotDto,
+    val visitSession: FriendHomeVisitSessionDto? = null
 )
 
 data class FriendHomeResponseDto(
@@ -67,6 +68,28 @@ data class SendFriendMessageRequestDto(
 
 data class FriendMessageResponseDto(
     val message: FriendMessageDto
+)
+
+data class ActiveHomeVisitsResponseDto(
+    val hosting: List<FriendHomeVisitSessionDto> = emptyList(),
+    val visiting: List<FriendHomeVisitSessionDto> = emptyList()
+)
+
+data class FriendHomeVisitSessionResponseDto(
+    val visitSession: FriendHomeVisitSessionDto
+)
+
+data class HomeVisitMessagesResponseDto(
+    val messages: List<HomeVisitMessageDto>,
+    val nextCursor: String? = null
+)
+
+data class SendHomeVisitMessageRequestDto(
+    val text: String
+)
+
+data class HomeVisitMessageResponseDto(
+    val message: HomeVisitMessageDto
 )
 
 data class FriendUserDto(
@@ -111,6 +134,26 @@ data class FriendHomeInvitationDto(
 data class FriendMessageDto(
     val id: String,
     val friendUserId: String,
+    val senderUserId: String,
+    val text: String,
+    val sentAt: String
+)
+
+data class FriendHomeVisitSessionDto(
+    val id: String,
+    val hostUser: FriendUserDto,
+    val visitorUser: FriendUserDto,
+    val status: String,
+    val startedAt: String,
+    val endedAt: String? = null,
+    val expiresAt: String? = null,
+    val hostHomeSnapshot: FriendHomeSnapshotDto? = null,
+    val visitorPetSnapshot: FriendPetSnapshotDto? = null
+)
+
+data class HomeVisitMessageDto(
+    val id: String,
+    val visitSessionId: String,
     val senderUserId: String,
     val text: String,
     val sentAt: String

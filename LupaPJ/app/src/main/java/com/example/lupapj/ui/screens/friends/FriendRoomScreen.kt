@@ -190,7 +190,7 @@ fun FriendRoomScreen(
 }
 
 @Composable
-private fun FriendRoomChatPanel(
+fun FriendRoomChatPanel(
     ownerName: String,
     messages: List<FriendMessage>,
     messageInput: String,

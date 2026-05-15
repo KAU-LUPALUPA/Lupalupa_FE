@@ -6,10 +6,13 @@ import com.example.lupapj.data.model.PetPersonality
 import com.example.lupapj.data.model.PetStatus
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.model.RoomObjectType
+import com.example.lupapj.data.model.friend.ActiveFriendHomeVisits
 import com.example.lupapj.data.model.friend.FriendCode
 import com.example.lupapj.data.model.friend.FriendHome
 import com.example.lupapj.data.model.friend.FriendHomeInvitation
 import com.example.lupapj.data.model.friend.FriendHomeInvitationStatus
+import com.example.lupapj.data.model.friend.FriendHomeVisitSession
+import com.example.lupapj.data.model.friend.FriendHomeVisitStatus
 import com.example.lupapj.data.model.friend.FriendMessage
 import com.example.lupapj.data.model.friend.FriendMessageSender
 import com.example.lupapj.data.model.friend.FriendOperationFailure
@@ -20,6 +23,7 @@ import com.example.lupapj.data.model.friend.FriendUser
 import com.example.lupapj.data.model.friend.FriendshipStatus
 import com.example.lupapj.data.model.initialRoomUiState
 import com.example.lupapj.data.model.scene.FloorAnchor
+import com.example.lupapj.data.model.scene.PetSceneState
 import com.example.lupapj.data.model.scene.FloorTilePlacement
 import com.example.lupapj.data.model.scene.RoomSceneDefinition
 import com.example.lupapj.data.model.scene.SceneObjectDefinition
@@ -121,6 +125,61 @@ internal fun AcceptHomeInvitationResponseDto.toDomain(
     )
 }
 
+internal fun AcceptHomeInvitationResponseDto.toHomeVisitSession(
+    sceneResolver: (String) -> RoomSceneDefinition
+): FriendHomeVisitSession {
+    return requireNotNull(visitSession) {
+        "Accept home invitation response is missing visitSession."
+    }.toDomain(sceneResolver)
+}
+
+internal fun ActiveHomeVisitsResponseDto.toDomain(
+    sceneResolver: (String) -> RoomSceneDefinition
+): ActiveFriendHomeVisits {
+    return ActiveFriendHomeVisits(
+        hosting = hosting.map { it.toDomain(sceneResolver) },
+        visiting = visiting.map { it.toDomain(sceneResolver) }
+    )
+}
+
+internal fun FriendHomeVisitSessionDto.toDomain(
+    sceneResolver: (String) -> RoomSceneDefinition
+): FriendHomeVisitSession {
+    return FriendHomeVisitSession(
+        id = id,
+        hostUser = hostUser.toDomain(),
+        visitorUser = visitorUser.toDomain(),
+        status = enumValueOrDefault(status, FriendHomeVisitStatus.ACTIVE),
+        startedAtMillis = startedAt.toEpochMillis(),
+        endedAtMillis = endedAt?.toEpochMillis(),
+        expiresAtMillis = expiresAt?.toEpochMillis(),
+        hostHome = hostHomeSnapshot?.toDomain(
+            sceneResolver = sceneResolver,
+            fallbackOwner = hostUser,
+            fallbackVisitedAt = startedAt
+        ),
+        visitorPet = visitorPetSnapshot?.toPetSceneState()
+    )
+}
+
+internal fun HomeVisitMessageDto.toDomain(
+    currentUserId: String,
+    friendUserId: String
+): FriendMessage {
+    return FriendMessage(
+        id = id,
+        friendUserId = friendUserId,
+        senderUserId = senderUserId,
+        sender = if (senderUserId == currentUserId) {
+            FriendMessageSender.ME
+        } else {
+            FriendMessageSender.FRIEND
+        },
+        text = text,
+        sentAtMillis = sentAt.toEpochMillis()
+    )
+}
+
 private fun FriendHomeSnapshotDto.toDomain(
     sceneResolver: (String) -> RoomSceneDefinition,
     fallbackOwner: FriendUserDto? = null,
@@ -161,6 +220,10 @@ internal fun FriendApiException.toFriendOperationFailure(): FriendOperationFailu
         "NOT_HOME_INVITATION_RECEIVER" -> FriendOperationFailure.NOT_HOME_INVITATION_RECEIVER
         "NOT_HOME_INVITATION_SENDER" -> FriendOperationFailure.NOT_HOME_INVITATION_SENDER
         "FRIEND_HOME_UNAVAILABLE" -> FriendOperationFailure.FRIEND_HOME_UNAVAILABLE
+        "HOME_VISIT_ALREADY_ACTIVE" -> FriendOperationFailure.HOME_VISIT_ALREADY_ACTIVE
+        "HOME_VISIT_NOT_FOUND" -> FriendOperationFailure.HOME_VISIT_NOT_FOUND
+        "HOME_VISIT_NOT_ACTIVE" -> FriendOperationFailure.HOME_VISIT_NOT_ACTIVE
+        "NOT_HOME_VISIT_PARTICIPANT" -> FriendOperationFailure.NOT_HOME_VISIT_PARTICIPANT
         "BLOCKED" -> FriendOperationFailure.BLOCKED
         else -> FriendOperationFailure.UNKNOWN
     }
@@ -305,6 +368,21 @@ private fun FriendPetConditionDto.toDomain(): PetStatus {
         satiety = satiety.coerceIn(0, 100),
         vitality = vitality.coerceIn(0, 100),
         isEgg = isEgg
+    )
+}
+
+private fun FriendPetSnapshotDto.toPetSceneState(): PetSceneState {
+    return PetSceneState(
+        petId = petId,
+        ownerUserId = ownerUserId,
+        name = name,
+        characterAssetKey = characterAssetKey,
+        appearance = appearance.toDomain(),
+        status = condition.toDomain(),
+        personality = enumValueOrDefault(personality, PetPersonality.ACTIVE),
+        equippedItemIds = equippedItemIds,
+        action = enumValueOrDefault(sceneState.action, PetAction.IDLE),
+        anchor = sceneState.anchor.toFloorAnchor()
     )
 }
 

@@ -201,6 +201,13 @@ fun LupaApp(deepLink: Uri? = null) {
                     mailboxVisible = uiState.mailboxVisible,
                     friendRequests = uiState.receivedFriendRequests,
                     homeInvitations = uiState.receivedHomeInvitations,
+                    hostingHomeVisitSessions = uiState.hostingHomeVisitSessions,
+                    hostingVisitMessages = uiState.friendRoomMessages,
+                    hostingVisitMessageInput = uiState.friendMessageInput,
+                    isSendingHostingVisitMessage = uiState.isSendingFriendMessage,
+                    onHostingVisitMessageInputChange = appViewModel::onFriendMessageChange,
+                    onSendHostingVisitMessage = appViewModel::sendFriendMessage,
+                    onEndHostingVisit = appViewModel::endActiveHomeVisit,
                     onMailboxClick = appViewModel::openMailbox,
                     onMailboxDismiss = appViewModel::closeMailbox,
                     onAcceptFriendRequest = appViewModel::acceptFriendRequest,
@@ -247,8 +254,10 @@ fun LupaApp(deepLink: Uri? = null) {
 
         AppPhase.FRIEND_ROOM -> {
             FriendRoomScreen(
-                friendHome = uiState.visitingFriendHome,
-                visitorPet = uiState.room?.houseSceneState?.pet,
+                friendHome = uiState.activeHomeVisitSession?.hostHome
+                    ?: uiState.visitingFriendHome,
+                visitorPet = uiState.activeHomeVisitSession?.visitorPet
+                    ?: uiState.room?.houseSceneState?.pet,
                 isLoading = uiState.isLoadingFriendHome,
                 messages = uiState.friendRoomMessages,
                 messageInput = uiState.friendMessageInput,

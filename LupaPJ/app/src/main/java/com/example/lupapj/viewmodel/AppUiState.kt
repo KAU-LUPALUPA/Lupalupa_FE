@@ -6,6 +6,7 @@ import com.example.lupapj.data.model.MainMenuAction
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.model.friend.FriendHome
 import com.example.lupapj.data.model.friend.FriendHomeInvitation
+import com.example.lupapj.data.model.friend.FriendHomeVisitSession
 import com.example.lupapj.data.model.friend.FriendMessage
 import com.example.lupapj.data.model.friend.FriendRequest
 import com.example.lupapj.data.model.friend.FriendSummary
@@ -33,6 +34,8 @@ data class AppUiState(
     val pendingHomeInvitationFriendId: String? = null,
     val isLoadingFriendHome: Boolean = false,
     val visitingFriendHome: FriendHome? = null,
+    val activeHomeVisitSession: FriendHomeVisitSession? = null,
+    val hostingHomeVisitSessions: List<FriendHomeVisitSession> = emptyList(),
     val friendRoomMessages: List<FriendMessage> = emptyList(),
     val friendMessageInput: String = "",
     val isSendingFriendMessage: Boolean = false,

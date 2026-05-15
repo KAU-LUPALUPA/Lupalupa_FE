@@ -11,11 +11,12 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,10 +43,13 @@ import androidx.core.view.drawToBitmap
 import com.example.lupapj.R
 import com.example.lupapj.data.model.BottomNavItem
 import com.example.lupapj.data.model.MainMenuAction
+import com.example.lupapj.data.model.PetAction
 import com.example.lupapj.data.model.iconRes
 import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.model.friend.FriendHomeInvitation
+import com.example.lupapj.data.model.friend.FriendHomeVisitSession
+import com.example.lupapj.data.model.friend.FriendMessage
 import com.example.lupapj.data.model.friend.FriendRequest
 import com.example.lupapj.data.model.scene.FloorAnchor
 import com.example.lupapj.ui.components.FloatingMailboxButton
@@ -53,6 +57,7 @@ import com.example.lupapj.ui.components.InventorySheet
 import com.example.lupapj.ui.components.MailboxSheet
 import com.example.lupapj.ui.components.RoomViewport
 import com.example.lupapj.ui.preview.previewRoomUiState
+import com.example.lupapj.ui.screens.friends.FriendRoomChatPanel
 import com.example.lupapj.ui.theme.LupaPJTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
@@ -94,6 +99,13 @@ fun RoomScreen(
     mailboxVisible: Boolean,
     friendRequests: List<FriendRequest>,
     homeInvitations: List<FriendHomeInvitation>,
+    hostingHomeVisitSessions: List<FriendHomeVisitSession>,
+    hostingVisitMessages: List<FriendMessage>,
+    hostingVisitMessageInput: String,
+    isSendingHostingVisitMessage: Boolean,
+    onHostingVisitMessageInputChange: (String) -> Unit,
+    onSendHostingVisitMessage: () -> Unit,
+    onEndHostingVisit: () -> Unit,
     onMailboxClick: () -> Unit,
     onMailboxDismiss: () -> Unit,
     onAcceptFriendRequest: (String) -> Unit,
@@ -120,6 +132,13 @@ fun RoomScreen(
 
     val room = uiState ?: return
     val mailboxItemCount = friendRequests.size + homeInvitations.size
+    val activeHostingVisitSession = hostingHomeVisitSessions.firstOrNull()
+    val visitingCompanionPets = hostingHomeVisitSessions.mapNotNull { session ->
+        session.visitorPet?.copy(
+            petId = "${session.id}_${session.visitorPet.petId}",
+            action = PetAction.IDLE
+        )
+    }
 
     // [추가됨] 카메라 모드 진입 시 캐릭터를 중앙에 두도록 자동 확대
     LaunchedEffect(room.isCameraMode) {
@@ -148,6 +167,7 @@ fun RoomScreen(
                 // 1. 배경 레이어: 블러 처리된 비확대 뷰포트 (프레임 바깥 영역을 담당)
                 RoomViewport(
                     uiState = room,
+                    companionPets = visitingCompanionPets,
                     onRoomObjectClick = {},
                     onFloorTap = {},
                     modifier = Modifier
@@ -176,6 +196,7 @@ fun RoomScreen(
 
                 RoomViewport(
                     uiState = room,
+                    companionPets = visitingCompanionPets,
                     onRoomObjectClick = onRoomObjectClick,
                     onFloorTap = onFloorTap,
                     modifier = Modifier
@@ -209,11 +230,58 @@ fun RoomScreen(
                     roomContent = {
                         RoomViewport(
                             uiState = room,
+                            companionPets = visitingCompanionPets,
                             onRoomObjectClick = onRoomObjectClick,
                             onFloorTap = onFloorTap,
                             onDroppedToyClick = onDroppedToyClick,
                             modifier = Modifier.fillMaxSize()
                         )
+
+                        if (hostingHomeVisitSessions.isNotEmpty()) {
+                            val visitorNames = hostingHomeVisitSessions
+                                .map { it.visitorUser.nickname }
+                                .distinct()
+                                .joinToString(", ")
+                            Surface(
+                                shape = RoundedCornerShape(18.dp),
+                                color = Color(0xFFEADFD3).copy(alpha = 0.94f),
+                                shadowElevation = 6.dp,
+                                modifier = Modifier
+                                    .align(Alignment.TopCenter)
+                                    .padding(top = 112.dp, start = 16.dp, end = 16.dp)
+                                    .fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "${visitorNames}님이 놀러왔어요.",
+                                        color = Color(0xFF5C4033),
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    TextButton(onClick = onEndHostingVisit) {
+                                        Text("방문 종료", color = Color(0xFF7F5539))
+                                    }
+                                }
+                            }
+                        }
+
+                        if (activeHostingVisitSession != null) {
+                            FriendRoomChatPanel(
+                                ownerName = activeHostingVisitSession.visitorUser.nickname,
+                                messages = hostingVisitMessages,
+                                messageInput = hostingVisitMessageInput,
+                                isSendingMessage = isSendingHostingVisitMessage,
+                                onMessageInputChange = onHostingVisitMessageInputChange,
+                                onSendMessage = onSendHostingVisitMessage,
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(12.dp)
+                                    .imePadding()
+                            )
+                        }
                         
                         // [추가됨(권)] 행동 디버깅 토글 버튼
                         androidx.compose.material3.TextButton(
@@ -495,6 +563,13 @@ private fun RoomScreenPreview() {
             mailboxVisible = false,
             friendRequests = emptyList(),
             homeInvitations = emptyList(),
+            hostingHomeVisitSessions = emptyList(),
+            hostingVisitMessages = emptyList(),
+            hostingVisitMessageInput = "",
+            isSendingHostingVisitMessage = false,
+            onHostingVisitMessageInputChange = {},
+            onSendHostingVisitMessage = {},
+            onEndHostingVisit = {},
             onMailboxClick = {},
             onMailboxDismiss = {},
             onAcceptFriendRequest = {},

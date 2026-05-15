@@ -69,6 +69,25 @@ interface FriendRetrofitService {
         @Path("invitationId") invitationId: String
     ): Response<FriendHomeInvitationResponseDto>
 
+    @GET("friends/home-visits/active")
+    suspend fun getActiveHomeVisits(): Response<ActiveHomeVisitsResponseDto>
+
+    @POST("friends/home-visits/{visitSessionId}/leave")
+    suspend fun leaveHomeVisit(
+        @Path("visitSessionId") visitSessionId: String
+    ): Response<FriendHomeVisitSessionResponseDto>
+
+    @GET("friends/home-visits/{visitSessionId}/messages")
+    suspend fun getHomeVisitMessages(
+        @Path("visitSessionId") visitSessionId: String
+    ): Response<HomeVisitMessagesResponseDto>
+
+    @POST("friends/home-visits/{visitSessionId}/messages")
+    suspend fun sendHomeVisitMessage(
+        @Path("visitSessionId") visitSessionId: String,
+        @Body request: SendHomeVisitMessageRequestDto
+    ): Response<HomeVisitMessageResponseDto>
+
     @GET("friends/{friendUserId}/messages")
     suspend fun getFriendMessages(
         @Path("friendUserId") friendUserId: String,
