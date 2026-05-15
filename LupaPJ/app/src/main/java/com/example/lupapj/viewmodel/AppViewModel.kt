@@ -219,7 +219,7 @@ class AppViewModel(
 
             _uiState.update {
                 it.copy(
-                    phase = AppPhase.ROOM,
+                    phase = AppPhase.SPLASH_LOADING,
                     authPopupVisible = false,
                     isProcessingLogin = false,
                     room = room,
@@ -227,7 +227,6 @@ class AppViewModel(
                     userId = resolvedUserId // [수정됨(권)] 하트비트 로직을 위한 유저 식별자 저장
                 )
             }
-            startPetConditionTicker()
         }
     }
 
@@ -256,7 +255,7 @@ class AppViewModel(
 
             _uiState.update {
                 it.copy(
-                    phase = AppPhase.ROOM,
+                    phase = AppPhase.SPLASH_LOADING,
                     authPopupVisible = false,
                     isProcessingLogin = false,
                     room = room,
@@ -266,8 +265,27 @@ class AppViewModel(
                     plazaFeedbackMessage = null
                 )
             }
-            startPetConditionTicker()
         }
+    }
+
+    fun onSplashComplete() {
+        _uiState.update {
+            it.copy(
+                phase = AppPhase.START_PROMPT,
+                authPopupVisible = false
+            )
+        }
+        viewModelScope.launch {
+            delay(150)
+            _uiState.update { it.copy(authPopupVisible = true) }
+        }
+    }
+
+    fun startRoomPhase() {
+        _uiState.update {
+            it.copy(phase = AppPhase.ROOM)
+        }
+        startPetConditionTicker()
     }
 
     fun onButtonAClick() {

@@ -40,6 +40,7 @@ import com.example.lupapj.ui.screens.minigame.MinigameScreen
 import com.example.lupapj.ui.screens.plaza.PlazaScreen
 import com.example.lupapj.ui.screens.shop.ShopDetailScreen
 import com.example.lupapj.ui.screens.shop.ShopScreen
+import com.example.lupapj.ui.screens.splash.SplashScreen
 import com.example.lupapj.viewmodel.AppViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -152,15 +153,34 @@ fun LupaApp(deepLink: Uri? = null) {
     }
 
     when (uiState.phase) {
-        AppPhase.MAIN_LOADING -> {
+        AppPhase.LOGIN_PROMPT -> {
             MainLoadingScreen(
-                loadingMessage = uiState.loadingMessage,
-                authPopupVisible = uiState.authPopupVisible,
+                promptText = "로그인하시려면 화면을 터치하세요",
+                showGalleryFrame = false,
+                isPromptReady = uiState.authPopupVisible,
+                isLoginMode = true,
                 isProcessingLogin = uiState.isProcessingLogin,
-                galleryImages = uiState.galleryImages,
+                galleryImages = emptyList(),
                 isDevLoginEnabled = BuildConfig.DEBUG,
                 onKakaoLoginClick = appViewModel::onKakaoLoginClick,
                 onDevLoginClick = appViewModel::onDevLoginClick
+            )
+        }
+
+        AppPhase.SPLASH_LOADING -> {
+            SplashScreen(onSplashComplete = appViewModel::onSplashComplete)
+        }
+
+        AppPhase.START_PROMPT -> {
+            MainLoadingScreen(
+                promptText = "게임을 시작하시려면 화면을 터치하세요",
+                showGalleryFrame = true,
+                isPromptReady = uiState.authPopupVisible,
+                isLoginMode = false,
+                galleryImages = uiState.galleryImages,
+                onStartClick = appViewModel::startRoomPhase,
+                onKakaoLoginClick = {}, // Not used
+                onDevLoginClick = {} // Not used
             )
         }
 

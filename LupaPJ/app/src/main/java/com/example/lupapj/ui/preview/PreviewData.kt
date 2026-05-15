@@ -14,7 +14,7 @@ import com.example.lupapj.data.model.scene.initialHouseSceneState
 import com.example.lupapj.viewmodel.AppUiState
 
 val previewLoadingUiState = AppUiState(
-    phase = AppPhase.MAIN_LOADING,
+    phase = AppPhase.LOGIN_PROMPT,
     loadingMessage = "로딩 완료",
     authPopupVisible = true
 )
