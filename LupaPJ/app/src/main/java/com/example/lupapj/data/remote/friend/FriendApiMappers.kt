@@ -5,6 +5,7 @@ import com.example.lupapj.data.model.PetAppearance
 import com.example.lupapj.data.model.PetPersonality
 import com.example.lupapj.data.model.PetStatus
 import com.example.lupapj.data.model.RoomUiState
+import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.friend.FriendCode
 import com.example.lupapj.data.model.friend.FriendHome
 import com.example.lupapj.data.model.friend.FriendHomeInvitation
@@ -19,8 +20,14 @@ import com.example.lupapj.data.model.friend.FriendUser
 import com.example.lupapj.data.model.friend.FriendshipStatus
 import com.example.lupapj.data.model.initialRoomUiState
 import com.example.lupapj.data.model.scene.FloorAnchor
+import com.example.lupapj.data.model.scene.FloorTilePlacement
 import com.example.lupapj.data.model.scene.RoomSceneDefinition
+import com.example.lupapj.data.model.scene.SceneObjectDefinition
+import com.example.lupapj.data.model.scene.TileAnchorMode
+import com.example.lupapj.data.model.scene.TileCoord
+import com.example.lupapj.data.model.scene.TileFootprint
 import com.example.lupapj.data.model.scene.initialHouseSceneState
+import com.example.lupapj.data.model.scene.toFloorAnchor
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneId
@@ -93,7 +100,7 @@ internal fun FriendMessageDto.toDomain(currentUserId: String): FriendMessage {
 internal fun FriendHomeResponseDto.toDomain(
     sceneResolver: (String) -> RoomSceneDefinition
 ): FriendHome {
-    val sceneDefinition = sceneResolver(room.sceneId)
+    val sceneDefinition = room.toSceneDefinition(sceneResolver)
     return FriendHome(
         owner = owner.toDomain(),
         room = room.toDomainRoomState(
@@ -119,7 +126,7 @@ private fun FriendHomeSnapshotDto.toDomain(
     fallbackOwner: FriendUserDto? = null,
     fallbackVisitedAt: String? = null
 ): FriendHome {
-    val sceneDefinition = sceneResolver(room.sceneId)
+    val sceneDefinition = room.toSceneDefinition(sceneResolver)
     val ownerDto = owner ?: fallbackOwner ?: fallbackFriendUserDto()
     return FriendHome(
         owner = ownerDto.toDomain(),
@@ -208,6 +215,71 @@ private fun FriendRoomDto.toDomainRoomState(
             } ?: PetAction.IDLE
         )
     )
+}
+
+private fun FriendRoomDto.toSceneDefinition(
+    sceneResolver: (String) -> RoomSceneDefinition
+): RoomSceneDefinition {
+    val baseScene = sceneResolver(sceneId)
+    return baseScene.copy(
+        wallAssetKey = wallAssetKey ?: baseScene.wallAssetKey,
+        floorAssetKey = floorAssetKey ?: baseScene.floorAssetKey,
+        objects = placedItems.toSceneObjects(baseScene)
+    )
+}
+
+private fun List<FriendPlacedItemDto>.toSceneObjects(
+    baseScene: RoomSceneDefinition
+): List<SceneObjectDefinition> {
+    return mapNotNull { placedItem ->
+        val type = placedItem.objectType.toRoomObjectTypeOrNull()
+            ?: placedItem.itemId.toRoomObjectTypeOrNull()
+            ?: return@mapNotNull null
+        val template = baseScene.objects.firstOrNull { it.type == type }
+            ?: return@mapNotNull null
+        val tilePlacement = placedItem.tile?.toFloorTilePlacement()
+        val anchor = tilePlacement?.toFloorAnchor(baseScene.projectionSpec)
+            ?: FloorAnchor(
+                u = placedItem.anchor.u.coerceIn(0f, 1f),
+                v = placedItem.anchor.v.coerceIn(0f, 1f)
+            )
+
+        template.copy(
+            id = placedItem.placedItemId,
+            anchor = anchor,
+            tilePlacement = tilePlacement,
+            clickable = false
+        )
+    }
+}
+
+private fun FriendTileDto.toFloorTilePlacement(): FloorTilePlacement {
+    return FloorTilePlacement(
+        tile = TileCoord(
+            x = x.coerceAtLeast(0),
+            y = y.coerceAtLeast(0)
+        ),
+        footprint = TileFootprint(
+            widthTiles = widthTiles.coerceAtLeast(1),
+            depthTiles = depthTiles.coerceAtLeast(1)
+        ),
+        anchorMode = enumValueOrDefault(anchorMode, TileAnchorMode.CENTER)
+    )
+}
+
+private fun String?.toRoomObjectTypeOrNull(): RoomObjectType? {
+    val normalized = this
+        ?.uppercase()
+        ?.replace(Regex("[^A-Z0-9]+"), "_")
+        ?: return null
+
+    return when {
+        "BED" in normalized -> RoomObjectType.BED
+        "TOY" in normalized -> RoomObjectType.TOY_BOX
+        "FOOD" in normalized || "FEED" in normalized -> RoomObjectType.FOOD_BAG
+        "WINDOW" in normalized -> RoomObjectType.WINDOW
+        else -> null
+    }
 }
 
 private fun FriendPetAppearanceDto.toDomain(): PetAppearance {

@@ -8,8 +8,8 @@
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
         <option name="modules">
           <set>
-            <option value="$PROJECT_DIR$" />
-            <option value="$PROJECT_DIR$/app" />
+            <option value="$PROJECT_DIR$/../../../../루파루파/FE/Lupalupa_FE/LupaPJ" />
+            <option value="$PROJECT_DIR$/../../../../루파루파/FE/Lupalupa_FE/LupaPJ/app" />
           </set>
         </option>
       </GradleProjectSettings>

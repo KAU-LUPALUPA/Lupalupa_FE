@@ -102,7 +102,8 @@ fun LupaApp(deepLink: Uri? = null) {
     LaunchedEffect(deepLink) {
         val token = deepLink?.getQueryParameter("accessToken")
         val nickname = deepLink?.getQueryParameter("nickname")
-        val uid = deepLink?.getQueryParameter("uid")
+        val uid = deepLink?.getQueryParameter("userId")
+            ?: deepLink?.getQueryParameter("uid")
 
         if (!token.isNullOrBlank()) {
 
