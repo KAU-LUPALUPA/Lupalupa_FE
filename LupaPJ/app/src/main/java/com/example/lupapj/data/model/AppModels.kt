@@ -126,7 +126,10 @@ data class RoomUiState(
 
     val rearrangeMode: Boolean = false,
 
-    val selectedRearrangeObjectType: RoomObjectType? = null
+    val selectedRearrangeObjectType: RoomObjectType? = null,
+    val layoutRevision: Int? = null,
+    val layoutHash: String? = null,
+    val layoutUpdatedAt: String? = null
 ) {
     val statusText: String
         get() = when {

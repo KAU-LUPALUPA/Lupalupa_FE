@@ -85,9 +85,9 @@ class MockFriendRepositoryTest {
         val result = repository.acceptHomeInvitation(invitation.id)
 
         assertTrue(result is FriendOperationResult.Success)
-        val home = (result as FriendOperationResult.Success).value
-        assertEquals(DemoFriendUsers.alreadyFriend.userId, home.owner.userId)
-        assertEquals(DemoScenes.mainRoom.id, home.room.sceneDefinition.id)
+        val session = (result as FriendOperationResult.Success).value
+        assertEquals(DemoFriendUsers.alreadyFriend.userId, session.hostUser.userId)
+        assertEquals(DemoScenes.mainRoom.id, session.hostHome?.room?.sceneDefinition?.id)
         assertTrue(repository.receivedHomeInvitations.value.isEmpty())
     }
 

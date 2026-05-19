@@ -11,13 +11,13 @@ class PetConditionPolicyTest {
         val result = advancePetCondition(
             status = PetStatus(satiety = 80, vitality = 80),
             action = PetAction.IDLE,
-            elapsedSeconds = 5L,
+            elapsedSeconds = 10L,
             remainder = PetConditionTickRemainder()
         )
 
-        assertEquals(79, result.status.satiety)
+        assertEquals(78, result.status.satiety)
         assertEquals(79, result.status.vitality)
-        assertEquals(1L, result.remainder.vitalityDecaySeconds)
+        assertEquals(0L, result.remainder.vitalityDecaySeconds)
     }
 
     @Test
@@ -31,12 +31,12 @@ class PetConditionPolicyTest {
         val second = advancePetCondition(
             status = first.status,
             action = PetAction.IDLE,
-            elapsedSeconds = 2L,
+            elapsedSeconds = 7L,
             remainder = first.remainder
         )
 
         assertEquals(80, first.status.satiety)
-        assertEquals(79, second.status.satiety)
+        assertEquals(78, second.status.satiety)
     }
 
     @Test
@@ -44,7 +44,7 @@ class PetConditionPolicyTest {
         val result = advancePetCondition(
             status = PetStatus(satiety = 80, vitality = 97),
             action = PetAction.RESTING,
-            elapsedSeconds = 2L,
+            elapsedSeconds = 20L,
             remainder = PetConditionTickRemainder()
         )
 

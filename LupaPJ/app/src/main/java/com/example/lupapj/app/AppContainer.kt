@@ -3,7 +3,6 @@ package com.example.lupapj.app
 import android.content.Context
 import com.example.lupapj.data.mock.MockAuthRepository
 import com.example.lupapj.data.mock.DemoScenes
-import com.example.lupapj.data.mock.MockRoomRepository
 import com.example.lupapj.data.model.friend.FriendCode
 import com.example.lupapj.data.model.friend.FriendUser
 import com.example.lupapj.data.model.scene.RoomSceneId
@@ -28,6 +27,9 @@ import com.example.lupapj.data.remote.friend.RetrofitFriendApiClient
 import com.example.lupapj.data.remote.plaza.PlazaRetrofitService
 import com.example.lupapj.data.remote.plaza.RemotePlazaRepository
 import com.example.lupapj.data.remote.plaza.RetrofitPlazaApiClient
+import com.example.lupapj.data.remote.room.RemoteRoomRepository
+import com.example.lupapj.data.remote.room.RetrofitRoomLayoutApiClient
+import com.example.lupapj.data.remote.room.RoomRetrofitService
 import okhttp3.OkHttpClient // [추가됨(권)]
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -57,13 +59,19 @@ class AppContainer(context: Context) {
         retrofit.create(FriendRetrofitService::class.java)
     private val plazaRetrofitService: PlazaRetrofitService =
         retrofit.create(PlazaRetrofitService::class.java)
+    private val roomRetrofitService: RoomRetrofitService =
+        retrofit.create(RoomRetrofitService::class.java)
     
     // [수정됨(권)] DataSource 인스턴스화
     private val currencyRemoteDataSource = CurrencyRemoteDataSource(currencyApiService)
 
     val authRepository: AuthRepository = MockAuthRepository()
     private val roomLocalCache = com.example.lupapj.data.local.RoomLocalCache(appContext)
-    val roomRepository: RoomRepository = MockRoomRepository(roomLocalCache)
+    val roomRepository: RoomRepository = RemoteRoomRepository(
+        apiClient = RetrofitRoomLayoutApiClient(roomRetrofitService),
+        localCache = roomLocalCache,
+        sceneResolver = { sceneId -> DemoScenes.sceneFor(RoomSceneId(sceneId)) }
+    )
 
     val friendRepository: FriendRepository = RemoteFriendRepository(
         apiClient = RetrofitFriendApiClient(friendRetrofitService),

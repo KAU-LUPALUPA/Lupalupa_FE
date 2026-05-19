@@ -9,7 +9,7 @@ import com.example.lupapj.data.model.scene.HouseSceneState
 import com.example.lupapj.data.model.scene.RoomSceneId
 import com.example.lupapj.data.model.scene.initialHouseSceneState
 
-internal fun PetDto.toHouseSceneState(
+fun PetDto.toHouseSceneState(
     sceneId: RoomSceneId
 ): HouseSceneState {
     return initialHouseSceneState(
@@ -27,7 +27,7 @@ internal fun PetDto.toHouseSceneState(
     )
 }
 
-internal fun PetAppearanceDto.toDomain(): PetAppearance {
+fun PetAppearanceDto.toDomain(): PetAppearance {
     return PetAppearance(
         headSizeScale = headSizeScale,
         bodySizeScale = bodySizeScale,
@@ -37,7 +37,7 @@ internal fun PetAppearanceDto.toDomain(): PetAppearance {
     )
 }
 
-internal fun PetStatusDto.toDomain(): PetStatus {
+fun PetStatusDto.toDomain(): PetStatus {
     return PetStatus(
         satiety = satiety.coerceIn(0, 100),
         vitality = vitality.coerceIn(0, 100),
@@ -45,7 +45,7 @@ internal fun PetStatusDto.toDomain(): PetStatus {
     )
 }
 
-internal fun PetAnchorDto.toFloorAnchor(): FloorAnchor {
+fun PetAnchorDto.toFloorAnchor(): FloorAnchor {
     return FloorAnchor(
         u = u.coerceIn(0f, 1f),
         v = v.coerceIn(0f, 1f)

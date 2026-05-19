@@ -35,7 +35,9 @@ import com.example.lupapj.data.model.applyFeedRecovery
 import com.example.lupapj.data.model.scene.autonomousMovementProfileFor
 import com.example.lupapj.data.model.scene.chooseAutonomousPetTarget
 import com.example.lupapj.data.model.scene.updatePet
+import com.example.lupapj.data.remote.room.RoomLayoutApiException
 import com.example.lupapj.data.repository.PlazaRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -502,11 +504,52 @@ class AppViewModel(
         viewModelScope.launch {
             val confirmedRoom = com.example.lupapj.ui.screens.main.RearrangeController.confirm(room)
 
-            val savedRoom = roomRepository.saveRoomLayout(
-                confirmedRoom
-            )
+            try {
+                val savedRoom = roomRepository.saveRoomLayout(
+                    confirmedRoom
+                )
+                roomBeforeRearrange = null
+                applyRepositoryRoom(savedRoom)
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: RoomLayoutApiException) {
+                if (exception.code == "ROOM_LAYOUT_CONFLICT") {
+                    refreshRoomAfterLayoutConflict()
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            placeholderMessage = "재배치 저장에 실패했습니다. 위치가 겹치지 않는지 확인해주세요."
+                        )
+                    }
+                }
+            } catch (_: Exception) {
+                _uiState.update {
+                    it.copy(
+                        placeholderMessage = "재배치 저장에 실패했습니다. 위치가 겹치지 않는지 확인해주세요."
+                    )
+                }
+            }
+        }
+    }
+
+    private suspend fun refreshRoomAfterLayoutConflict() {
+        try {
+            val latestRoom = roomRepository.refreshRoomLayout()
             roomBeforeRearrange = null
-            applyRepositoryRoom(savedRoom)
+            applyRepositoryRoom(latestRoom)
+            _uiState.update {
+                it.copy(
+                    placeholderMessage = "다른 기기에서 방 배치가 먼저 변경돼 최신 배치로 갱신했습니다."
+                )
+            }
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (_: Exception) {
+            _uiState.update {
+                it.copy(
+                    placeholderMessage = "다른 기기에서 방 배치가 먼저 변경됐지만 최신 배치를 불러오지 못했습니다. 네트워크 확인 후 다시 시도해주세요."
+                )
+            }
         }
     }
 

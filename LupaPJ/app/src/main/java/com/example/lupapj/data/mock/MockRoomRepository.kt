@@ -63,6 +63,10 @@ class MockRoomRepository(
         return roomState
     }
 
+    override suspend fun refreshRoomLayout(): RoomUiState {
+        return getRoom()
+    }
+
     override suspend fun performObjectAction(objectType: RoomObjectType): RoomUiState {
         delay(220)
 

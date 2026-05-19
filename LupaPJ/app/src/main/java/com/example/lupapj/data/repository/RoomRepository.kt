@@ -6,6 +6,7 @@ import com.example.lupapj.data.model.scene.FloorAnchor
 
 interface RoomRepository {
     suspend fun getRoom(): RoomUiState
+    suspend fun refreshRoomLayout(): RoomUiState
     suspend fun performObjectAction(objectType: RoomObjectType): RoomUiState
     suspend fun placeFood(position: FloorAnchor): RoomUiState
     suspend fun consumeFood(): RoomUiState
