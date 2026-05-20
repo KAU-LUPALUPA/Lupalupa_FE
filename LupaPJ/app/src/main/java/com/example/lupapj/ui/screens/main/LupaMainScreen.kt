@@ -78,7 +78,14 @@ private data class PopupMenuItem(
     val iconRes: Int,
     val navItem: BottomNavItem? = null,
     val opensPlayground: Boolean = false,
+    val opensContest: Boolean = false,
     val opensMinigame: Boolean = false // [수정됨(권)] 미니게임 진입 필드 추가
+)
+
+private val ContestPopupMenuItem = PopupMenuItem(
+    label = "콘테스트",
+    iconRes = R.drawable.icon_card,
+    opensContest = true
 )
 
 private val PopupMenuItems = listOf(
@@ -132,6 +139,7 @@ fun LupaMainScreen(
     onSettingClick: () -> Unit = {},
     onPopupMenuItemClick: (BottomNavItem) -> Unit = {},
     onPlaygroundClick: () -> Unit = {},
+    onContestClick: () -> Unit = {},
     onMinigameClick: () -> Unit = {}, // [수정됨(권)] 미니게임 클릭 콜백 추가
     roomContent: @Composable BoxScope.() -> Unit = {
         Box(
@@ -174,6 +182,7 @@ fun LupaMainScreen(
                     isPopupVisible = false
                     when {
                         item.opensPlayground -> onPlaygroundClick()
+                        item.opensContest -> onContestClick()
                         item.opensMinigame -> onMinigameClick() // [수정됨(권)] 미니게임 진입 처리
                         item.navItem != null -> onPopupMenuItemClick(item.navItem)
                     }
@@ -568,11 +577,25 @@ private fun MainMenuPopup(
                 .padding(
                     start = popupWidth * 0.10f,
                     end = popupWidth * 0.10f,
-                    top = popupHeight * 0.17f,
-                    bottom = popupHeight * 0.17f
+                    top = popupHeight * 0.12f,
+                    bottom = popupHeight * 0.14f
                 ),
-            verticalArrangement = Arrangement.spacedBy(popupHeight * 0.08f)
+            verticalArrangement = Arrangement.spacedBy(popupHeight * 0.045f)
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                PopupMenuButton(
+                    iconRes = ContestPopupMenuItem.iconRes,
+                    contentDescription = ContestPopupMenuItem.label,
+                    onClick = { onMenuItemClick(ContestPopupMenuItem) },
+                    modifier = Modifier.width(popupWidth * 0.30f),
+                    buttonHeight = popupHeight * 0.20f
+                )
+            }
+
             PopupMenuItems.chunked(3).forEach { rowItems ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),

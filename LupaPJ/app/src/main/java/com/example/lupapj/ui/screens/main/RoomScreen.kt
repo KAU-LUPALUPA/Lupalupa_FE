@@ -96,6 +96,7 @@ fun RoomScreen(
     currencyAmount: Int,
     purchasedShopItems: List<com.example.lupapj.data.model.ShopItem>,
     onPlaygroundClick: () -> Unit,
+    onContestClick: () -> Unit,
     mailboxVisible: Boolean,
     friendRequests: List<FriendRequest>,
     homeInvitations: List<FriendHomeInvitation>,
@@ -226,6 +227,7 @@ fun RoomScreen(
                     onSettingClick = onSettingsClick,
                     onPopupMenuItemClick = onBottomNavItemClick,
                     onPlaygroundClick = onPlaygroundClick,
+                    onContestClick = onContestClick,
                     onMinigameClick = onMinigameClick, // [수정됨(권)] 전달
                     roomContent = {
                         RoomViewport(
@@ -560,6 +562,7 @@ private fun RoomScreenPreview() {
             currencyAmount = 100,
             purchasedShopItems = emptyList(),
             onPlaygroundClick = {},
+            onContestClick = {},
             mailboxVisible = false,
             friendRequests = emptyList(),
             homeInvitations = emptyList(),

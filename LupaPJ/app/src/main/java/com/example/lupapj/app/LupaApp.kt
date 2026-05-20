@@ -31,6 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.lupapj.BuildConfig
 import com.example.lupapj.data.model.AppPhase
+import com.example.lupapj.ui.screens.contest.ContestScreen
 import com.example.lupapj.ui.screens.friends.FriendRoomScreen
 import com.example.lupapj.ui.screens.friends.FriendScreen
 import com.example.lupapj.ui.screens.gallery.GalleryScreen
@@ -198,6 +199,7 @@ fun LupaApp(deepLink: Uri? = null) {
                         uiState.purchasedItems.any { it.masterId == item.id }
                     },
                     onPlaygroundClick = appViewModel::openPlaza,
+                    onContestClick = appViewModel::openContest,
                     mailboxVisible = uiState.mailboxVisible,
                     friendRequests = uiState.receivedFriendRequests,
                     homeInvitations = uiState.receivedHomeInvitations,
@@ -315,6 +317,12 @@ fun LupaApp(deepLink: Uri? = null) {
             } else {
                 appViewModel.exitShopDetail()
             }
+        }
+
+        AppPhase.CONTEST -> {
+            ContestScreen(
+                onBackClick = appViewModel::exitContest
+            )
         }
 
         AppPhase.MINIGAME -> {

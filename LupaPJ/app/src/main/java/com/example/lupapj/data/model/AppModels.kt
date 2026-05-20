@@ -31,6 +31,7 @@ enum class AppPhase {
     PLAZA,
     SHOP,        // [추가됨(권)] 상점 메인 화면 페이즈. 상점 하단 탭 클릭 시 진입.
     SHOP_DETAIL, // [추가됨(권)] 상점 아이템 상세 및 치장 미리보기 화면 페이즈. 아이템 클릭 시 진입.
+    CONTEST,
     MINIGAME     // [추가됨(권)] 미니게임 플레이 화면 페이즈.
 }
 
@@ -181,6 +182,7 @@ enum class MainMenuAction {
     CONTACTS,
     SHOP,
     PLAYGROUND,
+    CONTEST,
     MINIGAME // [수정됨(권)] 최근 활동을 위해 미니게임 액션 추가
 }
 
@@ -210,6 +212,7 @@ val MainMenuAction.label: String
         MainMenuAction.CONTACTS -> "친구"
         MainMenuAction.SHOP -> "상점"
         MainMenuAction.PLAYGROUND -> "광장"
+        MainMenuAction.CONTEST -> "콘테스트"
         MainMenuAction.MINIGAME -> "미니게임" // [수정됨(권)]
     }
 
@@ -221,6 +224,7 @@ val MainMenuAction.iconRes: Int
         MainMenuAction.CONTACTS -> com.example.lupapj.R.drawable.friends_trimmed
         MainMenuAction.SHOP -> com.example.lupapj.R.drawable.shop_trimmed
         MainMenuAction.PLAYGROUND -> com.example.lupapj.R.drawable.playground_trimmed
+        MainMenuAction.CONTEST -> com.example.lupapj.R.drawable.icon_card
         MainMenuAction.MINIGAME -> com.example.lupapj.R.drawable.minigame_icon // [수정됨(권)] 전용 아이콘 사용
     }
 
