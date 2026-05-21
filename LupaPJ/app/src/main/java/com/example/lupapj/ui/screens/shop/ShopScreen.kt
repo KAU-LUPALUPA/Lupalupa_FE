@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -56,6 +57,12 @@ fun ShopScreen(
                 )
             }
         ) { padding ->
+            // [추가됨(권)] 보유 중인 아이템은 가장 아래로 내리는 정렬 로직 적용
+            val sortedShopItems = remember(shopItems, purchasedItemIds) {
+                val (purchased, unpurchased) = shopItems.partition { purchasedItemIds.contains(it.id) }
+                unpurchased + purchased
+            }
+
             Surface(
                 modifier = Modifier
                     .fillMaxSize()
@@ -72,17 +79,17 @@ fun ShopScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                items(shopItems) { item ->
-                    ShopItemCard(
-                        item = item,
-                        isPurchased = purchasedItemIds.contains(item.id),
-                        onClick = { onItemClick(item) }
-                    )
+                    items(sortedShopItems) { item ->
+                        ShopItemCard(
+                            item = item,
+                            isPurchased = purchasedItemIds.contains(item.id),
+                            onClick = { onItemClick(item) }
+                        )
+                    }
                 }
             }
         }
     }
-}
 }
 
 // [추가됨(권)] 상점 목록의 개별 아이템을 표시하는 카드 컴포넌트
@@ -109,11 +116,19 @@ fun ShopItemCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // [추가됨(권)] 임시 아이콘 (차후 thumbnailResId가 있다면 실제 이미지로 대체 가능)
-            Text(
-                text = "📦",
-                style = MaterialTheme.typography.displayMedium
-            )
+            // [수정됨(권)] 썸네일 리소스가 등록되어 있는 경우 이미지 렌더링, 없으면 📦 이모지 출력
+            if (item.thumbnailResId != null) {
+                Image(
+                    painter = painterResource(id = item.thumbnailResId),
+                    contentDescription = item.name,
+                    modifier = Modifier.size(64.dp)
+                )
+            } else {
+                Text(
+                    text = "📦",
+                    style = MaterialTheme.typography.displayMedium
+                )
+            }
             Spacer(modifier = Modifier.height(8.dp))
             Text(text = item.name, style = MaterialTheme.typography.titleMedium)
             Text(text = item.category.label, style = MaterialTheme.typography.bodySmall)

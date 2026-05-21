@@ -217,6 +217,8 @@ fun LupaApp(deepLink: Uri? = null) {
                     purchasedShopItems = uiState.shopItems.filter { item ->
                         uiState.purchasedItems.any { it.masterId == item.id }
                     },
+                    onEquipClick = appViewModel::equipItem, // [추가됨(권)] 장착 콜백
+                    onUnequipClick = appViewModel::unequipItem, // [추가됨(권)] 해제 콜백
                     onPlaygroundClick = appViewModel::openPlaza,
                     mailboxVisible = uiState.mailboxVisible,
                     friendRequests = uiState.receivedFriendRequests,
@@ -328,7 +330,13 @@ fun LupaApp(deepLink: Uri? = null) {
                     isPurchased = uiState.purchasedItems.any { it.masterId == selectedItem.id },
                     isPurchasing = uiState.isPurchasing,
                     feedbackMessage = uiState.shopFeedbackMessage,
+                    equippedItemIds = uiState.room?.pet?.equippedItemIds ?: emptyList(), // [추가됨(권)] 장착 정보 전달
+                    petAppearance = uiState.room?.pet?.appearance ?: com.example.lupapj.data.model.PetAppearance(), // [추가됨(권)] 외형 상태 전달
+                    isEgg = uiState.room?.pet?.status?.isEgg ?: false, // [추가됨(권)] 에그 여부 전달
+                    allShopItems = uiState.shopItems, // [추가됨(권)] 전체 아이템 전달
                     onPurchaseClick = { appViewModel.purchaseItem(selectedItem.id) },
+                    onEquipClick = appViewModel::equipItem, // [추가됨(권)] 장착 콜백 연결
+                    onUnequipClick = appViewModel::unequipItem, // [추가됨(권)] 해제 콜백 연결
                     onBackClick = appViewModel::exitShopDetail,
                     onFeedbackConsumed = appViewModel::consumeShopFeedback
                 )

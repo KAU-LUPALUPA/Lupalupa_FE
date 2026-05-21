@@ -2,9 +2,11 @@ package com.example.lupapj.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,6 +28,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.res.painterResource // [추가됨(권)] painterResource 임포트
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
@@ -56,6 +59,7 @@ fun AnimatedCharacterSprite(
     animation: CharacterAnimation = CharacterAnimation.Row0,
     appearance: PetAppearance = PetAppearance(),
     equippedItemIds: List<String> = emptyList(),
+    allShopItems: List<com.example.lupapj.data.model.ShopItem> = com.example.lupapj.data.model.DefaultShopItems, // [수정됨(권)] 데이터 주입을 위한 파라미터 추가
     isEgg: Boolean = false,
     frameDurationMillis: Long = 150L,
     isPlaying: Boolean = true,
@@ -97,38 +101,115 @@ fun AnimatedCharacterSprite(
     val density = LocalDensity.current
 
     BoxWithConstraints(
-        modifier = modifier.clipToBounds(),
+        modifier = modifier, // [수정됨(권)] 모자가 컴포넌트 경계를 넘어가도 잘리지 않도록 clipToBounds() 제거
         contentAlignment = Alignment.Center
     ) {
-        val boxWidthPx = with(density) { maxWidth.toPx() }
-        val boxHeightPx = with(density) { maxHeight.toPx() }
-        val scale = min(
-            boxWidthPx / bitmap.width.toFloat(),
-            boxHeightPx / bitmap.height.toFloat()
-        )
-        val drawnHeightPx = bitmap.height * scale
+        val boxWidthDp = maxWidth
+        val boxHeightDp = maxHeight
+        val petAspectRatio = 170f / 258f
+        val boxAspectRatio = if (boxHeightDp.value > 0f) boxWidthDp.value / boxHeightDp.value else 1f
+        
+        val spriteWidthDp: androidx.compose.ui.unit.Dp
+        val spriteHeightDp: androidx.compose.ui.unit.Dp
+        
+        if (boxAspectRatio > petAspectRatio) {
+            spriteHeightDp = boxHeightDp
+            spriteWidthDp = boxHeightDp * petAspectRatio
+        } else {
+            spriteWidthDp = boxWidthDp
+            spriteHeightDp = boxWidthDp / petAspectRatio
+        }
+
+        val drawnHeightPx = with(density) { spriteHeightDp.toPx() }
         val translationYPx = drawnHeightPx * currentFrame.bottomInsetRatio
         val spriteScale = ((appearance.headSizeScale + appearance.bodySizeScale) * 0.5f)
             .coerceIn(0.88f, 1.12f)
+        
         val resolvedDescription = when {
             contentDescription == null -> null
             equippedItemIds.isEmpty() -> contentDescription
             else -> "$contentDescription, 치장 아이템 ${equippedItemIds.size}개 착용"
         }
 
-        Image(
-            bitmap = bitmap,
-            contentDescription = resolvedDescription,
+        val equippedItems = remember(equippedItemIds, allShopItems) {
+            equippedItemIds.mapNotNull { itemId ->
+                allShopItems.find { it.id == itemId }
+            }.filter { it.previewOverlayResId != null }
+             .sortedBy { item ->
+                 when (item.category) {
+                     com.example.lupapj.data.model.ShopCategory.SHOES -> 1
+                     com.example.lupapj.data.model.ShopCategory.BOTTOM -> 2
+                     com.example.lupapj.data.model.ShopCategory.TOP -> 3
+                     com.example.lupapj.data.model.ShopCategory.FULL_BODY -> 3
+                     com.example.lupapj.data.model.ShopCategory.FACE_DECOR -> 4
+                     com.example.lupapj.data.model.ShopCategory.HAT -> 5
+                 }
+             }
+        }
+
+        // [수정됨(권)] 하나의 단일 이너 Box 안에 펫 이미지와 장착 아이템들을 감싸고,
+        // 이 Box 전체에 graphicsLayer를 적용하여 펫 캐릭터와 장착 아이템들이 축을 통일하고 완벽한 수학적 동기화로 움직이게 구현.
+        Box(
             modifier = Modifier
-                .fillMaxSize()
+                .size(spriteWidthDp, spriteHeightDp)
                 .graphicsLayer {
+                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f) // [추가됨(권)] 기준점을 바닥 중앙으로 고정하여 캐릭터와 아이템 축 이탈 방지
                     translationY = translationYPx
                     scaleX = spriteScale
                     scaleY = spriteScale
-                },
-            contentScale = ContentScale.Fit,
-            filterQuality = FilterQuality.None
-        )
+                }
+        ) {
+            // 1. 베이스 캐릭터 펫 스프라이트 그리기 (이너 Box에 맞춤)
+            Image(
+                bitmap = bitmap,
+                contentDescription = resolvedDescription,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.FillBounds,
+                filterQuality = FilterQuality.None
+            )
+
+            // 2. 장착 치장 아이템들을 레이어 순서대로 그리기
+            equippedItems.forEach { item ->
+                val itemResId = item.previewOverlayResId
+                if (itemResId != null) {
+                    if (item.overlayAspectRatio != null) {
+                        // [수정됨(권)] 하드코딩 제거: 아이템 모델의 데이터(렌더링 파라미터)를 기반으로 동적 스케일 및 기본 좌표 할당
+                        val itemWidth = spriteWidthDp * item.overlayScale
+                        val itemHeight = itemWidth * item.overlayAspectRatio
+                        
+                        // [추가됨(권)] 픽셀 프레임 애니메이션(Row0)에 맞춘 좌우/상하 흔들림(Sway) 미세 보정
+                        val swayOffsetX = when (animation) {
+                            CharacterAnimation.Row0 -> when (frameIndex) {
+                                1 -> -1.5f // 왼쪽으로 갸우뚱
+                                3 -> 1.5f  // 오른쪽으로 갸우뚱
+                                else -> 0f
+                            }
+                            else -> 0f
+                        }
+                        
+                        val itemLeft = (spriteWidthDp - itemWidth) / 2 + swayOffsetX.dp
+                        val itemTop = spriteHeightDp * item.overlayOffsetYRatio - itemHeight
+
+                        Image(
+                            painter = painterResource(id = itemResId),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(itemWidth, itemHeight)
+                                .absoluteOffset(x = itemLeft, y = itemTop),
+                            contentScale = ContentScale.FillBounds
+                        )
+                    } else {
+                        // 프리셋 좌표계 기반의 다른 부위 아이템들은 베이스 이미지에 1:1 매칭
+                        Image(
+                            painter = painterResource(id = itemResId),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.FillBounds
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

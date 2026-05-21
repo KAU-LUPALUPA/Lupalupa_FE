@@ -95,6 +95,8 @@ fun RoomScreen(
     onGalleryClick: () -> Unit, // [추가됨] 카메라 오버레이 내 갤러리 버튼 콜백
     currencyAmount: Int,
     purchasedShopItems: List<com.example.lupapj.data.model.ShopItem>,
+    onEquipClick: (String) -> Unit, // [추가됨(권)] 아이템 장착 콜백 추가
+    onUnequipClick: (String) -> Unit, // [추가됨(권)] 아이템 해제 콜백 추가
     onPlaygroundClick: () -> Unit,
     mailboxVisible: Boolean,
     friendRequests: List<FriendRequest>,
@@ -509,6 +511,9 @@ fun RoomScreen(
     if (room.inventoryVisible) {
         InventorySheet(
             purchasedShopItems = purchasedShopItems,
+            equippedItemIds = room.pet.equippedItemIds, // [추가됨(권)] 장착 상태 전달
+            onEquipClick = onEquipClick,               // [추가됨(권)] 장착 콜백 연결
+            onUnequipClick = onUnequipClick,           // [추가됨(권)] 해제 콜백 연결
             onDismiss = onInventoryDismiss
         )
     }
@@ -559,6 +564,8 @@ private fun RoomScreenPreview() {
             onGalleryClick = {},
             currencyAmount = 100,
             purchasedShopItems = emptyList(),
+            onEquipClick = {},
+            onUnequipClick = {},
             onPlaygroundClick = {},
             mailboxVisible = false,
             friendRequests = emptyList(),

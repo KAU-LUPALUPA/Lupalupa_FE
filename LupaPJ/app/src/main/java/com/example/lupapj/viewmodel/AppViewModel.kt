@@ -1410,6 +1410,69 @@ class AppViewModel(
         _uiState.update { it.copy(shopFeedbackMessage = null) }
     }
 
+    // [추가됨(권)] 아이템 장착 시 부위별 충돌을 해결해주는 헬퍼 함수
+    private fun resolveEquippedCollision(
+        currentEquippedIds: List<String>,
+        newItemId: String,
+        allItems: List<com.example.lupapj.data.model.ShopItem>
+    ): List<String> {
+        val newItem = allItems.find { it.id == newItemId } ?: return currentEquippedIds
+        val newCategory = newItem.category
+
+        val resolved = currentEquippedIds.filter { equippedId ->
+            val eqItem = allItems.find { it.id == equippedId } ?: return@filter false
+            val eqCategory = eqItem.category
+            
+            when (newCategory) {
+                com.example.lupapj.data.model.ShopCategory.FULL_BODY -> {
+                    eqCategory != com.example.lupapj.data.model.ShopCategory.TOP &&
+                    eqCategory != com.example.lupapj.data.model.ShopCategory.BOTTOM &&
+                    eqCategory != com.example.lupapj.data.model.ShopCategory.FULL_BODY
+                }
+                com.example.lupapj.data.model.ShopCategory.TOP -> {
+                    eqCategory != com.example.lupapj.data.model.ShopCategory.FULL_BODY &&
+                    eqCategory != com.example.lupapj.data.model.ShopCategory.TOP
+                }
+                com.example.lupapj.data.model.ShopCategory.BOTTOM -> {
+                    eqCategory != com.example.lupapj.data.model.ShopCategory.FULL_BODY &&
+                    eqCategory != com.example.lupapj.data.model.ShopCategory.BOTTOM
+                }
+                else -> {
+                    eqCategory != newCategory
+                }
+            }
+        }.toMutableList()
+        
+        resolved.add(newItemId)
+        return resolved
+    }
+
+    // [추가됨(권)] 아이템 장착 함수
+    fun equipItem(itemId: String) {
+        updateRoom { room ->
+            val pet = room.houseSceneState.pet
+            val allItems = _uiState.value.shopItems.ifEmpty { com.example.lupapj.data.model.DefaultShopItems }
+            val resolved = resolveEquippedCollision(pet.equippedItemIds, itemId, allItems)
+            room.copy(
+                houseSceneState = room.houseSceneState.copy(
+                    pet = pet.copy(equippedItemIds = resolved)
+                )
+            )
+        }
+    }
+
+    // [추가됨(권)] 아이템 해제 함수
+    fun unequipItem(itemId: String) {
+        updateRoom { room ->
+            val pet = room.houseSceneState.pet
+            room.copy(
+                houseSceneState = room.houseSceneState.copy(
+                    pet = pet.copy(equippedItemIds = pet.equippedItemIds.filter { it != itemId })
+                )
+            )
+        }
+    }
+
     fun toggleBehaviorDebugWindow() {
         _uiState.update { 
             it.copy(behaviorDebugInfo = it.behaviorDebugInfo.copy(isVisible = !it.behaviorDebugInfo.isVisible)) 
@@ -1771,8 +1834,12 @@ class AppViewModel(
                     currentPet.status 
                 } else {
                     repositoryPet.status 
-                }
+                },
+                equippedItemIds = currentPet.equippedItemIds // [추가됨(권)] 로컬에서 장착한 아이템 상태 유지
             )
+        } else if (currentPet != null) {
+            // [추가됨(권)] IDLE 상태가 아닐 때도 장착 아이템 상태는 유지
+            repositoryPet.copy(equippedItemIds = currentPet.equippedItemIds)
         } else {
             repositoryPet
         }

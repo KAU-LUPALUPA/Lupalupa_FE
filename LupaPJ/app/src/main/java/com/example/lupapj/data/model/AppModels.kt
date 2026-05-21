@@ -345,6 +345,7 @@ val ShopCategory.label: String
     }
 
 // [추가됨(권)] 상점 아이템 모델. 구매 시 필요한 재화(price) 및 미리보기 오버레이 리소스(previewOverlayResId) 포함.
+// [수정됨(권)] UI 로직 하드코딩 방지를 위한 에셋 렌더링 속성(scale, offset, aspect ratio) 추가
 data class ShopItem(
     val id: String,
     val name: String,
@@ -352,7 +353,10 @@ data class ShopItem(
     val price: Int,
     val category: ShopCategory,
     val thumbnailResId: Int? = null,
-    val previewOverlayResId: Int? = null
+    val previewOverlayResId: Int? = null,
+    val overlayScale: Float = 1.0f,
+    val overlayOffsetYRatio: Float = 0f,
+    val overlayAspectRatio: Float? = null // 지정되지 않으면 베이스 스프라이트 캔버스에 1:1 매칭(fillMaxSize)
 )
 
 /**
@@ -368,7 +372,19 @@ data class InventoryItem(
 // [추가됨(권)] 앱 내에 내장된 상점 마스터 데이터 (로컬 기본값)
 val DefaultShopItems = listOf(
     // 모자 (01)
-    ShopItem("10010001", "밀짚모자", "여름에 쓰기 좋은 시원한 모자입니다.", 100, ShopCategory.HAT),
+    // [수정됨(권)] 밀짚모자 에셋 설정 (이미지 및 미리보기 오버레이) 및 렌더링 파라미터 분리
+    ShopItem(
+        id = "10010001",
+        name = "밀짚모자",
+        description = "여름에 쓰기 좋은 시원한 모자입니다.",
+        price = 100,
+        category = ShopCategory.HAT,
+        thumbnailResId = com.example.lupapj.R.drawable.straw_hat,
+        previewOverlayResId = com.example.lupapj.R.drawable.straw_hat,
+        overlayScale = 1.15f,
+        overlayOffsetYRatio = 0.45f,
+        overlayAspectRatio = 481f / 519f
+    ),
     ShopItem("10010002", "캡모자", "활동적인 느낌의 깔끔한 캡모자입니다.", 200, ShopCategory.HAT),
     
     // 얼굴 치장 (02)
