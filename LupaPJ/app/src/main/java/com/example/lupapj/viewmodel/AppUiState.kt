@@ -16,7 +16,7 @@ import com.example.lupapj.data.model.plaza.PlazaRoom // [보존] 팀원 작업 �
 import com.example.lupapj.data.model.ShopItem // [추가됨(권)] 상점 아이템 데이터 모델 Import
 
 data class AppUiState(
-    val phase: AppPhase = AppPhase.MAIN_LOADING,
+    val phase: AppPhase = AppPhase.LOGIN_PROMPT,
     val loadingMessage: String = "로딩 중...",
     val authPopupVisible: Boolean = false,
     val isProcessingLogin: Boolean = false,

@@ -26,13 +26,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             LupaPJTheme {
-                var showSplash by remember { mutableStateOf(true) }
-
-                if (showSplash) {
-                    SplashScreen(onSplashComplete = { showSplash = false })
-                } else {
-                    LupaApp(deepLink = deepLinkState)
-                }
+                LupaApp(deepLink = deepLinkState)
             }
         }
     }

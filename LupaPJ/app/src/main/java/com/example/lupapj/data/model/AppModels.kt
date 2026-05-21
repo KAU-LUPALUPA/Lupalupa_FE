@@ -23,7 +23,9 @@ data class BehaviorDebugInfo(
 )
 
 enum class AppPhase {
-    MAIN_LOADING,
+    LOGIN_PROMPT,
+    SPLASH_LOADING,
+    START_PROMPT,
     ROOM,
     GALLERY, // [추가됨] 갤러리 화면 상태 추가
     FRIENDS,

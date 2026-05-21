@@ -44,13 +44,16 @@ import com.example.lupapj.ui.theme.LupaPJTheme
 
 @Composable
 fun MainLoadingScreen(
-    loadingMessage: String,
-    authPopupVisible: Boolean,
-    isProcessingLogin: Boolean,
+    promptText: String,
+    showGalleryFrame: Boolean,
+    isPromptReady: Boolean,
+    isLoginMode: Boolean,
+    isProcessingLogin: Boolean = false,
     galleryImages: List<GalleryImage> = emptyList(), // [추가됨] 로딩 화면용 이미지 목록
     isDevLoginEnabled: Boolean = false,
     onKakaoLoginClick: () -> Unit,
-    onDevLoginClick: () -> Unit = {}
+    onDevLoginClick: () -> Unit = {},
+    onStartClick: () -> Unit = {}
 ) {
     // 팝업 노출 상태는 최상위 레벨에서 remember 선언
     var showLoginPopup by remember { mutableStateOf(false) }
@@ -89,19 +92,20 @@ fun MainLoadingScreen(
         )
 
         // 귀여운 액자 프레임 UI는 사진이 있든 없든 항상 노출
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.6f) // 화면 가로의 60% 크기로 살짝 줄임
-                .aspectRatio(0.75f) 
-                .align(Alignment.Center)
-                .offset(y = (-80).dp) // 위로 올림
-                .rotate(-10f) // 왼쪽으로 10도 기울임
-                // TODO: 나중에 여기에 귀여운 액자 테두리 이미지를 추가하세요. (예: R.drawable.cute_frame)
-                // .paint(painterResource(id = R.drawable.cute_frame), contentScale = ContentScale.FillBounds)
-                .background(Color.White, shape = RoundedCornerShape(12.dp)) 
-                .padding(8.dp) 
-        ) {
-            if (displayBitmap != null) {
+        if (showGalleryFrame) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.6f) // 화면 가로의 60% 크기로 살짝 줄임
+                    .aspectRatio(0.75f) 
+                    .align(Alignment.Center)
+                    .offset(y = (-80).dp) // 위로 올림
+                    .rotate(-10f) // 왼쪽으로 10도 기울임
+                    // TODO: 나중에 여기에 귀여운 액자 테두리 이미지를 추가하세요. (예: R.drawable.cute_frame)
+                    // .paint(painterResource(id = R.drawable.cute_frame), contentScale = ContentScale.FillBounds)
+                    .background(Color.White, shape = RoundedCornerShape(12.dp)) 
+                    .padding(8.dp) 
+            ) {
+                if (displayBitmap != null) {
                 Image(
                     bitmap = displayBitmap!!,
                     contentDescription = "Captured Screenshot",
@@ -121,9 +125,10 @@ fun MainLoadingScreen(
                 )
             }
         }
+    }
 
         // 로딩바가 끝나고 팝업이 뜰 타이밍에 팝업 대신 화면 전체 터치 대기 상태로 전환
-        if (authPopupVisible) {
+        if (isPromptReady) {
             if (!showLoginPopup) {
                 val infiniteTransition = rememberInfiniteTransition(label = "blink")
                 val alpha by infiniteTransition.animateFloat(
@@ -142,12 +147,17 @@ fun MainLoadingScreen(
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null, // 클릭 이펙트 제거
-                            onClick = { showLoginPopup = true } // 화면 터치 시 기존 로그인 팝업 띄움
+                            onClick = { 
+                                if (isLoginMode) {
+                                    showLoginPopup = true 
+                                } else {
+                                    onStartClick()
+                                }
+                            } 
                         )
                 ) {
                     Text(
-                        // TODO: 실제 유저 로그인 상태를 받아서 텍스트 분기 처리 필요
-                        text = if (false) "게임을 시작하시려면 화면을 터치하세요" else "로그인하시려면 화면을 터치하세요",
+                        text = promptText,
                         color = Color.White.copy(alpha = alpha),
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
@@ -156,7 +166,7 @@ fun MainLoadingScreen(
                             .padding(bottom = 100.dp) // 기존 로딩바 위치 부근
                     )
                 }
-            } else {
+            } else if (isLoginMode) {
                 // 기존 로그인 팝업 렌더링
                 AuthPopup(
                     isProcessingLogin = isProcessingLogin,
@@ -174,8 +184,10 @@ fun MainLoadingScreen(
 private fun MainLoadingScreenPreview() {
     LupaPJTheme {
         MainLoadingScreen(
-            loadingMessage = previewLoadingUiState.loadingMessage,
-            authPopupVisible = previewLoadingUiState.authPopupVisible,
+            promptText = "로그인하시려면 화면을 터치하세요",
+            showGalleryFrame = false,
+            isPromptReady = previewLoadingUiState.authPopupVisible,
+            isLoginMode = true,
             isProcessingLogin = false,
             galleryImages = emptyList(), // [추가됨]
             isDevLoginEnabled = true,

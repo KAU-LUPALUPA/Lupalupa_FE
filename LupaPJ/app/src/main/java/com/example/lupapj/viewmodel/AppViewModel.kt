@@ -320,9 +320,12 @@ class AppViewModel(
             )
             val displayName = nickname ?: "사용자"
 
+            // [통합 수정] 로그인 성공 시 바로 방에 진입하지 않고, feat/shopv2 기획에 따라 
+            // 신규 로딩/스플래시 화면(AppPhase.SPLASH_LOADING)으로 진입합니다.
+            // 기존 main의 Ticker 및 Polling 시작 로직은 실제 방 진입 시점인 startRoomPhase()로 이관되었습니다.
             _uiState.update {
                 it.copy(
-                    phase = AppPhase.ROOM,
+                    phase = AppPhase.SPLASH_LOADING,
                     authPopupVisible = false,
                     isProcessingLogin = false,
                     room = room,
@@ -330,8 +333,6 @@ class AppViewModel(
                     userId = resolvedUserId // [수정됨(권)] 하트비트 로직을 위한 유저 식별자 저장
                 )
             }
-            startPetConditionTicker()
-            startHomeVisitPolling()
         }
     }
 
@@ -358,9 +359,11 @@ class AppViewModel(
                 houseSceneState = room.houseSceneState.updatePet(isMoving = false)
             )
 
+            // [통합 수정] 개발자 로그인 성공 시에도 동일하게 스플래시 화면(AppPhase.SPLASH_LOADING)으로 진입합니다.
+            // 펫 상태 Ticker 및 친구 방문 폴링 시작 로직은 startRoomPhase()로 이관되었습니다.
             _uiState.update {
                 it.copy(
-                    phase = AppPhase.ROOM,
+                    phase = AppPhase.SPLASH_LOADING,
                     authPopupVisible = false,
                     isProcessingLogin = false,
                     room = room,
@@ -370,9 +373,30 @@ class AppViewModel(
                     plazaFeedbackMessage = null
                 )
             }
-            startPetConditionTicker()
-            startHomeVisitPolling()
         }
+    }
+
+    fun onSplashComplete() {
+        _uiState.update {
+            it.copy(
+                phase = AppPhase.START_PROMPT,
+                authPopupVisible = false
+            )
+        }
+        viewModelScope.launch {
+            delay(150)
+            _uiState.update { it.copy(authPopupVisible = true) }
+        }
+    }
+
+    // [통합 추가] 스플래시 연출 및 터치 대기 상태를 완료하고 실제 게임 방에 들어가는 시점입니다.
+    fun startRoomPhase() {
+        _uiState.update {
+            it.copy(phase = AppPhase.ROOM)
+        }
+        startPetConditionTicker()
+        // [통합 추가] main 브랜치의 실시간 친구 집 방문 정보 조회 폴링을 방 입장 시점에 맞춰 시작합니다.
+        startHomeVisitPolling()
     }
 
     fun onButtonAClick() {
