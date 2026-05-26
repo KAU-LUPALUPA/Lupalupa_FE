@@ -321,6 +321,7 @@ fun LupaApp(deepLink: Uri? = null) {
 
         AppPhase.CONTEST -> {
             ContestScreen(
+                galleryImages = uiState.galleryImages,
                 onBackClick = appViewModel::exitContest
             )
         }

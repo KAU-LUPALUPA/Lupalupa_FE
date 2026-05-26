@@ -84,7 +84,7 @@ private data class PopupMenuItem(
 
 private val ContestPopupMenuItem = PopupMenuItem(
     label = "콘테스트",
-    iconRes = R.drawable.icon_card,
+    iconRes = R.drawable.contest_trophy_icon,
     opensContest = true
 )
 

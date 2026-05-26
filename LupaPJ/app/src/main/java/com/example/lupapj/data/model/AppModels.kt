@@ -224,7 +224,7 @@ val MainMenuAction.iconRes: Int
         MainMenuAction.CONTACTS -> com.example.lupapj.R.drawable.friends_trimmed
         MainMenuAction.SHOP -> com.example.lupapj.R.drawable.shop_trimmed
         MainMenuAction.PLAYGROUND -> com.example.lupapj.R.drawable.playground_trimmed
-        MainMenuAction.CONTEST -> com.example.lupapj.R.drawable.icon_card
+        MainMenuAction.CONTEST -> com.example.lupapj.R.drawable.contest_trophy_icon
         MainMenuAction.MINIGAME -> com.example.lupapj.R.drawable.minigame_icon // [수정됨(권)] 전용 아이콘 사용
     }
 
