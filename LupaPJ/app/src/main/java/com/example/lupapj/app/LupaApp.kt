@@ -65,7 +65,8 @@ fun LupaApp(deepLink: Uri? = null) {
             friendRepository = container.friendRepository,
             plazaRepository = container.plazaRepository,
             currencyRepository = container.currencyRepository,
-            shopRepository = container.shopRepository
+            shopRepository = container.shopRepository,
+            contestRepository = container.contestRepository
         )
     )
 
@@ -322,6 +323,15 @@ fun LupaApp(deepLink: Uri? = null) {
         AppPhase.CONTEST -> {
             ContestScreen(
                 galleryImages = uiState.galleryImages,
+                isUploadingEntry = uiState.isContestEntryUploading,
+                uploadMessage = uiState.contestUploadMessage,
+                groups = uiState.contestGroups,
+                selectedGroup = uiState.selectedContestGroup,
+                isLoadingGroups = uiState.isContestGroupsLoading,
+                groupMessage = uiState.contestGroupMessage,
+                onEntryImageSelected = appViewModel::uploadContestEntryImage,
+                onGroupClick = appViewModel::openContestGroup,
+                onGroupBackClick = appViewModel::exitContestGroup,
                 onBackClick = appViewModel::exitContest
             )
         }

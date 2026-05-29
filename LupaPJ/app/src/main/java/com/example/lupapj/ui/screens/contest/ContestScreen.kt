@@ -6,6 +6,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,6 +51,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.example.lupapj.R
 import com.example.lupapj.data.model.GalleryImage
+import com.example.lupapj.data.repository.ContestEntryInfo
+import com.example.lupapj.data.repository.ContestGroupDetail
+import com.example.lupapj.data.repository.ContestGroupSummary
+import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -67,6 +73,15 @@ private val PreviewCharacterResIds = listOf(
 @Composable
 fun ContestScreen(
     galleryImages: List<GalleryImage>,
+    isUploadingEntry: Boolean,
+    uploadMessage: String?,
+    groups: List<ContestGroupSummary>,
+    selectedGroup: ContestGroupDetail?,
+    isLoadingGroups: Boolean,
+    groupMessage: String?,
+    onEntryImageSelected: (GalleryImage) -> Unit,
+    onGroupClick: (String) -> Unit,
+    onGroupBackClick: () -> Unit,
     onBackClick: () -> Unit,
     onParticipateClick: () -> Unit = {},
     onVoteClick: () -> Unit = {}
@@ -109,6 +124,7 @@ fun ContestScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
                         .padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -152,6 +168,8 @@ fun ContestScreen(
 
                     Text(
                         text = when {
+                            isUploadingEntry -> "선택한 이미지를 S3에 업로드 중입니다."
+                            uploadMessage != null && !isVoteMode -> uploadMessage
                             selectedEntryImage != null && !isVoteMode -> "선택한 사진이 내 참가 칸에 등록되었어요."
                             !isVoteMode -> "투표하기를 누르면 캐릭터를 선택할 수 있어요."
                             selectedCharacterNumber == null -> "투표할 캐릭터를 선택해주세요."
@@ -166,18 +184,38 @@ fun ContestScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    ContestCharacterGrid(
-                        characterResIds = PreviewCharacterResIds,
-                        selectedEntryImage = selectedEntryImage,
-                        isVoteMode = isVoteMode,
-                        selectedCharacterNumber = selectedCharacterNumber,
-                        onCharacterClick = { characterNumber ->
-                            if (isVoteMode) {
-                                selectedCharacterNumber = characterNumber
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    if (selectedGroup == null) {
+                        ContestCharacterGrid(
+                            characterResIds = PreviewCharacterResIds,
+                            selectedEntryImage = selectedEntryImage,
+                            isVoteMode = isVoteMode,
+                            selectedCharacterNumber = selectedCharacterNumber,
+                            onCharacterClick = { characterNumber ->
+                                if (isVoteMode) {
+                                    selectedCharacterNumber = characterNumber
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(18.dp))
+
+                        ContestGroupList(
+                            groups = groups,
+                            isLoading = isLoadingGroups,
+                            message = groupMessage,
+                            onGroupClick = onGroupClick,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else {
+                        ContestGroupDetailPanel(
+                            group = selectedGroup,
+                            isLoading = isLoadingGroups,
+                            message = groupMessage,
+                            onBackClick = onGroupBackClick,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
         }
@@ -185,9 +223,11 @@ fun ContestScreen(
         if (isGalleryPickerVisible) {
             ContestGalleryPicker(
                 images = galleryImages,
-                onImageSelected = { image ->
+                initialSelectedImageId = selectedEntryImage?.id,
+                onImageConfirmed = { image ->
                     selectedEntryImage = image
                     isGalleryPickerVisible = false
+                    onEntryImageSelected(image)
                 },
                 onDismiss = { isGalleryPickerVisible = false }
             )
@@ -359,11 +399,317 @@ private fun ContestCharacterSlot(
 }
 
 @Composable
+private fun ContestGroupList(
+    groups: List<ContestGroupSummary>,
+    isLoading: Boolean,
+    message: String?,
+    onGroupClick: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = "매칭된 조",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF5C371D)
+        )
+
+        when {
+            isLoading && groups.isEmpty() -> Text(
+                text = "조 목록을 불러오는 중입니다.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF80684F)
+            )
+            groups.isEmpty() -> Text(
+                text = message ?: "아직 생성된 콘테스트 조가 없습니다.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF80684F)
+            )
+            else -> groups.forEach { group ->
+                ContestGroupRow(
+                    group = group,
+                    onClick = { onGroupClick(group.groupId) }
+                )
+            }
+        }
+
+        if (!message.isNullOrBlank() && groups.isNotEmpty()) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF80684F)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ContestGroupRow(
+    group: ContestGroupSummary,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.White.copy(alpha = 0.58f))
+            .border(1.dp, ContestBorderColor.copy(alpha = 0.45f), RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text(
+                text = "${group.groupNumber.coerceAtLeast(1L)}조",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF5C371D)
+            )
+            Text(
+                text = when (group.status) {
+                    "ACTIVE" -> "진행 중"
+                    "OPEN" -> "${group.memberCount.coerceAtMost(3L)}/3명 매칭 중"
+                    else -> group.status
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF80684F)
+            )
+        }
+
+        Text(
+            text = if (group.isMyGroup) "내 조" else "보기",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = if (group.isMyGroup) ContestPrimaryColor else ContestSecondaryColor
+        )
+    }
+}
+
+@Composable
+private fun ContestGroupDetailPanel(
+    group: ContestGroupDetail,
+    isLoading: Boolean,
+    message: String?,
+    onBackClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "${group.groupNumber.coerceAtLeast(1L)}조",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF5C371D)
+                )
+                Text(
+                    text = when (group.status) {
+                        "ACTIVE" -> "진행 중"
+                        "OPEN" -> "${group.entries.size.coerceAtMost(3)}/3명 매칭 중"
+                        else -> group.status
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF80684F)
+                )
+            }
+
+            Button(
+                onClick = onBackClick,
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = ContestSecondaryColor)
+            ) {
+                Text("목록")
+            }
+        }
+
+        if (isLoading) {
+            Text(
+                text = "조 정보를 불러오는 중입니다.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF80684F)
+            )
+        } else if (!message.isNullOrBlank()) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF80684F),
+                textAlign = TextAlign.Center
+            )
+        }
+
+        ContestGroupEntryGrid(
+            entries = group.entries,
+            myEntryId = group.myEntryId,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@Composable
+private fun ContestGroupEntryGrid(
+    entries: List<ContestEntryInfo>,
+    myEntryId: Long?,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        repeat(3) { index ->
+            val entry = entries.getOrNull(index)
+            ContestGroupEntrySlot(
+                slotNumber = index + 1,
+                entry = entry,
+                isMine = entry?.entryId == myEntryId,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ContestGroupEntrySlot(
+    slotNumber: Int,
+    entry: ContestEntryInfo?,
+    isMine: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .aspectRatio(0.62f)
+            .clip(RoundedCornerShape(18.dp))
+            .background(ContestSlotColor)
+            .border(
+                width = if (isMine) 3.dp else 1.dp,
+                color = if (isMine) ContestPrimaryColor else ContestBorderColor.copy(alpha = 0.55f),
+                shape = RoundedCornerShape(18.dp)
+            )
+            .padding(7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = "${slotNumber}번",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF6B4423),
+            textAlign = TextAlign.Center
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(vertical = 5.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            when {
+                entry?.imageUrl != null -> ContestRemoteImage(
+                    imageUrl = entry.imageUrl,
+                    contentDescription = "콘테스트 ${slotNumber}번 참가 사진",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(12.dp))
+                )
+                entry != null -> Image(
+                    painter = painterResource(id = PreviewCharacterResIds[(slotNumber - 1) % PreviewCharacterResIds.size]),
+                    contentDescription = "콘테스트 ${slotNumber}번 참가자",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize()
+                )
+                else -> Text(
+                    text = "빈 자리",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color(0xFF9A8065)
+                )
+            }
+        }
+
+        Surface(
+            color = Color.White.copy(alpha = 0.72f),
+            shape = RoundedCornerShape(50),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(26.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = when {
+                        entry == null -> "대기 중"
+                        isMine -> "내 참가"
+                        entry.confirmed -> "${entry.voteCount}표"
+                        else -> "이미지 없음"
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF6B4423),
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContestRemoteImage(
+    imageUrl: String,
+    contentDescription: String,
+    modifier: Modifier = Modifier
+) {
+    val imageBitmap by produceState<ImageBitmap?>(initialValue = null, imageUrl) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                URL(imageUrl).openStream().use { stream ->
+                    BitmapFactory.decodeStream(stream)?.asImageBitmap()
+                }
+            }.getOrNull()
+        }
+    }
+
+    if (imageBitmap != null) {
+        Image(
+            bitmap = imageBitmap!!,
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Crop,
+            modifier = modifier
+        )
+    } else {
+        Box(
+            modifier = modifier.background(Color(0xFFE7D7BF)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "로딩",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF80684F)
+            )
+        }
+    }
+}
+
+@Composable
 private fun ContestGalleryPicker(
     images: List<GalleryImage>,
-    onImageSelected: (GalleryImage) -> Unit,
+    initialSelectedImageId: String?,
+    onImageConfirmed: (GalleryImage) -> Unit,
     onDismiss: () -> Unit
 ) {
+    var pendingImage by remember(images, initialSelectedImageId) {
+        mutableStateOf(images.firstOrNull { it.id == initialSelectedImageId })
+    }
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             color = Color(0xFFFFFBF0),
@@ -408,7 +754,8 @@ private fun ContestGalleryPicker(
                         items(images, key = { it.id }) { image ->
                             ContestGalleryThumbnail(
                                 image = image,
-                                onClick = { onImageSelected(image) }
+                                isSelected = pendingImage?.id == image.id,
+                                onClick = { pendingImage = image }
                             )
                         }
                     }
@@ -416,12 +763,30 @@ private fun ContestGalleryPicker(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Button(
-                    onClick = onDismiss,
-                    colors = ButtonDefaults.buttonColors(containerColor = ContestPrimaryColor),
-                    modifier = Modifier.fillMaxWidth()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text("취소")
+                    Button(
+                        onClick = onDismiss,
+                        colors = ButtonDefaults.buttonColors(containerColor = ContestPrimaryColor),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("취소")
+                    }
+
+                    Button(
+                        onClick = { pendingImage?.let(onImageConfirmed) },
+                        enabled = pendingImage != null,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = ContestSecondaryColor,
+                            disabledContainerColor = Color(0xFFD8C7AD),
+                            disabledContentColor = Color.White.copy(alpha = 0.72f)
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("확인")
+                    }
                 }
             }
         }
@@ -431,6 +796,7 @@ private fun ContestGalleryPicker(
 @Composable
 private fun ContestGalleryThumbnail(
     image: GalleryImage,
+    isSelected: Boolean,
     onClick: () -> Unit
 ) {
     val imageBitmap by produceState<ImageBitmap?>(initialValue = null, image.filePath) {
@@ -445,6 +811,11 @@ private fun ContestGalleryThumbnail(
             .aspectRatio(1f)
             .clip(RoundedCornerShape(12.dp))
             .background(Color(0xFFE7D7BF))
+            .border(
+                width = if (isSelected) 3.dp else 1.dp,
+                color = if (isSelected) ContestSecondaryColor else Color.White.copy(alpha = 0.55f),
+                shape = RoundedCornerShape(12.dp)
+            )
             .clickable(onClick = onClick)
     ) {
         imageBitmap?.let { bitmap ->

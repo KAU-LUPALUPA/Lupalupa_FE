@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.lupapj.data.model.AppPhase
 import com.example.lupapj.data.model.BottomNavItem
 import com.example.lupapj.data.model.DemoPetConditionPolicy
+import com.example.lupapj.data.model.GalleryImage
 import com.example.lupapj.data.model.MainMenuAction
 import com.example.lupapj.data.model.PetAction
 import com.example.lupapj.data.model.PetConditionTickRemainder
@@ -13,6 +14,8 @@ import com.example.lupapj.data.model.PetUiState
 import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.repository.AuthRepository
+import com.example.lupapj.data.repository.ContestRepository
+import com.example.lupapj.data.repository.ContestUploadResult
 import com.example.lupapj.data.repository.FriendRepository
 import com.example.lupapj.data.repository.GalleryRepository // [추가됨]
 import com.example.lupapj.data.repository.RoomRepository
@@ -68,7 +71,8 @@ class AppViewModel(
     private val friendRepository: FriendRepository,
     private val plazaRepository: PlazaRepository,
     private val currencyRepository: CurrencyRepository, // [추가됨(권)] ViewModel 파라미터로 추가
-    private val shopRepository: ShopRepository // [추가됨(권)] ViewModel 파라미터로 추가
+    private val shopRepository: ShopRepository, // [추가됨(권)] ViewModel 파라미터로 추가
+    private val contestRepository: ContestRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AppUiState())
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
@@ -1383,13 +1387,127 @@ class AppViewModel(
         _uiState.update {
             it.copy(
                 phase = AppPhase.CONTEST,
-                recentMainMenuAction = MainMenuAction.CONTEST
+                recentMainMenuAction = MainMenuAction.CONTEST,
+                selectedContestGroup = null,
+                contestGroupMessage = null
             )
         }
+        loadContestGroups()
     }
 
     fun exitContest() {
         _uiState.update { it.copy(phase = AppPhase.ROOM) }
+    }
+
+    fun openContestGroup(groupId: String) {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isContestGroupsLoading = true,
+                    contestGroupMessage = null
+                )
+            }
+
+            contestRepository.getGroupDetail(groupId)
+                .onSuccess { group ->
+                    _uiState.update {
+                        it.copy(
+                            selectedContestGroup = group,
+                            isContestGroupsLoading = false
+                        )
+                    }
+                }
+                .onFailure { throwable ->
+                    _uiState.update {
+                        it.copy(
+                            isContestGroupsLoading = false,
+                            contestGroupMessage = throwable.message ?: "콘테스트 조 정보를 불러오지 못했습니다."
+                        )
+                    }
+                }
+        }
+    }
+
+    fun exitContestGroup() {
+        _uiState.update { it.copy(selectedContestGroup = null) }
+    }
+
+    fun uploadContestEntryImage(image: GalleryImage) {
+        if (_uiState.value.isContestEntryUploading) return
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isContestEntryUploading = true,
+                    contestUploadMessage = "콘테스트 이미지를 업로드 중입니다."
+                )
+            }
+
+            when (val result = contestRepository.uploadEntryImage(image)) {
+                is ContestUploadResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isContestEntryUploading = false,
+                            contestUploadMessage = "콘테스트 참가 이미지가 업로드되었습니다."
+                        )
+                    }
+                    loadContestGroups(result.groupId)
+                }
+
+                is ContestUploadResult.MatchedWithoutImage -> {
+                    _uiState.update {
+                        it.copy(
+                            isContestEntryUploading = false,
+                            contestUploadMessage = "조 매칭은 완료됐지만 이미지 업로드는 실패했습니다. ${result.message}"
+                        )
+                    }
+                    loadContestGroups(result.groupId)
+                }
+
+                is ContestUploadResult.Failure -> {
+                    _uiState.update {
+                        it.copy(
+                            isContestEntryUploading = false,
+                            contestUploadMessage = result.message
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun loadContestGroups(selectedGroupId: String? = null) {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isContestGroupsLoading = true,
+                    contestGroupMessage = null
+                )
+            }
+
+            contestRepository.getGroups()
+                .onSuccess { groups ->
+                    _uiState.update {
+                        it.copy(
+                            contestGroups = groups,
+                            isContestGroupsLoading = false,
+                            contestGroupMessage = if (groups.isEmpty()) "아직 생성된 콘테스트 조가 없습니다." else null
+                        )
+                    }
+
+                    if (selectedGroupId != null) {
+                        openContestGroup(selectedGroupId)
+                    }
+                }
+                .onFailure { throwable ->
+                    _uiState.update {
+                        it.copy(
+                            isContestGroupsLoading = false,
+                            contestGroupMessage = throwable.message ?: "콘테스트 조 목록을 불러오지 못했습니다."
+                        )
+                    }
+                }
+        }
     }
 
     fun exitMinigame() {
@@ -2007,7 +2125,8 @@ class AppViewModel(
         private val friendRepository: FriendRepository,
         private val plazaRepository: PlazaRepository,
         private val currencyRepository: CurrencyRepository, 
-        private val shopRepository: ShopRepository 
+        private val shopRepository: ShopRepository,
+        private val contestRepository: ContestRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -2018,7 +2137,8 @@ class AppViewModel(
                 friendRepository = friendRepository,
                 plazaRepository = plazaRepository,
                 currencyRepository = currencyRepository,
-                shopRepository = shopRepository
+                shopRepository = shopRepository,
+                contestRepository = contestRepository
             ) as T
         }
     }
