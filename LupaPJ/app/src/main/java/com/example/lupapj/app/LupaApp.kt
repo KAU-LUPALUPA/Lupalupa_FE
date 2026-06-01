@@ -329,9 +329,12 @@ fun LupaApp(deepLink: Uri? = null) {
                 selectedGroup = uiState.selectedContestGroup,
                 isLoadingGroups = uiState.isContestGroupsLoading,
                 groupMessage = uiState.contestGroupMessage,
+                isSubmittingVote = uiState.isContestVoteSubmitting,
+                voteMessage = uiState.contestVoteMessage,
                 onEntryImageSelected = appViewModel::uploadContestEntryImage,
                 onGroupClick = appViewModel::openContestGroup,
                 onGroupBackClick = appViewModel::exitContestGroup,
+                onVoteEntryClick = appViewModel::voteForContestEntry,
                 onBackClick = appViewModel::exitContest
             )
         }

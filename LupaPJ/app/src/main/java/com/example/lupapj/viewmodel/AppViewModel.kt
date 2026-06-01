@@ -1389,7 +1389,8 @@ class AppViewModel(
                 phase = AppPhase.CONTEST,
                 recentMainMenuAction = MainMenuAction.CONTEST,
                 selectedContestGroup = null,
-                contestGroupMessage = null
+                contestGroupMessage = null,
+                contestVoteMessage = null
             )
         }
         loadContestGroups()
@@ -1404,7 +1405,8 @@ class AppViewModel(
             _uiState.update {
                 it.copy(
                     isContestGroupsLoading = true,
-                    contestGroupMessage = null
+                    contestGroupMessage = null,
+                    contestVoteMessage = null
                 )
             }
 
@@ -1429,7 +1431,46 @@ class AppViewModel(
     }
 
     fun exitContestGroup() {
-        _uiState.update { it.copy(selectedContestGroup = null) }
+        _uiState.update {
+            it.copy(
+                selectedContestGroup = null,
+                contestVoteMessage = null
+            )
+        }
+    }
+
+    fun voteForContestEntry(entryId: Long) {
+        if (_uiState.value.isContestVoteSubmitting) return
+
+        val groupId = _uiState.value.selectedContestGroup?.groupId ?: return
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isContestVoteSubmitting = true,
+                    contestVoteMessage = "투표를 처리 중입니다."
+                )
+            }
+
+            contestRepository.vote(entryId)
+                .onSuccess {
+                    val refreshedGroup = contestRepository.getGroupDetail(groupId).getOrNull()
+                    _uiState.update {
+                        it.copy(
+                            selectedContestGroup = refreshedGroup ?: it.selectedContestGroup,
+                            isContestVoteSubmitting = false,
+                            contestVoteMessage = "투표가 완료되었습니다."
+                        )
+                    }
+                }
+                .onFailure { throwable ->
+                    _uiState.update {
+                        it.copy(
+                            isContestVoteSubmitting = false,
+                            contestVoteMessage = throwable.message ?: "투표 처리에 실패했습니다."
+                        )
+                    }
+                }
+        }
     }
 
     fun uploadContestEntryImage(image: GalleryImage) {

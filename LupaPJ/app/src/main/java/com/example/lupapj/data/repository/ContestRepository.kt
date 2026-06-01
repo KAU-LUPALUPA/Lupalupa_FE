@@ -6,6 +6,7 @@ interface ContestRepository {
     suspend fun uploadEntryImage(image: GalleryImage): ContestUploadResult
     suspend fun getGroups(): Result<List<ContestGroupSummary>>
     suspend fun getGroupDetail(groupId: String): Result<ContestGroupDetail>
+    suspend fun vote(entryId: Long): Result<Int>
 }
 
 sealed interface ContestUploadResult {

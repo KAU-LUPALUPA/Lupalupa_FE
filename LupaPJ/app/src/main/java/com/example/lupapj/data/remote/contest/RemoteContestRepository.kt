@@ -113,6 +113,18 @@ class RemoteContestRepository(
         }
     }
 
+    override suspend fun vote(entryId: Long): Result<Int> {
+        return runCatching {
+            val response = service.vote(ContestVoteRequestDto(entryId))
+            if (!response.success) {
+                error("콘테스트 투표 처리에 실패했습니다.")
+            }
+            response.voteCount
+        }.recoverCatching { exception ->
+            throw IllegalStateException(exception.toContestUploadMessage())
+        }
+    }
+
     private suspend fun uploadFileToS3(
         uploadUrl: String,
         file: File
@@ -155,7 +167,7 @@ class RemoteContestRepository(
         )
     }
 
-    private fun Exception.toContestUploadMessage(): String {
+    private fun Throwable.toContestUploadMessage(): String {
         if (this is HttpException) {
             val errorBody = response()?.errorBody()?.string()
             val apiMessage = errorBody?.toApiErrorMessage()

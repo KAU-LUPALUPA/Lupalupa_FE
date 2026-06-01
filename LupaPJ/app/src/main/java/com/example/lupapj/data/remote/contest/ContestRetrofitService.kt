@@ -21,6 +21,11 @@ interface ContestRetrofitService {
     suspend fun getGroupDetail(
         @Path("groupId") groupId: String
     ): ContestGroupDetailResponseDto
+
+    @POST("contest/vote")
+    suspend fun vote(
+        @Body request: ContestVoteRequestDto
+    ): ContestVoteResponseDto
 }
 
 data class ContestJoinResponseDto(
@@ -80,4 +85,13 @@ data class ContestEntryInfoDto(
     val voteCount: Int = 0,
     val rank: Int? = null,
     val confirmed: Boolean = false
+)
+
+data class ContestVoteRequestDto(
+    val entryId: Long
+)
+
+data class ContestVoteResponseDto(
+    val success: Boolean = false,
+    val voteCount: Int = 0
 )

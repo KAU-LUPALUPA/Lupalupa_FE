@@ -32,6 +32,8 @@ data class AppUiState(
     val selectedContestGroup: ContestGroupDetail? = null,
     val isContestGroupsLoading: Boolean = false,
     val contestGroupMessage: String? = null,
+    val isContestVoteSubmitting: Boolean = false,
+    val contestVoteMessage: String? = null,
     val myFriendProfile: FriendUser? = null,
     val friends: List<FriendSummary> = emptyList(),
     val receivedFriendRequests: List<FriendRequest> = emptyList(),
