@@ -315,7 +315,8 @@ data class GalleryImage(
     val filePath: String,
     val isFavorite: Boolean = false,
     val timestamp: Long,
-    val isBackedUp: Boolean = false // [추가됨] 백업 상태 (구름 아이콘)
+    val isBackedUp: Boolean = false, // [추가됨] 백업 상태 (구름 아이콘)
+    val serverImageId: String? = null // [추가됨] 서버 동기화(삭제/즐겨찾기)용 ID
 )
 
 // [추가됨(권)] 재화 상태 모델. 서버 스펙(Long)에 맞춰 타입을 변경했습니다.

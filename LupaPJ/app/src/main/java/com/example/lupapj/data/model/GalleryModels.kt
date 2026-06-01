@@ -1,7 +1,5 @@
 package com.example.lupapj.data.model
 
-import com.google.gson.annotations.SerializedName
-
 // 로컬 DB (DataStore) 용 모델
 data class GalleryEntity(
     val id: String,               // 로컬 고유 ID (UUID)
@@ -15,41 +13,52 @@ data class GalleryEntity(
 // 백엔드 API (GalleryController) 연동용 Request/Response DTO
 data class GalleryItemsResponse(
     val success: Boolean,
+    val data: GalleryItemsData?
+)
+
+data class GalleryItemsData(
     val items: List<GalleryItemDto>
 )
 
 data class GalleryItemDto(
     val imageId: String,
-    val uid: String,
-    val url: String,
-    val createdAt: String,
-    val isFavorite: Boolean
+    val imageUrl: String,
+    val isFavorite: Boolean,
+    val timestamp: Long
 )
 
 data class UploadUrlRequest(
     val fileName: String,
-    val contentType: String
+    val fileType: String
 )
 
 data class UploadUrlResponse(
     val success: Boolean,
+    val data: UploadUrlData?
+)
+
+data class UploadUrlData(
     val uploadUrl: String,
-    val imageUrl: String
+    val fileKey: String
 )
 
 data class SaveMetadataRequest(
-    val imageUrl: String
+    val fileKey: String,
+    val size: Long,
+    val isFavorite: Boolean
 )
 
 data class SaveMetadataResponse(
     val success: Boolean,
-    val imageId: String,
-    val message: String
+    val data: SaveMetadataData?
+)
+
+data class SaveMetadataData(
+    val imageId: String
 )
 
 data class DeleteResponse(
-    val success: Boolean,
-    val message: String
+    val success: Boolean
 )
 
 data class FavoriteRequest(
@@ -58,5 +67,10 @@ data class FavoriteRequest(
 
 data class FavoriteResponse(
     val success: Boolean,
-    val message: String
+    val data: FavoriteData?
+)
+
+data class FavoriteData(
+    val imageId: String,
+    val isFavorite: Boolean
 )

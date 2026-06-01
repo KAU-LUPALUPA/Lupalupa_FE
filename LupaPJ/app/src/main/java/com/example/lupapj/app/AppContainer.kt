@@ -85,8 +85,11 @@ class AppContainer(context: Context) {
     val plazaRepository: PlazaRepository = RemotePlazaRepository(
         apiClient = RetrofitPlazaApiClient(plazaRetrofitService)
     )
-    val galleryRepository: GalleryRepository by lazy { GalleryRepository(appContext) } // [보존] 팀원 작업 내용
-    
+    val galleryRepository: GalleryRepository by lazy { 
+        val galleryRetrofitService = retrofit.create(com.example.lupapj.data.remote.gallery.GalleryRetrofitService::class.java)
+        val remoteGalleryRepo = com.example.lupapj.data.repository.RemoteGalleryRepository(galleryRetrofitService)
+        GalleryRepository(appContext, remoteGalleryRepo) 
+    }
     // [수정됨(권)] 로컬 캐시 인스턴스
     private val shopLocalCache = ShopLocalCache(appContext)
 

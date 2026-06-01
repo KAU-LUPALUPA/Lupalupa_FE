@@ -25,14 +25,14 @@ class RemoteGalleryRepository(
             // 1. Get Presigned URL
             val uploadReq = UploadUrlRequest(
                 fileName = file.name,
-                contentType = "image/png"
+                fileType = "image/png"
             )
             val urlResponse = apiService.getUploadUrl(uploadReq)
-            if (!urlResponse.isSuccessful || urlResponse.body() == null) {
+            if (!urlResponse.isSuccessful || urlResponse.body()?.data == null) {
                 throw Exception("Failed to get upload URL: ${urlResponse.code()}")
             }
-            val presignedUrl = urlResponse.body()!!.uploadUrl
-            val imageUrl = urlResponse.body()!!.imageUrl
+            val presignedUrl = urlResponse.body()!!.data!!.uploadUrl
+            val fileKey = urlResponse.body()!!.data!!.fileKey
 
             // 2. Upload to S3
             val requestBody = file.asRequestBody("image/png".toMediaTypeOrNull())
@@ -42,13 +42,17 @@ class RemoteGalleryRepository(
             }
 
             // 3. Save Metadata
-            val metaReq = SaveMetadataRequest(imageUrl = imageUrl)
+            val metaReq = SaveMetadataRequest(
+                fileKey = fileKey,
+                size = file.length(),
+                isFavorite = false
+            )
             val metaResponse = apiService.saveMetadata(metaReq)
-            if (!metaResponse.isSuccessful || metaResponse.body() == null) {
+            if (!metaResponse.isSuccessful || metaResponse.body()?.data == null) {
                 throw Exception("Failed to save metadata: ${metaResponse.code()}")
             }
             
-            metaResponse.body()!!.imageId
+            metaResponse.body()!!.data!!.imageId
         }
     }
 

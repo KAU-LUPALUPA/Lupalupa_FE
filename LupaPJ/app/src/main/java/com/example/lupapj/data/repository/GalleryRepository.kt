@@ -2,6 +2,7 @@ package com.example.lupapj.data.repository
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.util.Log
 import androidx.work.Constraints
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
@@ -17,12 +18,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import java.time.Instant
 import java.util.UUID
 
-class GalleryRepository(private val context: Context) {
+class GalleryRepository(
+    private val context: Context,
+    private val remoteGalleryRepository: RemoteGalleryRepository? = null
+) {
     private val localCache = GalleryLocalCache(context)
     private val scope = CoroutineScope(Dispatchers.IO)
     private val workManager = WorkManager.getInstance(context)
@@ -36,7 +41,8 @@ class GalleryRepository(private val context: Context) {
                     filePath = entity.localUri,
                     isFavorite = entity.isFavorite,
                     timestamp = Instant.parse(entity.createdAt).toEpochMilli(),
-                    isBackedUp = entity.isBackedUp
+                    isBackedUp = entity.isBackedUp,
+                    serverImageId = entity.serverImageId
                 )
             }.sortedByDescending { it.timestamp }
         }
@@ -71,33 +77,51 @@ class GalleryRepository(private val context: Context) {
     }
 
     suspend fun toggleFavorite(imageId: String) = withContext(Dispatchers.IO) {
-        // 기존 엔티티 찾아서 업데이트 (실제로는 localCache 쪽에 getItem이 있으면 좋음, 여기선 약간 편법)
-        val currentItems = localCache.getUnbackedUpItems() // (x) 모든 아이템을 가져와야 함
-        // DataStore 특성 상 updateGalleryItem에서 리스트를 다시 읽어 수정하므로
-        // 임시로 생성해서 업데이트를 보내거나 updateGalleryItem 로직을 조금 고쳐야 함.
-        // 현재 updateGalleryItem은 동일 id의 항목을 덮어씀.
-        // 가장 좋은 것은 localCache.toggleFavorite 를 만드는 것이지만, 여기선 Flow 최신값을 읽어옴.
         val target = images.value.find { it.id == imageId }
         if (target != null) {
+            val newFavoriteStatus = !target.isFavorite
             val updated = GalleryEntity(
                 id = target.id,
                 localUri = target.filePath,
                 createdAt = Instant.ofEpochMilli(target.timestamp).toString(),
                 isBackedUp = target.isBackedUp,
-                isFavorite = !target.isFavorite
-                // serverImageId 도 보존해야 완벽하지만 UI 모델엔 없음.
+                isFavorite = newFavoriteStatus,
+                serverImageId = target.serverImageId
             )
             localCache.updateGalleryItem(updated)
-            triggerSyncWorker()
+            
+            // 백엔드 동기화 (Fire-and-forget)
+            target.serverImageId?.let { serverId ->
+                scope.launch {
+                    try {
+                        remoteGalleryRepository?.toggleFavorite(serverId, newFavoriteStatus)
+                    } catch (e: Exception) {
+                        Log.e("GalleryRepo", "Failed to sync favorite", e)
+                    }
+                }
+            }
         }
     }
 
     suspend fun deleteImage(imageId: String) = withContext(Dispatchers.IO) {
+        val target = images.value.find { it.id == imageId }
+        val serverId = target?.serverImageId
+        
         val file = File(galleryDir, "$imageId.png")
         if (file.exists()) file.delete()
         
         localCache.deleteGalleryItem(imageId)
-        triggerSyncWorker()
+        
+        // 백엔드 동기화 (Fire-and-forget)
+        serverId?.let { sId ->
+            scope.launch {
+                try {
+                    remoteGalleryRepository?.deleteItems(listOf(sId))
+                } catch (e: Exception) {
+                    Log.e("GalleryRepo", "Failed to sync delete", e)
+                }
+            }
+        }
     }
 
     private fun triggerSyncWorker() {
