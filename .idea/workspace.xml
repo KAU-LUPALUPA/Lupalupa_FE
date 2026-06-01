@@ -6,6 +6,13 @@
   <component name="ChangeListManager">
     <list default="true" id="787e44b5-2ad2-4f15-8fa9-760757c05508" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/LupaPJ/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/LupaPJ/.idea/gradle.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/LupaPJ/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/LupaPJ/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/LupaPJ/app/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/LupaPJ/app/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/LupaPJ/app/src/main/java/com/example/lupapj/data/model/AppModels.kt" beforeDir="false" afterPath="$PROJECT_DIR$/LupaPJ/app/src/main/java/com/example/lupapj/data/model/AppModels.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/LupaPJ/app/src/main/java/com/example/lupapj/data/repository/GalleryRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/LupaPJ/app/src/main/java/com/example/lupapj/data/repository/GalleryRepository.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/LupaPJ/app/src/main/java/com/example/lupapj/ui/screens/gallery/GalleryScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/LupaPJ/app/src/main/java/com/example/lupapj/ui/screens/gallery/GalleryScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/LupaPJ/app/src/main/java/com/example/lupapj/viewmodel/AppViewModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/LupaPJ/app/src/main/java/com/example/lupapj/viewmodel/AppViewModel.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

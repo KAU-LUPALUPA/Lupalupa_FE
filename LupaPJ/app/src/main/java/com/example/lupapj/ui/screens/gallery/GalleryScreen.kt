@@ -105,7 +105,7 @@ fun GalleryItem(
                     .padding(8.dp)
             ) {
                 Text(
-                    text = "📸 $dateString",
+                    text = "📸 $dateString${if (image.isBackedUp) " ☁️" else ""}",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -675,11 +675,15 @@ class AppViewModel(
     }
 
     fun toggleFavorite(imageId: String) {
-        galleryRepository.toggleFavorite(imageId)
+        viewModelScope.launch {
+            galleryRepository.toggleFavorite(imageId)
+        }
     }
 
     fun deleteImage(imageId: String) {
-        galleryRepository.deleteImage(imageId)
+        viewModelScope.launch {
+            galleryRepository.deleteImage(imageId)
+        }
     }
 
     fun exitGallery() {

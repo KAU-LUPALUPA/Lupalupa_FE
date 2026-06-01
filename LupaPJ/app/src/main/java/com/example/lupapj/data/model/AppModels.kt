@@ -314,7 +314,8 @@ data class GalleryImage(
     val id: String,
     val filePath: String,
     val isFavorite: Boolean = false,
-    val timestamp: Long
+    val timestamp: Long,
+    val isBackedUp: Boolean = false // [추가됨] 백업 상태 (구름 아이콘)
 )
 
 // [추가됨(권)] 재화 상태 모델. 서버 스펙(Long)에 맞춰 타입을 변경했습니다.
