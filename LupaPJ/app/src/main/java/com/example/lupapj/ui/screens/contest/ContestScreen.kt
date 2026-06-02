@@ -74,6 +74,8 @@ fun ContestScreen(
     selectedGroup: ContestGroupDetail?,
     isLoadingGroups: Boolean,
     groupMessage: String?,
+    isParticipating: Boolean,
+    myEntryImageUrl: String?,
     isSubmittingVote: Boolean,
     voteMessage: String?,
     onEntryImageSelected: (GalleryImage) -> Unit,
@@ -134,7 +136,7 @@ fun ContestScreen(
 
                     if (selectedGroup == null) {
                         ContestActionButton(
-                            text = "참가하기",
+                            text = if (isParticipating) "사진 바꾸기" else "참가하기",
                             containerColor = ContestPrimaryColor,
                             onClick = {
                                 isGalleryPickerVisible = true
@@ -149,6 +151,7 @@ fun ContestScreen(
                             text = when {
                                 isUploadingEntry -> "선택한 이미지를 S3에 업로드 중입니다."
                                 uploadMessage != null -> uploadMessage
+                                isParticipating -> "조에 참가중입니다."
                                 selectedEntryImage != null -> "선택한 사진이 내 참가 칸에 등록되었어요."
                                 else -> "참가할 캐릭터 사진을 선택해주세요."
                             },
@@ -163,6 +166,8 @@ fun ContestScreen(
 
                         MyContestEntrySlot(
                             selectedEntryImage = selectedEntryImage,
+                            serverImageUrl = myEntryImageUrl,
+                            isParticipating = isParticipating,
                             modifier = Modifier.fillMaxWidth(0.52f)
                         )
 
@@ -234,6 +239,8 @@ private fun ContestActionButton(
 @Composable
 private fun MyContestEntrySlot(
     selectedEntryImage: GalleryImage?,
+    serverImageUrl: String?,
+    isParticipating: Boolean,
     modifier: Modifier = Modifier
 ) {
     val selectedBitmap = selectedEntryImage?.let { image ->
@@ -269,8 +276,8 @@ private fun MyContestEntrySlot(
                 .padding(vertical = 5.dp),
             contentAlignment = Alignment.Center
         ) {
-            if (selectedBitmap != null) {
-                Image(
+            when {
+                selectedBitmap != null -> Image(
                     bitmap = selectedBitmap,
                     contentDescription = "내 콘테스트 참가 사진",
                     contentScale = ContentScale.Crop,
@@ -278,8 +285,14 @@ private fun MyContestEntrySlot(
                         .fillMaxSize()
                         .clip(RoundedCornerShape(12.dp))
                 )
-            } else {
-                Text(
+                serverImageUrl != null -> ContestRemoteImage(
+                    imageUrl = serverImageUrl,
+                    contentDescription = "서버에 등록된 내 콘테스트 참가 사진",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(12.dp))
+                )
+                else -> Text(
                     text = "사진 없음",
                     style = MaterialTheme.typography.labelMedium,
                     color = Color(0xFF9A8065)
@@ -296,7 +309,11 @@ private fun MyContestEntrySlot(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Text(
-                    text = if (selectedEntryImage != null) "내 참가작" else "선택 대기",
+                    text = when {
+                        selectedEntryImage != null || serverImageUrl != null -> "내 참가작"
+                        isParticipating -> "이미지 대기"
+                        else -> "선택 대기"
+                    },
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF6B4423),
@@ -410,8 +427,9 @@ private fun ContestGroupDetailPanel(
     modifier: Modifier = Modifier
 ) {
     var isVoteMode by remember(group.groupId) { mutableStateOf(false) }
+    var selectedVoteEntryId by remember(group.groupId) { mutableStateOf<Long?>(null) }
     val canVote = group.status != "CLOSED" &&
-        group.entries.any { entry -> entry.confirmed && entry.entryId != group.myEntryId }
+        group.entries.any { entry -> entry.confirmed }
 
     Column(
         modifier = modifier,
@@ -466,7 +484,10 @@ private fun ContestGroupDetailPanel(
         }
 
         Button(
-            onClick = { isVoteMode = !isVoteMode },
+            onClick = {
+                isVoteMode = !isVoteMode
+                selectedVoteEntryId = null
+            },
             enabled = canVote && !isSubmittingVote,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
@@ -483,7 +504,8 @@ private fun ContestGroupDetailPanel(
             text = when {
                 !voteMessage.isNullOrBlank() -> voteMessage
                 group.status == "CLOSED" -> "종료된 조에는 투표할 수 없습니다."
-                !canVote -> "투표할 수 있는 다른 참가 사진이 없습니다."
+                !canVote -> "투표할 수 있는 참가 사진이 없습니다."
+                selectedVoteEntryId != null -> "선택한 참가 사진에 투표하려면 확인을 눌러주세요."
                 isVoteMode -> "투표할 참가 사진을 선택해주세요."
                 else -> "투표하기를 누르면 참가 사진을 선택할 수 있습니다."
             },
@@ -499,12 +521,32 @@ private fun ContestGroupDetailPanel(
             myEntryId = group.myEntryId,
             isVoteMode = isVoteMode,
             isSubmittingVote = isSubmittingVote,
-            onVoteEntryClick = { entryId ->
-                isVoteMode = false
-                onVoteEntryClick(entryId)
-            },
+            selectedVoteEntryId = selectedVoteEntryId,
+            onVoteEntryClick = { entryId -> selectedVoteEntryId = entryId },
             modifier = Modifier.fillMaxWidth()
         )
+
+        if (isVoteMode) {
+            Button(
+                onClick = {
+                    selectedVoteEntryId?.let { entryId ->
+                        isVoteMode = false
+                        selectedVoteEntryId = null
+                        onVoteEntryClick(entryId)
+                    }
+                },
+                enabled = selectedVoteEntryId != null && !isSubmittingVote,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = ContestPrimaryColor,
+                    disabledContainerColor = Color(0xFFD8C7AD),
+                    disabledContentColor = Color.White.copy(alpha = 0.72f)
+                )
+            ) {
+                Text("확인")
+            }
+        }
     }
 }
 
@@ -514,6 +556,7 @@ private fun ContestGroupEntryGrid(
     myEntryId: Long?,
     isVoteMode: Boolean,
     isSubmittingVote: Boolean,
+    selectedVoteEntryId: Long?,
     onVoteEntryClick: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -529,6 +572,7 @@ private fun ContestGroupEntryGrid(
                 isMine = entry?.entryId == myEntryId,
                 isVoteMode = isVoteMode,
                 isSubmittingVote = isSubmittingVote,
+                isVoteSelected = entry?.entryId == selectedVoteEntryId,
                 onVoteEntryClick = onVoteEntryClick,
                 modifier = Modifier.weight(1f)
             )
@@ -543,10 +587,11 @@ private fun ContestGroupEntrySlot(
     isMine: Boolean,
     isVoteMode: Boolean,
     isSubmittingVote: Boolean,
+    isVoteSelected: Boolean,
     onVoteEntryClick: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val canSelectForVote = isVoteMode && !isSubmittingVote && entry?.confirmed == true && !isMine
+    val canSelectForVote = isVoteMode && !isSubmittingVote && entry?.confirmed == true
 
     Column(
         modifier = modifier
@@ -554,8 +599,12 @@ private fun ContestGroupEntrySlot(
             .clip(RoundedCornerShape(18.dp))
             .background(ContestSlotColor)
             .border(
-                width = if (isMine) 3.dp else 1.dp,
-                color = if (isMine) ContestPrimaryColor else ContestBorderColor.copy(alpha = 0.55f),
+                width = if (isMine || isVoteSelected) 3.dp else 1.dp,
+                color = when {
+                    isVoteSelected -> ContestSecondaryColor
+                    isMine -> ContestPrimaryColor
+                    else -> ContestBorderColor.copy(alpha = 0.55f)
+                },
                 shape = RoundedCornerShape(18.dp)
             )
             .clickable(
@@ -614,6 +663,7 @@ private fun ContestGroupEntrySlot(
                 Text(
                     text = when {
                         entry == null -> "대기 중"
+                        isVoteSelected -> "선택됨"
                         isMine -> "내 참가"
                         entry.confirmed -> "${entry.voteCount}표"
                         else -> "이미지 없음"

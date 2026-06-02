@@ -1389,6 +1389,7 @@ class AppViewModel(
                 phase = AppPhase.CONTEST,
                 recentMainMenuAction = MainMenuAction.CONTEST,
                 selectedContestGroup = null,
+                contestUploadMessage = null,
                 contestGroupMessage = null,
                 contestVoteMessage = null
             )
@@ -1528,12 +1529,19 @@ class AppViewModel(
 
             contestRepository.getGroups()
                 .onSuccess { groups ->
+                    val myGroupId = groups.firstOrNull { it.isMyGroup }?.groupId
                     _uiState.update {
                         it.copy(
                             contestGroups = groups,
                             isContestGroupsLoading = false,
+                            isContestParticipating = myGroupId != null,
+                            contestMyEntryImageUrl = if (myGroupId == null) null else it.contestMyEntryImageUrl,
                             contestGroupMessage = if (groups.isEmpty()) "아직 생성된 콘테스트 조가 없습니다." else null
                         )
+                    }
+
+                    if (myGroupId != null) {
+                        loadContestParticipation(myGroupId)
                     }
 
                     if (selectedGroupId != null) {
@@ -1545,6 +1553,23 @@ class AppViewModel(
                         it.copy(
                             isContestGroupsLoading = false,
                             contestGroupMessage = throwable.message ?: "콘테스트 조 목록을 불러오지 못했습니다."
+                        )
+                    }
+            }
+        }
+    }
+
+    private fun loadContestParticipation(groupId: String) {
+        viewModelScope.launch {
+            contestRepository.getGroupDetail(groupId)
+                .onSuccess { group ->
+                    val myEntryImageUrl = group.entries
+                        .firstOrNull { entry -> entry.entryId == group.myEntryId }
+                        ?.imageUrl
+                    _uiState.update {
+                        it.copy(
+                            isContestParticipating = true,
+                            contestMyEntryImageUrl = myEntryImageUrl
                         )
                     }
                 }

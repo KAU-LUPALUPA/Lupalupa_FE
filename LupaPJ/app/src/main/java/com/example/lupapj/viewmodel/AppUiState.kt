@@ -32,6 +32,8 @@ data class AppUiState(
     val selectedContestGroup: ContestGroupDetail? = null,
     val isContestGroupsLoading: Boolean = false,
     val contestGroupMessage: String? = null,
+    val isContestParticipating: Boolean = false,
+    val contestMyEntryImageUrl: String? = null,
     val isContestVoteSubmitting: Boolean = false,
     val contestVoteMessage: String? = null,
     val myFriendProfile: FriendUser? = null,
