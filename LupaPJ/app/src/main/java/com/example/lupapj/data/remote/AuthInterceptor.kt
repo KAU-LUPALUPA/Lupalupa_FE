@@ -12,12 +12,16 @@ class AuthInterceptor(
     private val tokenProvider: () -> String?
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
-        val requestBuilder = chain.request().newBuilder()
+        val request = chain.request()
+        val requestBuilder = request.newBuilder()
         
-        // 토큰이 존재하면 Authorization 헤더 추가
-        val token = tokenProvider()
-        if (!token.isNullOrEmpty()) {
-            requestBuilder.addHeader("Authorization", "Bearer $token")
+        // S3로 가는 요청(presigned url)에는 Authorization 헤더를 추가하지 않음
+        if (!request.url.host.contains("amazonaws.com")) {
+            // 토큰이 존재하면 Authorization 헤더 추가
+            val token = tokenProvider()
+            if (!token.isNullOrEmpty()) {
+                requestBuilder.addHeader("Authorization", "Bearer $token")
+            }
         }
         
         return chain.proceed(requestBuilder.build())
