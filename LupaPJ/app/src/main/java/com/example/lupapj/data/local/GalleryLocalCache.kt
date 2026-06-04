@@ -21,6 +21,8 @@ interface GalleryCache {
     suspend fun updateGalleryItem(item: GalleryEntity)
     suspend fun getUnbackedUpItems(): List<GalleryEntity>
     suspend fun markAsBackedUp(localId: String, serverImageId: String)
+    suspend fun getDirtyFavoriteItems(): List<GalleryEntity>
+    suspend fun clearFavoriteDirtyFlag(localId: String)
 }
 
 class GalleryLocalCache(private val context: Context) : GalleryCache {
@@ -110,6 +112,34 @@ class GalleryLocalCache(private val context: Context) : GalleryCache {
                         isBackedUp = true,
                         serverImageId = serverImageId
                     )
+                    prefs[Keys.GALLERY_ITEMS_JSON] = gson.toJson(items)
+                }
+            }
+        }
+    }
+
+    override suspend fun getDirtyFavoriteItems(): List<GalleryEntity> {
+        var dirtyList = emptyList<GalleryEntity>()
+        dataStore.edit { prefs ->
+            val json = prefs[Keys.GALLERY_ITEMS_JSON]
+            if (!json.isNullOrBlank()) {
+                val type = object : TypeToken<List<GalleryEntity>>() {}.type
+                val items: List<GalleryEntity> = gson.fromJson(json, type)
+                dirtyList = items.filter { it.isFavoriteDirty && it.isBackedUp && it.serverImageId != null }
+            }
+        }
+        return dirtyList
+    }
+
+    override suspend fun clearFavoriteDirtyFlag(localId: String) {
+        dataStore.edit { prefs ->
+            val json = prefs[Keys.GALLERY_ITEMS_JSON]
+            if (!json.isNullOrBlank()) {
+                val type = object : TypeToken<MutableList<GalleryEntity>>() {}.type
+                val items: MutableList<GalleryEntity> = gson.fromJson(json, type)
+                val index = items.indexOfFirst { it.id == localId }
+                if (index != -1) {
+                    items[index] = items[index].copy(isFavoriteDirty = false)
                     prefs[Keys.GALLERY_ITEMS_JSON] = gson.toJson(items)
                 }
             }

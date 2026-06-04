@@ -75,6 +75,27 @@ class GallerySyncWorker(
             }
         }
 
+        // 3. 즐겨찾기 오프라인 변경분 동기화
+        val dirtyFavorites = localCache.getDirtyFavoriteItems()
+        Log.d("GallerySyncWorker", "Dirty favorite items: ${dirtyFavorites.size}")
+        for (item in dirtyFavorites) {
+            item.serverImageId?.let { serverId ->
+                try {
+                    val result = remoteRepo.toggleFavorite(serverId, item.isFavorite)
+                    if (result.isSuccess) {
+                        localCache.clearFavoriteDirtyFlag(item.id)
+                        Log.d("GallerySyncWorker", "Successfully synced favorite for: ${item.id}")
+                    } else {
+                        Log.e("GallerySyncWorker", "Failed to sync favorite for: ${item.id}", result.exceptionOrNull())
+                        allSuccess = false
+                    }
+                } catch (e: Exception) {
+                    Log.e("GallerySyncWorker", "Exception during favorite sync: ${item.id}", e)
+                    allSuccess = false
+                }
+            }
+        }
+
         return if (allSuccess) {
             Log.d("GallerySyncWorker", "Sync finished successfully.")
             Result.success()

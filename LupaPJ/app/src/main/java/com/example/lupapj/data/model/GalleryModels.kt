@@ -7,7 +7,8 @@ data class GalleryEntity(
     val createdAt: String,        // 촬영 시각 (ISO-8601 등)
     val isBackedUp: Boolean = false, // 서버 백업 완료 여부
     val serverImageId: String? = null, // 서버에 백업된 후 발급받은 ID
-    val isFavorite: Boolean = false // 즐겨찾기 여부
+    val isFavorite: Boolean = false, // 즐겨찾기 여부
+    val isFavoriteDirty: Boolean = false // 오프라인 동기화 큐 상태
 )
 
 // 백엔드 API (GalleryController) 연동용 Request/Response DTO

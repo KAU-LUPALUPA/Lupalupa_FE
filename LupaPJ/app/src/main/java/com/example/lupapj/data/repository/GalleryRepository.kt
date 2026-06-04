@@ -86,17 +86,24 @@ class GalleryRepository(
                 createdAt = Instant.ofEpochMilli(target.timestamp).toString(),
                 isBackedUp = target.isBackedUp,
                 isFavorite = newFavoriteStatus,
-                serverImageId = target.serverImageId
+                serverImageId = target.serverImageId,
+                isFavoriteDirty = true
             )
             localCache.updateGalleryItem(updated)
             
-            // 백엔드 동기화 (Fire-and-forget)
+            // 워커를 띄워 백그라운드에서 오프라인 동기화 큐 역할 수행
+            triggerSyncWorker()
+            
+            // 즉시 백엔드 동기화 시도 (빠른 반영)
             target.serverImageId?.let { serverId ->
                 scope.launch {
                     try {
-                        remoteGalleryRepository?.toggleFavorite(serverId, newFavoriteStatus)
+                        val result = remoteGalleryRepository?.toggleFavorite(serverId, newFavoriteStatus)
+                        if (result?.isSuccess == true) {
+                            localCache.clearFavoriteDirtyFlag(target.id)
+                        }
                     } catch (e: Exception) {
-                        Log.e("GalleryRepo", "Failed to sync favorite", e)
+                        Log.e("GalleryRepo", "Failed to sync favorite immediately", e)
                     }
                 }
             }
