@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -430,6 +431,7 @@ private fun ContestGroupDetailPanel(
     var selectedVoteEntryId by remember(group.groupId) { mutableStateOf<Long?>(null) }
     val canVote = group.status != "CLOSED" &&
         group.entries.any { entry -> entry.confirmed }
+    val standings = remember(group.entries) { buildContestStandings(group.entries) }
 
     Column(
         modifier = modifier,
@@ -526,6 +528,12 @@ private fun ContestGroupDetailPanel(
             modifier = Modifier.fillMaxWidth()
         )
 
+        ContestVoteStatusPanel(
+            standings = standings,
+            myEntryId = group.myEntryId,
+            modifier = Modifier.fillMaxWidth()
+        )
+
         if (isVoteMode) {
             Button(
                 onClick = {
@@ -545,6 +553,160 @@ private fun ContestGroupDetailPanel(
                 )
             ) {
                 Text("확인")
+            }
+        }
+    }
+}
+
+private data class ContestEntryStanding(
+    val entry: ContestEntryInfo,
+    val slotNumber: Int,
+    val rank: Int
+)
+
+private fun buildContestStandings(entries: List<ContestEntryInfo>): List<ContestEntryStanding> {
+    val orderedEntries = entries
+        .mapIndexed { index, entry -> index + 1 to entry }
+        .sortedWith(
+            compareByDescending<Pair<Int, ContestEntryInfo>> { it.second.voteCount }
+                .thenBy { it.first }
+        )
+
+    var previousVoteCount: Int? = null
+    var currentRank = 0
+    return orderedEntries.mapIndexed { index, pair ->
+        val voteCount = pair.second.voteCount
+        if (previousVoteCount != voteCount) {
+            currentRank = index + 1
+            previousVoteCount = voteCount
+        }
+
+        ContestEntryStanding(
+            entry = pair.second,
+            slotNumber = pair.first,
+            rank = currentRank
+        )
+    }
+}
+
+@Composable
+private fun ContestVoteStatusPanel(
+    standings: List<ContestEntryStanding>,
+    myEntryId: Long?,
+    modifier: Modifier = Modifier
+) {
+    val maxVoteCount = standings.maxOfOrNull { it.entry.voteCount } ?: 0
+
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = "투표 현황",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF5C371D)
+        )
+
+        if (standings.isEmpty()) {
+            Text(
+                text = "아직 조에 참가자가 없습니다.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF80684F)
+            )
+        } else {
+            standings.forEach { standing ->
+                ContestStandingRow(
+                    standing = standing,
+                    isMine = standing.entry.entryId == myEntryId,
+                    maxVoteCount = maxVoteCount
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContestStandingRow(
+    standing: ContestEntryStanding,
+    isMine: Boolean,
+    maxVoteCount: Int
+) {
+    val voteFraction = when {
+        maxVoteCount <= 0 -> 0f
+        else -> standing.entry.voteCount.toFloat() / maxVoteCount.toFloat()
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = "${standing.rank}위",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF5C371D)
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color.White.copy(alpha = 0.58f))
+                .border(1.dp, ContestBorderColor.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                .padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "${standing.slotNumber}번",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF5C371D)
+                    )
+                    Text(
+                        text = if (standing.entry.confirmed) "사진 등록 완료" else "이미지 없음",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF80684F)
+                    )
+                }
+
+                Text(
+                    text = "${standing.entry.voteCount}표",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = ContestPrimaryColor
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color(0xFFEADCC7))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(voteFraction.coerceIn(0f, 1f))
+                        .height(10.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(if (isMine) ContestPrimaryColor else ContestSecondaryColor)
+                )
+                if (standing.entry.voteCount == 0) {
+                    Box(
+                        modifier = Modifier
+                            .width(4.dp)
+                            .height(10.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(Color(0xFFBFA280).copy(alpha = 0.55f))
+                    )
+                }
             }
         }
     }
