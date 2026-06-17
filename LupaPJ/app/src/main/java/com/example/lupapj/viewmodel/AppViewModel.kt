@@ -1543,86 +1543,54 @@ class AppViewModel(
             if (behaviorConsecutiveTicks % 5 != 0) return
         }
 
-        val isCrisis = com.example.lupapj.data.model.BehaviorStateMachine.isCrisis(pet.status.satiety, pet.status.vitality)
-        
-        // [수정됨(권)] 위기 상황에서 휴식 중일 때 활력이 너무 낮으면 강제 기상 방지
-        if (isRestingState && isCrisis && pet.status.vitality < 30) return
+        // V2 감정 및 상태 파생
+        val derived = com.example.lupapj.data.model.BehaviorEvaluator.calculateDerivedTraits(pet.traits)
+        val affect = com.example.lupapj.data.model.BehaviorEvaluator.calculateAffect(pet.traits, derived, pet.status)
 
-        val (m, k) = if (isCrisis) {
-            com.example.lupapj.data.model.BehaviorStateMachine.getCrisisTransitionParams(pet.personality)
-        } else {
-            if (pet.personality == com.example.lupapj.data.model.PetPersonality.ACTIVE && pet.action == PetAction.WALKING) {
-                1.0f to 10.0f 
-            } else {
-                com.example.lupapj.data.model.BehaviorStateMachine.getStableTransitionParams(pet.personality, pet.action)
-            }
-        }
-
-        val currentProb = m * (1f - kotlin.math.exp(-k * behaviorConsecutiveTicks)).toFloat()
-
-        // [수정됨(권)] 디버그 정보 업데이트 (휴식 중일 경우 10초마다 계단식으로 갱신되도록 조정)
+        // 감정 기반 디버그 정보 갱신
         _uiState.update { s -> 
             s.copy(behaviorDebugInfo = s.behaviorDebugInfo.copy(
                 consecutiveTicks = behaviorConsecutiveTicks,
-                currentProbability = currentProb,
-                isCrisis = isCrisis,
-                mValue = m,
-                kValue = k
+                currentProbability = 0f,
+                isCrisis = pet.status.satiety < 30 || pet.status.vitality < 30,
+                mValue = affect.valence,
+                kValue = affect.arousal
             ))
+        }
+
+        // 기존 행동 이탈 체크 (Hazard)
+        if (pet.action != PetAction.IDLE && !com.example.lupapj.data.model.BehaviorEvaluator.checkHazardExit(behaviorConsecutiveTicks.toFloat(), pet.traits.patience)) {
+            return
         }
 
         if (pet.action == PetAction.EATING || pet.action == PetAction.PLAYING) {
             return
         }
 
-        val shouldTransition = com.example.lupapj.data.model.BehaviorStateMachine.checkTransitionProbability(behaviorConsecutiveTicks, m, k)
-        
-        if (shouldTransition || pet.action == PetAction.IDLE) {
-            if (pet.action == PetAction.PLAYING) {
-                viewModelScope.launch {
-                    val nextRoom = roomRepository.updateToyKnockedOver(true)
-                    applyRepositoryRoom(nextRoom)
-                }
+        if (pet.action == PetAction.PLAYING) {
+            viewModelScope.launch {
+                val nextRoom = roomRepository.updateToyKnockedOver(true)
+                applyRepositoryRoom(nextRoom)
             }
-            behaviorConsecutiveTicks = 0
-            
-            val hasFood = room.houseSceneState.currentSceneRuntime.droppedFoodAnchor != null
-            val hasToy = room.houseSceneState.currentSceneRuntime.droppedToyAnchor != null
-
-            if (hasFood) droppedFoodTicks++ else droppedFoodTicks = 0
-            if (hasToy) droppedToyTicks++ else droppedToyTicks = 0
-
-            // [보호] 휴식 중이거나 행동 중일 때는 주변 인지를 차단하여 버그 방지
-            if (!isCrisis && !isRestingState && pet.action != PetAction.EATING && pet.action != PetAction.PLAYING) {
-                val (mN, kN) = com.example.lupapj.data.model.BehaviorStateMachine.getNoticeParams(pet.personality)
-                
-                val discoveredFood = hasFood && com.example.lupapj.data.model.BehaviorStateMachine.checkTransitionProbability(droppedFoodTicks, mN, kN)
-                if (discoveredFood) {
-                    executeBehaviorAction(PetAction.EATING, pet)
-                    droppedFoodTicks = 0
-                    return
-                }
-
-                val discoveredToy = hasToy && com.example.lupapj.data.model.BehaviorStateMachine.checkTransitionProbability(droppedToyTicks, mN, kN)
-                if (discoveredToy) {
-                    executeBehaviorAction(PetAction.PLAYING, pet)
-                    droppedToyTicks = 0
-                    return
-                }
-            }
-
-            val nextAction = if (isCrisis) {
-                if (pet.status.satiety < pet.status.vitality) PetAction.EATING else PetAction.BED_RESTING
-            } else {
-                com.example.lupapj.data.model.BehaviorStateMachine.rollStableBehavior(
-                    personality = pet.personality,
-                    satiety = pet.status.satiety,
-                    hasFood = hasFood,
-                    hasToy = hasToy
-                )
-            }
-            executeBehaviorAction(nextAction, pet)
         }
+        behaviorConsecutiveTicks = 0
+
+        val hasFood = room.houseSceneState.currentSceneRuntime.droppedFoodAnchor != null
+        val hasToy = room.houseSceneState.currentSceneRuntime.droppedToyAnchor != null
+        val hasBed = room.sceneDefinition.objects.any { it.type == com.example.lupapj.data.model.RoomObjectType.BED }
+
+        // 새 행동 결정 (Softmax)
+        val scores = com.example.lupapj.data.model.BehaviorEvaluator.calculateUtilityScores(
+            traits = pet.traits,
+            derived = derived,
+            affect = affect,
+            status = pet.status,
+            hasFood = hasFood,
+            hasToy = hasToy,
+            hasBed = hasBed
+        )
+        val nextAction = com.example.lupapj.data.model.BehaviorEvaluator.sampleAction(scores, pet.traits.patience, derived.volatility)
+        executeBehaviorAction(nextAction, pet)
     }
 
     private fun executeBehaviorAction(action: PetAction, pet: com.example.lupapj.data.model.scene.PetSceneState) {
@@ -1631,7 +1599,7 @@ class AppViewModel(
         
         when (action) {
             PetAction.WALKING -> {
-                val profile = autonomousMovementProfileFor(pet.personality)
+                val profile = autonomousMovementProfileFor(pet.traits)
                 val targetAnchor = chooseAutonomousPetTarget(
                     currentAnchor = pet.anchor,
                     sceneDefinition = room.sceneDefinition,
@@ -1664,7 +1632,7 @@ class AppViewModel(
                         if (distToBed < 1.0f) { /* 스킵 */ }
                     }
 
-                    if (pet.personality == com.example.lupapj.data.model.PetPersonality.LAZY) {
+                    if (pet.traits.activity < 0.3f) {
                         val dist = calculateTileDistance(pet.anchor, targetAnchor, room.sceneDefinition.projectionSpec)
                         if (dist > 3f) {
                             setPetAction(PetAction.RESTING)
@@ -1680,7 +1648,7 @@ class AppViewModel(
                 val targetAnchor = houseSceneState.currentSceneRuntime.droppedFoodAnchor 
                     ?: room.sceneDefinition.objects.find { it.type == RoomObjectType.FOOD_BAG }?.anchor?.let { it as? FloorAnchor }
                 if (targetAnchor != null) {
-                    if (pet.personality == com.example.lupapj.data.model.PetPersonality.LAZY) {
+                    if (pet.traits.activity < 0.3f) {
                         val dist = calculateTileDistance(pet.anchor, targetAnchor, room.sceneDefinition.projectionSpec)
                         if (dist > 3f) {
                             setPetAction(PetAction.RESTING)
@@ -1887,7 +1855,7 @@ class AppViewModel(
         pendingFoodConsumeJob?.cancel()
         pendingFoodConsumeJob = viewModelScope.launch {
             val pet = _uiState.value.room?.houseSceneState?.pet ?: return@launch
-            val profile = autonomousMovementProfileFor(pet.personality)
+            val profile = autonomousMovementProfileFor(pet.traits)
 
             if (!skipMovement) {
                 if (pet.isLyingSide) {
@@ -1927,7 +1895,7 @@ class AppViewModel(
         pendingFoodConsumeJob?.cancel()
         pendingFoodConsumeJob = viewModelScope.launch {
             val pet = _uiState.value.room?.houseSceneState?.pet ?: return@launch
-            val profile = autonomousMovementProfileFor(pet.personality)
+            val profile = autonomousMovementProfileFor(pet.traits)
 
             val delayMs = calculateMovementDelay(pet.anchor, targetAnchor, profile)
             movePetAutonomously(
@@ -1962,7 +1930,7 @@ class AppViewModel(
         pendingFoodConsumeJob?.cancel()
         pendingFoodConsumeJob = viewModelScope.launch {
             var pet = _uiState.value.room?.houseSceneState?.pet ?: return@launch
-            val profile = autonomousMovementProfileFor(pet.personality)
+            val profile = autonomousMovementProfileFor(pet.traits)
 
             if (pet.isLyingSide) {
                 setPetAction(PetAction.IDLE)
@@ -2020,7 +1988,7 @@ class AppViewModel(
         pendingFoodConsumeJob?.cancel()
         pendingFoodConsumeJob = viewModelScope.launch {
             val pet = _uiState.value.room?.houseSceneState?.pet ?: return@launch
-            val profile = autonomousMovementProfileFor(pet.personality)
+            val profile = autonomousMovementProfileFor(pet.traits)
 
             val delayMs = calculateMovementDelay(pet.anchor, targetAnchor, profile)
             movePetAutonomously(
@@ -2120,7 +2088,7 @@ private fun PetUiState.toPlazaPetSnapshot(ownerUserId: String): PlazaPetSnapshot
         characterAssetKey = characterAssetKey,
         appearance = appearance,
         status = status,
-        personality = personality,
+        traits = traits,
         equippedItemIds = equippedItemIds
     )
 }

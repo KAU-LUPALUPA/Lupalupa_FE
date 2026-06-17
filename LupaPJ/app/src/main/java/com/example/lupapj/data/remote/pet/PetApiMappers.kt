@@ -2,7 +2,7 @@ package com.example.lupapj.data.remote.pet
 
 import com.example.lupapj.data.model.PetAction
 import com.example.lupapj.data.model.PetAppearance
-import com.example.lupapj.data.model.PetPersonality
+import com.example.lupapj.data.model.PetTraits
 import com.example.lupapj.data.model.PetStatus
 import com.example.lupapj.data.model.scene.FloorAnchor
 import com.example.lupapj.data.model.scene.HouseSceneState
@@ -20,7 +20,7 @@ fun PetDto.toHouseSceneState(
         characterAssetKey = characterAssetKey,
         petAppearance = appearance.toDomain(),
         petStatus = status.toDomain(),
-        petPersonality = enumValueOrDefault(personality, PetPersonality.ACTIVE),
+        petTraits = traits.toDomain(),
         equippedItemIds = equippedItemIds,
         petAnchor = anchor.toFloorAnchor(),
         petAction = enumValueOrDefault(action, PetAction.IDLE)
@@ -41,7 +41,18 @@ fun PetStatusDto.toDomain(): PetStatus {
     return PetStatus(
         satiety = satiety.coerceIn(0, 100),
         vitality = vitality.coerceIn(0, 100),
+        cleanliness = cleanliness.coerceIn(0, 100), // [추가됨(V2)]
         isEgg = isEgg
+    )
+}
+
+fun PetTraitsDto.toDomain(): PetTraits { // [추가됨(V2)]
+    return PetTraits(
+        activity = activity.coerceIn(0f, 1f),
+        appetite = appetite.coerceIn(0f, 1f),
+        attention = attention.coerceIn(0f, 1f),
+        curiosity = curiosity.coerceIn(0f, 1f),
+        patience = patience.coerceIn(0f, 1f)
     )
 }
 

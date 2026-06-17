@@ -1,6 +1,6 @@
 package com.example.lupapj.data.mock
 
-import com.example.lupapj.data.model.PetPersonality
+import com.example.lupapj.data.model.PetTraits
 import com.example.lupapj.data.model.PetStatus
 import com.example.lupapj.data.model.plaza.PLAZA_MAX_PARTICIPANTS
 import com.example.lupapj.data.model.plaza.PLAZA_MESSAGE_MAX_LENGTH
@@ -303,7 +303,7 @@ class MockPlazaRepository(
                     ownerUserId = "plaza_user_mina",
                     name = "몽글",
                     status = PetStatus(satiety = 88, vitality = 74),
-                    personality = PetPersonality.CALM
+                    traits = PetTraits(activity = 0.2f),
                 ),
                 joinedAtMillis = 0L
             ),
@@ -315,7 +315,7 @@ class MockPlazaRepository(
                     ownerUserId = "plaza_user_haru",
                     name = "콩이",
                     status = PetStatus(satiety = 71, vitality = 92),
-                    personality = PetPersonality.ACTIVE
+                    traits = PetTraits(activity = 0.8f),
                 ),
                 joinedAtMillis = 0L
             ),
@@ -327,7 +327,7 @@ class MockPlazaRepository(
                     ownerUserId = "plaza_user_bori",
                     name = "포포",
                     status = PetStatus(satiety = 64, vitality = 67),
-                    personality = PetPersonality.LAZY
+                    traits = PetTraits(activity = 0.1f),
                 ),
                 joinedAtMillis = 0L
             ),
@@ -339,7 +339,7 @@ class MockPlazaRepository(
                     ownerUserId = "plaza_user_nari",
                     name = "라라",
                     status = PetStatus(satiety = 79, vitality = 81),
-                    personality = PetPersonality.ACTIVE
+                    traits = PetTraits(activity = 0.6f),
                 ),
                 joinedAtMillis = 0L
             )
@@ -350,14 +350,14 @@ class MockPlazaRepository(
             ownerUserId: String,
             name: String,
             status: PetStatus,
-            personality: PetPersonality
+            traits: PetTraits
         ): PlazaPetSnapshot {
             return PlazaPetSnapshot(
                 petId = petId,
                 ownerUserId = ownerUserId,
                 name = name,
                 status = status,
-                personality = personality
+                traits = traits,
             )
         }
     }

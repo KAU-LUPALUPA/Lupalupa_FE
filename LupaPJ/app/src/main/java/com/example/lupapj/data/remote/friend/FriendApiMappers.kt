@@ -2,11 +2,12 @@ package com.example.lupapj.data.remote.friend
 
 import com.example.lupapj.data.model.PetAction
 import com.example.lupapj.data.model.PetAppearance
-import com.example.lupapj.data.model.PetPersonality
+import com.example.lupapj.data.model.PetTraits
 import com.example.lupapj.data.model.PetStatus
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.friend.ActiveFriendHomeVisits
+import com.example.lupapj.data.remote.pet.toDomain
 import com.example.lupapj.data.model.friend.FriendCode
 import com.example.lupapj.data.model.friend.FriendHome
 import com.example.lupapj.data.model.friend.FriendHomeInvitation
@@ -243,9 +244,7 @@ private fun FriendRoomDto.toDomainRoomState(
             characterAssetKey = pet?.characterAssetKey ?: "room/characters/lupa_default",
             petAppearance = pet?.appearance?.toDomain() ?: PetAppearance(),
             petStatus = pet?.status?.toDomain() ?: PetStatus(),
-            petPersonality = pet?.personality?.let {
-                enumValueOrDefault(it, PetPersonality.ACTIVE)
-            } ?: PetPersonality.ACTIVE,
+            petTraits = pet?.traits?.toDomain() ?: PetTraits(),
             equippedItemIds = pet?.equippedItemIds.orEmpty(),
             petAnchor = pet?.anchor?.toFloorAnchor() ?: FloorAnchor(u = 0.44f, v = 0.64f),
             petAction = PetAction.IDLE
@@ -267,9 +266,7 @@ private fun FriendRoomDto.toDomainRoomState(
             characterAssetKey = petSnapshot?.characterAssetKey ?: "room/characters/lupa_default",
             petAppearance = petSnapshot?.appearance?.toDomain() ?: PetAppearance(),
             petStatus = petSnapshot?.condition?.toDomain() ?: PetStatus(),
-            petPersonality = petSnapshot?.personality?.let {
-                enumValueOrDefault(it, PetPersonality.ACTIVE)
-            } ?: PetPersonality.ACTIVE,
+            petTraits = petSnapshot?.traits?.toDomain() ?: PetTraits(),
             equippedItemIds = petSnapshot?.equippedItemIds.orEmpty(),
             petAnchor = petSnapshot?.sceneState?.anchor?.toFloorAnchor()
                 ?: FloorAnchor(u = 0.44f, v = 0.64f),
@@ -359,6 +356,7 @@ private fun FriendPetStatusDto.toDomain(): PetStatus {
     return PetStatus(
         satiety = satiety.coerceIn(0, 100),
         vitality = vitality.coerceIn(0, 100),
+        cleanliness = cleanliness.coerceIn(0, 100),
         isEgg = isEgg
     )
 }
@@ -367,6 +365,7 @@ private fun FriendPetConditionDto.toDomain(): PetStatus {
     return PetStatus(
         satiety = satiety.coerceIn(0, 100),
         vitality = vitality.coerceIn(0, 100),
+        cleanliness = cleanliness.coerceIn(0, 100),
         isEgg = isEgg
     )
 }
@@ -379,7 +378,7 @@ private fun FriendPetSnapshotDto.toPetSceneState(): PetSceneState {
         characterAssetKey = characterAssetKey,
         appearance = appearance.toDomain(),
         status = condition.toDomain(),
-        personality = enumValueOrDefault(personality, PetPersonality.ACTIVE),
+        traits = traits.toDomain(),
         equippedItemIds = equippedItemIds,
         action = enumValueOrDefault(sceneState.action, PetAction.IDLE),
         anchor = sceneState.anchor.toFloorAnchor()

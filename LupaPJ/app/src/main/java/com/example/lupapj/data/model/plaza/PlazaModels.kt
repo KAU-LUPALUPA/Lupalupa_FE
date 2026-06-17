@@ -5,7 +5,7 @@ import com.example.lupapj.data.model.DEFAULT_PET_ID
 import com.example.lupapj.data.model.DEFAULT_PET_NAME
 import com.example.lupapj.data.model.DEFAULT_PET_OWNER_USER_ID
 import com.example.lupapj.data.model.PetAppearance
-import com.example.lupapj.data.model.PetPersonality
+import com.example.lupapj.data.model.PetTraits
 import com.example.lupapj.data.model.PetStatus
 
 const val PLAZA_MAX_PARTICIPANTS = 4
@@ -59,7 +59,7 @@ data class PlazaPetSnapshot(
     val characterAssetKey: String = DEFAULT_PET_CHARACTER_ASSET_KEY,
     val appearance: PetAppearance = PetAppearance(),
     val status: PetStatus = PetStatus(),
-    val personality: PetPersonality = PetPersonality.ACTIVE,
+    val traits: PetTraits = PetTraits(),
     val equippedItemIds: List<String> = emptyList()
 )
 

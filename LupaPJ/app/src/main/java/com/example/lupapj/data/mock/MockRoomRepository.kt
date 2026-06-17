@@ -2,7 +2,7 @@ package com.example.lupapj.data.mock
 
 import com.example.lupapj.data.model.PetAction
 import com.example.lupapj.data.model.PetAppearance
-import com.example.lupapj.data.model.PetPersonality
+import com.example.lupapj.data.model.PetTraits
 import com.example.lupapj.data.model.PetStatus
 import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.RoomUiState
@@ -39,7 +39,7 @@ class MockRoomRepository(
                 vitality = 75,
                 isEgg = false
             ),
-            petPersonality = PetPersonality.ACTIVE,
+            petTraits = PetTraits(activity = 0.8f),
             equippedItemIds = emptyList()
         )
     )

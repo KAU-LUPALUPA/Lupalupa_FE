@@ -122,7 +122,7 @@ fun LupaMainScreen(
     isDayTime: Boolean? = null,
     petSatiety: Int = 80,
     petVitality: Int = 80,
-    petPersonality: com.example.lupapj.data.model.PetPersonality = com.example.lupapj.data.model.PetPersonality.ACTIVE, // [추가됨(권)] 디버깅용 성격
+    petTraits: com.example.lupapj.data.model.PetTraits = com.example.lupapj.data.model.PetTraits(), // [추가됨(권)] 디버깅용 성격
     recentIconRes: Int? = null,
     onConditionTabClick: () -> Unit = {}, // [추가됨(권)] 디버깅용 클릭 이벤트
     onRecentActionClick: () -> Unit = {},
@@ -195,7 +195,7 @@ fun LupaMainScreen(
             isDayTime = resolvedIsDayTime,
             petSatiety = petSatiety,
             petVitality = petVitality,
-            petPersonality = petPersonality, // [추가됨(권)]
+            petTraits = petTraits, // [추가됨(권)]
             onTabClick = onConditionTabClick, // [추가됨(권)]
             onSettingClick = onSettingClick,
             modifier = Modifier.align(Alignment.TopCenter)
@@ -222,7 +222,7 @@ fun TopStatusLayer(
     isDayTime: Boolean,
     petSatiety: Int,
     petVitality: Int,
-    petPersonality: com.example.lupapj.data.model.PetPersonality,
+    petTraits: com.example.lupapj.data.model.PetTraits,
     onTabClick: () -> Unit,
     onSettingClick: () -> Unit,
     modifier: Modifier = Modifier

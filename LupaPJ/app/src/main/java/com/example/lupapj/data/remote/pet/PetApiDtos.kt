@@ -21,6 +21,7 @@ data class PetResponseDto(
 data class UpdatePetStatusRequestDto(
     val satiety: Int? = null,
     val vitality: Int? = null,
+    val cleanliness: Int? = null, // [추가됨(V2)]
     val isEgg: Boolean? = null,
     val action: String? = null,
     val anchor: PetAnchorDto? = null
@@ -44,7 +45,7 @@ data class PetDto(
     val characterAssetKey: String,
     val appearance: PetAppearanceDto,
     val status: PetStatusDto,
-    val personality: String,
+    val traits: PetTraitsDto, // [변경됨(V2)] personality -> traits
     val equippedItemIds: List<String> = emptyList(),
     val action: String,
     val anchor: PetAnchorDto,
@@ -64,7 +65,16 @@ data class PetAppearanceDto(
 data class PetStatusDto(
     val satiety: Int,
     val vitality: Int,
+    val cleanliness: Int, // [추가됨(V2)]
     val isEgg: Boolean
+)
+
+data class PetTraitsDto( // [추가됨(V2)]
+    val activity: Float,
+    val appetite: Float,
+    val attention: Float,
+    val curiosity: Float,
+    val patience: Float
 )
 
 data class PetAnchorDto(

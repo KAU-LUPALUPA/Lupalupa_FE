@@ -63,14 +63,37 @@ enum class PetAction {
     BED_RESTING, // [추가됨(권)] 침대 휴식
     PLAYING,
     EATING,
-    CLEANING
+    CLEANING,
+    GROOM,       // [추가됨(V2)] 몸단장
+    TIDY,        // [추가됨(V2)] 장난감 정리
+    STRETCH      // [추가됨(V2)] 기지개
 }
 
-enum class PetPersonality {
-    ACTIVE,
-    CALM,
-    LAZY
-}
+// [추가됨(V2)] 연속형 성격 특성
+data class PetTraits(
+    val activity: Float = 0.5f,
+    val appetite: Float = 0.5f,
+    val attention: Float = 0.5f,
+    val curiosity: Float = 0.5f,
+    val patience: Float = 0.5f
+)
+
+// [추가됨(V2)] 내부 렌더링용 파생 특성
+data class DerivedTraits(
+    val vigor: Float = 0.5f,
+    val volatility: Float = 0.5f,
+    val tidiness: Float = 0.5f,
+    val boldness: Float = 0.5f,
+    val restfulness: Float = 0.5f,
+    val distractibility: Float = 0.5f
+)
+
+// [추가됨(V2)] 실시간 감정 상태
+data class AffectState(
+    val valence: Float = 0f,
+    val arousal: Float = 0f,
+    val moodLabel: String = "NORMAL"
+)
 
 const val DEFAULT_PET_ID = "pet_local"
 const val DEFAULT_PET_OWNER_USER_ID = "user_local"
@@ -88,6 +111,7 @@ data class PetAppearance(
 data class PetStatus(
     val satiety: Int = 100, // [수정됨(권)] 서버 초기값과 일치
     val vitality: Int = 100, // [수정됨(권)] 서버 초기값과 일치
+    val cleanliness: Int = 100, // [추가됨(V2)] 청결도
     val isEgg: Boolean = false
 )
 
@@ -98,7 +122,8 @@ data class PetUiState(
     val characterAssetKey: String = DEFAULT_PET_CHARACTER_ASSET_KEY,
     val appearance: PetAppearance = PetAppearance(),
     val status: PetStatus = PetStatus(),
-    val personality: PetPersonality = PetPersonality.ACTIVE,
+    val traits: PetTraits = PetTraits(),
+    val affect: AffectState = AffectState(),
     val equippedItemIds: List<String> = emptyList(),
     val currentAction: PetAction = PetAction.IDLE,
     val position: RoomPoint = RoomPoint(
@@ -158,7 +183,8 @@ data class RoomUiState(
             characterAssetKey = houseSceneState.pet.characterAssetKey,
             appearance = houseSceneState.pet.appearance,
             status = houseSceneState.pet.status,
-            personality = houseSceneState.pet.personality,
+            traits = houseSceneState.pet.traits,
+            affect = houseSceneState.pet.affect,
             equippedItemIds = houseSceneState.pet.equippedItemIds,
             currentAction = houseSceneState.pet.action,
             position = houseSceneState.pet.anchor.toLegacyRoomPoint(sceneDefinition)
@@ -194,7 +220,10 @@ val PetAction.label: String
         PetAction.BED_RESTING -> "침대에서 휴식 중" // [추가됨(권)]
         PetAction.PLAYING -> "노는 중"
         PetAction.EATING -> "먹는 중"
-        PetAction.CLEANING -> "정리 중"
+        PetAction.CLEANING -> "청소 중"
+        PetAction.GROOM -> "몸단장 중"
+        PetAction.TIDY -> "정리 중"
+        PetAction.STRETCH -> "기지개 켜는 중"
     }
 
 val BottomNavItem.label: String

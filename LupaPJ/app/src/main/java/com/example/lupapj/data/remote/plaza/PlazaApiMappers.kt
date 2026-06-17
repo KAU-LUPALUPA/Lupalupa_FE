@@ -4,7 +4,7 @@ import com.example.lupapj.data.model.DEFAULT_PET_CHARACTER_ASSET_KEY
 import com.example.lupapj.data.model.DEFAULT_PET_ID
 import com.example.lupapj.data.model.DEFAULT_PET_NAME
 import com.example.lupapj.data.model.PetAppearance
-import com.example.lupapj.data.model.PetPersonality
+import com.example.lupapj.data.model.PetTraits
 import com.example.lupapj.data.model.PetStatus
 import com.example.lupapj.data.model.plaza.PLAZA_MAX_PARTICIPANTS
 import com.example.lupapj.data.model.plaza.PlazaChatMessage
@@ -109,7 +109,7 @@ private fun PlazaPetSnapshotResponseDto?.toDomain(ownerUserId: String): PlazaPet
             ?: DEFAULT_PET_CHARACTER_ASSET_KEY,
         appearance = this?.appearance?.toDomain() ?: PetAppearance(),
         status = PetStatus(),
-        personality = PetPersonality.ACTIVE,
+        traits = PetTraits(),
         equippedItemIds = emptyList()
     )
 }

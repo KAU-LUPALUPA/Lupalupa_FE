@@ -1,6 +1,6 @@
 package com.example.lupapj.data.model.scene
 
-import com.example.lupapj.data.model.PetPersonality
+import com.example.lupapj.data.model.PetTraits
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -29,30 +29,28 @@ data class PetAutonomousMovementProfile(
 }
 
 fun autonomousMovementProfileFor(
-    personality: PetPersonality
+    traits: PetTraits
 ): PetAutonomousMovementProfile {
-    return when (personality) {
-        PetPersonality.ACTIVE -> PetAutonomousMovementProfile(
-            radius = 0.55f, // 5~6 타일 (화면 비율에 맞춰 조정)
+    return when {
+        traits.activity > 0.6f -> PetAutonomousMovementProfile(
+            radius = 0.55f,
             minIdleDelayMillis = 1_500L,
             maxIdleDelayMillis = 3_200L,
             bouncePx = 6f,
-            speedMultiplier = 1.2f // [수정됨] 1.5 -> 1.2
+            speedMultiplier = 1.2f
         )
-
-        PetPersonality.CALM -> PetAutonomousMovementProfile(
-            radius = 0.35f, // 3~4 타일
-            minIdleDelayMillis = 3_000L,
-            maxIdleDelayMillis = 5_500L,
-            bouncePx = 4f,
-            speedMultiplier = 1.0f
-        )
-
-        PetPersonality.LAZY -> PetAutonomousMovementProfile(
-            radius = 0.15f, // 1~2 타일
+        traits.activity < 0.3f -> PetAutonomousMovementProfile(
+            radius = 0.15f,
             minIdleDelayMillis = 5_500L,
             maxIdleDelayMillis = 8_500L,
             bouncePx = 0f,
+            speedMultiplier = 1.0f
+        )
+        else -> PetAutonomousMovementProfile(
+            radius = 0.35f,
+            minIdleDelayMillis = 3_000L,
+            maxIdleDelayMillis = 5_500L,
+            bouncePx = 4f,
             speedMultiplier = 1.0f
         )
     }

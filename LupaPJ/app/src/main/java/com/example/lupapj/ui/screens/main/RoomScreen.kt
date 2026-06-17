@@ -216,11 +216,11 @@ fun RoomScreen(
                 LupaMainScreen(
                     petSatiety = room.pet.status.satiety.coerceIn(0, 100),
                     petVitality = room.pet.status.vitality.coerceIn(0, 100),
-                    petPersonality = room.pet.personality, // [추가됨(권)]
+                    petTraits = room.pet.traits, // [추가됨(권)]
                     recentIconRes = recentMainMenuAction?.iconRes,
                     onConditionTabClick = { // [추가됨(권)] 터치 시 성격 스낵바 출력
                         coroutineScope.launch {
-                            snackbarHostState.showSnackbar("현재 성격: ${room.pet.personality.name}")
+                            snackbarHostState.showSnackbar("현재 활동성: ${room.pet.traits.activity}")
                         }
                     },
                     onRecentActionClick = onButtonAClick,

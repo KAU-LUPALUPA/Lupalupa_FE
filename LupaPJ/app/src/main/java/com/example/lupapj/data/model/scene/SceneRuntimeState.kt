@@ -6,7 +6,8 @@ import com.example.lupapj.data.model.DEFAULT_PET_NAME
 import com.example.lupapj.data.model.DEFAULT_PET_OWNER_USER_ID
 import com.example.lupapj.data.model.PetAction
 import com.example.lupapj.data.model.PetAppearance
-import com.example.lupapj.data.model.PetPersonality
+import com.example.lupapj.data.model.PetTraits
+import com.example.lupapj.data.model.AffectState
 import com.example.lupapj.data.model.PetStatus
 
 data class PetSceneState(
@@ -16,7 +17,8 @@ data class PetSceneState(
     val characterAssetKey: String = DEFAULT_PET_CHARACTER_ASSET_KEY,
     val appearance: PetAppearance = PetAppearance(),
     val status: PetStatus = PetStatus(),
-    val personality: PetPersonality = PetPersonality.ACTIVE,
+    val traits: PetTraits = PetTraits(),
+    val affect: AffectState = AffectState(),
     val equippedItemIds: List<String> = emptyList(),
     val movement: PetMovementState = PetMovementState(),
     val action: PetAction,
@@ -62,7 +64,8 @@ fun initialHouseSceneState(
     characterAssetKey: String = DEFAULT_PET_CHARACTER_ASSET_KEY,
     petAppearance: PetAppearance = PetAppearance(),
     petStatus: PetStatus = PetStatus(),
-    petPersonality: PetPersonality = PetPersonality.ACTIVE,
+    petTraits: PetTraits = PetTraits(),
+    petAffect: AffectState = AffectState(),
     equippedItemIds: List<String> = emptyList(),
     petAnchor: FloorAnchor = FloorAnchor(u = 0.44f, v = 0.64f),
     petAction: PetAction = PetAction.IDLE
@@ -76,7 +79,8 @@ fun initialHouseSceneState(
             characterAssetKey = characterAssetKey,
             appearance = petAppearance,
             status = petStatus,
-            personality = petPersonality,
+            traits = petTraits,
+            affect = petAffect,
             equippedItemIds = equippedItemIds,
             action = petAction,
             anchor = petAnchor

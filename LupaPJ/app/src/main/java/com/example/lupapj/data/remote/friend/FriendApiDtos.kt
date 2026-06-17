@@ -1,5 +1,7 @@
 package com.example.lupapj.data.remote.friend
 
+import com.example.lupapj.data.remote.pet.PetTraitsDto
+
 data class FriendCodeResponseDto(
     val friendCode: String,
     val displayFriendCode: String? = null
@@ -197,7 +199,7 @@ data class FriendPetDto(
     val characterAssetKey: String,
     val appearance: FriendPetAppearanceDto,
     val status: FriendPetStatusDto,
-    val personality: String,
+    val traits: PetTraitsDto,
     val equippedItemIds: List<String> = emptyList(),
     val anchor: FriendAnchorDto
 )
@@ -218,7 +220,7 @@ data class FriendPetSnapshotDto(
     val appearance: FriendPetAppearanceDto,
     val condition: FriendPetConditionDto,
     val sceneState: FriendPetSceneStateDto,
-    val personality: String,
+    val traits: PetTraitsDto,
     val equippedItemIds: List<String> = emptyList()
 )
 
@@ -233,12 +235,14 @@ data class FriendPetAppearanceDto(
 data class FriendPetStatusDto(
     val satiety: Int,
     val vitality: Int,
+    val cleanliness: Int,
     val isEgg: Boolean
 )
 
 data class FriendPetConditionDto(
     val satiety: Int,
     val vitality: Int,
+    val cleanliness: Int,
     val isEgg: Boolean
 )
 
