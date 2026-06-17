@@ -19,7 +19,11 @@ data class BehaviorDebugInfo(
     val isCrisis: Boolean = false,
     val isVisible: Boolean = false,
     val mValue: Float = 0f,
-    val kValue: Float = 0f
+    val kValue: Float = 0f,
+    val traits: PetTraits = PetTraits(),
+    val derived: DerivedTraits = DerivedTraits(),
+    val affect: AffectState = AffectState(),
+    val actionProbabilities: Map<PetAction, Float> = emptyMap()
 )
 
 enum class AppPhase {

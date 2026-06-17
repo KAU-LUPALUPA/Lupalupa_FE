@@ -216,6 +216,7 @@ fun RoomScreen(
                 LupaMainScreen(
                     petSatiety = room.pet.status.satiety.coerceIn(0, 100),
                     petVitality = room.pet.status.vitality.coerceIn(0, 100),
+                    petCleanliness = room.pet.status.cleanliness.coerceIn(0, 100),
                     petTraits = room.pet.traits, // [추가됨(권)]
                     recentIconRes = recentMainMenuAction?.iconRes,
                     onConditionTabClick = { // [추가됨(권)] 터치 시 성격 스낵바 출력
@@ -304,11 +305,19 @@ fun RoomScreen(
                                     .padding(start = 16.dp, bottom = 180.dp)
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
-                                    Text("Action: ${room.pet.currentAction.name}")
-                                    Text("Crisis: ${behaviorDebugInfo.isCrisis}")
-                                    Text("Ticks: ${behaviorDebugInfo.consecutiveTicks}")
-                                    Text("Prob: ${"%.2f".format(behaviorDebugInfo.currentProbability)}")
-                                    Text("M: ${behaviorDebugInfo.mValue}, k: ${behaviorDebugInfo.kValue}")
+                                    Text("Action: ${room.pet.currentAction.name}", color = Color.Green)
+                                    Text("Crisis: ${behaviorDebugInfo.isCrisis}", color = Color.Green)
+                                    Text("Ticks: ${behaviorDebugInfo.consecutiveTicks}", color = Color.Green)
+                                    Text("Traits (Act/App/Att/Cur/Pat): ${"%.2f".format(behaviorDebugInfo.traits.activity)}/${"%.2f".format(behaviorDebugInfo.traits.appetite)}/${"%.2f".format(behaviorDebugInfo.traits.attention)}/${"%.2f".format(behaviorDebugInfo.traits.curiosity)}/${"%.2f".format(behaviorDebugInfo.traits.patience)}", color = Color.White)
+                                    Text("Derived (Vig/Vol/Rest): ${"%.2f".format(behaviorDebugInfo.derived.vigor)}/${"%.2f".format(behaviorDebugInfo.derived.volatility)}/${"%.2f".format(behaviorDebugInfo.derived.restfulness)}", color = Color.White)
+                                    Text("Affect (Val/Aro): ${"%.2f".format(behaviorDebugInfo.affect.valence)}/${"%.2f".format(behaviorDebugInfo.affect.arousal)}", color = Color.White)
+                                    Text("Roulette Probabilities:", color = Color.Yellow)
+                                    com.example.lupapj.data.model.PetAction.values().forEach { action ->
+                                        if (action != com.example.lupapj.data.model.PetAction.CLEANING) {
+                                            val prob = behaviorDebugInfo.actionProbabilities[action] ?: 0f
+                                            Text("- ${action.name}: ${"%.1f".format(prob * 100)}%", color = Color.White)
+                                        }
+                                    }
                                 }
                             }
                         }

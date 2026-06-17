@@ -7,6 +7,8 @@ data class PetConditionPolicy(
     val satietyDecayAmount: Int,
     val vitalityDecayIntervalSeconds: Long,
     val vitalityDecayAmount: Int,
+    val cleanlinessDecayIntervalSeconds: Long, // [추가됨]
+    val cleanlinessDecayAmount: Int, // [추가됨]
     val feedRecoveryAmount: Int,
     val restRecoveryIntervalSeconds: Long,
     val floorRestRecoveryAmount: Int,
@@ -17,6 +19,7 @@ data class PetConditionPolicy(
 data class PetConditionTickRemainder(
     val satietyDecaySeconds: Long = 0L,
     val vitalityDecaySeconds: Long = 0L,
+    val cleanlinessDecaySeconds: Long = 0L, // [추가됨]
     val restRecoverySeconds: Long = 0L
 )
 
@@ -26,15 +29,18 @@ data class PetConditionTickResult(
     val shouldStopResting: Boolean = false
 )
 
+// 테스트 및 데모용으로 차감/회복 속도를 대폭 상향
 val DemoPetConditionPolicy = PetConditionPolicy(
-    satietyDecayIntervalSeconds = 10L,
-    satietyDecayAmount = 2,
-    vitalityDecayIntervalSeconds = 10L,
-    vitalityDecayAmount = 1,
+    satietyDecayIntervalSeconds = 5L, // 10 -> 5초
+    satietyDecayAmount = 3,           // 2 -> 3
+    vitalityDecayIntervalSeconds = 5L, // 10 -> 5초
+    vitalityDecayAmount = 2,           // 1 -> 2
+    cleanlinessDecayIntervalSeconds = 5L, // [추가됨]
+    cleanlinessDecayAmount = 1,           // [추가됨]
     feedRecoveryAmount = 30,
-    restRecoveryIntervalSeconds = 10L,
-    floorRestRecoveryAmount = 2,
-    bedRestRecoveryAmount = 6,
+    restRecoveryIntervalSeconds = 5L, // 10 -> 5초
+    floorRestRecoveryAmount = 3,      // 2 -> 3
+    bedRestRecoveryAmount = 8,        // 6 -> 8
     restSatietyDecayMultiplier = 1.0f
 )
 
@@ -52,58 +58,64 @@ fun advancePetCondition(
         )
     }
 
+    // 1. 기본 자연 차감 (숨만 쉬어도 무조건 깎임)
     val satietyTick = consumeInterval(
         currentSeconds = remainder.satietyDecaySeconds,
         addedSeconds = elapsedSeconds,
         intervalSeconds = policy.satietyDecayIntervalSeconds
     )
-    val satietyDecayAmount = satietyDecayAmountFor(
-        action = action,
-        steps = satietyTick.steps,
-        policy = policy
-    )
-    val nextSatiety = status.satiety - satietyDecayAmount
+    val baseSatietyDecay = satietyTick.steps * policy.satietyDecayAmount
 
-    val vitalityResult = if (action == PetAction.RESTING || action == PetAction.BED_RESTING) {
-        val restTick = consumeInterval(
-            currentSeconds = remainder.restRecoverySeconds,
-            addedSeconds = elapsedSeconds,
-            intervalSeconds = policy.restRecoveryIntervalSeconds
-        )
-        val recoveryAmount = if (action == PetAction.BED_RESTING) policy.bedRestRecoveryAmount else policy.floorRestRecoveryAmount
-        val nextVitality = status.vitality + (restTick.steps * recoveryAmount)
-        VitalityAdvanceResult(
-            vitality = nextVitality,
-            // [수정됨(권)] 상태 전환 시에도 기존 타이머 잔여 시간을 보존하여 포만감/활력 박자가 어긋나는 현상 방지
-            vitalityDecaySeconds = remainder.vitalityDecaySeconds,
-            restRecoverySeconds = restTick.remainingSeconds
-        )
+    val vitalityTick = consumeInterval(
+        currentSeconds = remainder.vitalityDecaySeconds,
+        addedSeconds = elapsedSeconds,
+        intervalSeconds = policy.vitalityDecayIntervalSeconds
+    )
+    val baseVitalityDecay = vitalityTick.steps * policy.vitalityDecayAmount
+
+    val cleanlinessTick = consumeInterval(
+        currentSeconds = remainder.cleanlinessDecaySeconds,
+        addedSeconds = elapsedSeconds,
+        intervalSeconds = policy.cleanlinessDecayIntervalSeconds
+    )
+    val baseCleanlinessDecay = cleanlinessTick.steps * policy.cleanlinessDecayAmount
+
+    // 2. 행동별 추가 수치 (표 기준 Extra)
+    val extraSatietyDecay = extraSatietyDecayAmountFor(action, satietyTick.steps, policy)
+    val extraVitalityDecay = extraVitalityDecayAmountFor(action, vitalityTick.steps, policy)
+    val extraCleanlinessDecay = extraCleanlinessDecayAmountFor(action, cleanlinessTick.steps, policy)
+
+    // 3. 휴식 회복 계산 (침대/바닥)
+    val restTick = consumeInterval(
+        currentSeconds = remainder.restRecoverySeconds,
+        addedSeconds = elapsedSeconds,
+        intervalSeconds = policy.restRecoveryIntervalSeconds
+    )
+    val vitalityRecovery = if (action == PetAction.BED_RESTING) {
+        restTick.steps * policy.bedRestRecoveryAmount
+    } else if (action == PetAction.RESTING) {
+        restTick.steps * policy.floorRestRecoveryAmount
     } else {
-        val vitalityTick = consumeInterval(
-            currentSeconds = remainder.vitalityDecaySeconds,
-            addedSeconds = elapsedSeconds,
-            intervalSeconds = policy.vitalityDecayIntervalSeconds
-        )
-        val nextVitality = status.vitality - (vitalityTick.steps * policy.vitalityDecayAmount)
-        VitalityAdvanceResult(
-            vitality = nextVitality,
-            vitalityDecaySeconds = vitalityTick.remainingSeconds,
-            // [수정됨(권)] 일반 상태에서도 기존 휴식 회복 잔여 타이머를 보존함
-            restRecoverySeconds = remainder.restRecoverySeconds
-        )
+        0
     }
+
+    val nextSatiety = status.satiety - baseSatietyDecay - extraSatietyDecay
+    val nextVitality = status.vitality - baseVitalityDecay - extraVitalityDecay + vitalityRecovery
+    val nextCleanliness = status.cleanliness - baseCleanlinessDecay - extraCleanlinessDecay
 
     val nextStatus = status.copy(
         satiety = nextSatiety,
-        vitality = vitalityResult.vitality
+        vitality = nextVitality,
+        cleanliness = nextCleanliness
     ).coerced()
 
     return PetConditionTickResult(
         status = nextStatus,
         remainder = PetConditionTickRemainder(
             satietyDecaySeconds = satietyTick.remainingSeconds,
-            vitalityDecaySeconds = vitalityResult.vitalityDecaySeconds,
-            restRecoverySeconds = vitalityResult.restRecoverySeconds
+            vitalityDecaySeconds = vitalityTick.remainingSeconds,
+            cleanlinessDecaySeconds = cleanlinessTick.remainingSeconds,
+            restRecoverySeconds = restTick.remainingSeconds
         ),
         shouldStopResting = (action == PetAction.RESTING || action == PetAction.BED_RESTING) && nextStatus.vitality == 100
     )
@@ -143,24 +155,50 @@ private fun consumeInterval(
     )
 }
 
-private fun satietyDecayAmountFor(
+private fun extraSatietyDecayAmountFor(
     action: PetAction,
     steps: Int,
     policy: PetConditionPolicy
 ): Int {
     if (steps <= 0) return 0
+    return when (action) {
+        // 표 기준: 돌아다니기, 장난감 놀기, 장난감 정리 시 추가 감소
+        PetAction.WALKING, PetAction.PLAYING, PetAction.CLEANING -> steps * policy.satietyDecayAmount
+        // 그 외에는 기본 감소만 적용됨
+        else -> 0
+    }
+}
 
-    val baseAmount = steps * policy.satietyDecayAmount
-    if (action != PetAction.RESTING && action != PetAction.BED_RESTING) return baseAmount
+private fun extraVitalityDecayAmountFor(
+    action: PetAction,
+    steps: Int,
+    policy: PetConditionPolicy
+): Int {
+    if (steps <= 0) return 0
+    return when (action) {
+        // 표 기준: 돌아다니기, 밥먹기, 장난감 놀기, 그루밍, 장난감 정리 시 추가 감소
+        PetAction.WALKING, PetAction.EATING, PetAction.PLAYING, PetAction.GROOM, PetAction.CLEANING -> steps * policy.vitalityDecayAmount
+        else -> 0
+    }
+}
 
-    return (baseAmount * policy.restSatietyDecayMultiplier)
-        .roundToInt()
-        .coerceAtLeast(1)
+private fun extraCleanlinessDecayAmountFor(
+    action: PetAction,
+    steps: Int,
+    policy: PetConditionPolicy
+): Int {
+    if (steps <= 0) return 0
+    return when (action) {
+        // 표 기준: 밥먹기, 바닥에서 자기, 장난감 놀기 시 추가 감소
+        PetAction.EATING, PetAction.RESTING, PetAction.PLAYING -> steps * policy.cleanlinessDecayAmount
+        else -> 0
+    }
 }
 
 private fun PetStatus.coerced(): PetStatus {
     return copy(
         satiety = satiety.coerceIn(0, 100),
-        vitality = vitality.coerceIn(0, 100)
+        vitality = vitality.coerceIn(0, 100),
+        cleanliness = cleanliness.coerceIn(0, 100) // [추가됨]
     )
 }

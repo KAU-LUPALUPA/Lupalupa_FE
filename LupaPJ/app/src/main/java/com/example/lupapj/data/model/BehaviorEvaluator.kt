@@ -39,55 +39,86 @@ object BehaviorEvaluator {
         status: PetStatus,
         hasFood: Boolean,
         hasToy: Boolean,
-        hasBed: Boolean
+        hasBed: Boolean,
+        hasDroppedToy: Boolean = false,
+        hasToyBox: Boolean = false
     ): Map<PetAction, Float> {
         val h = 100f - status.satiety
         val s = 100f - status.vitality
+        val c = 100f - status.cleanliness
 
         val scores = mutableMapOf<PetAction, Float>()
 
-        scores[PetAction.IDLE] = 0.1f
-
+        // [최종 교정] 기저(IDLE) 점수를 1.0으로 앵커링 (exp(2.5) ≈ 12.18의 강력한 중심축)
+        // 중간값(0.5)일 때 대기 38%, 걷기 23%, 놀이 19%, 정리 8% 수준으로 자연 분배되는 최적의 계수 튜닝
+        scores[PetAction.IDLE] = 1.0f
+        
         if (hasFood) {
-            scores[PetAction.EATING] = (h / 100f) * (0.5f + traits.appetite)
+            val hungerMultiplier = if (status.satiety <= 30) 5.0f else 1.0f
+            // 배고픔(h)이 20 이하일 경우 음수가 되어 수학적으로 확률이 소멸됨
+            scores[PetAction.EATING] = ((h - 20f) / 80f) * (0.5f + traits.appetite) * 1.5f * hungerMultiplier
         }
 
         if (hasBed) {
-            scores[PetAction.RESTING] = (s / 100f) * (1.2f - traits.activity) * 1.5f
-            scores[PetAction.BED_RESTING] = (s / 100f) * (1.2f - traits.activity) * 2.0f
+            val laziness = 1f - traits.activity
+            val exhaustionMultiplier = if (status.vitality <= 30) 4.0f else 1.0f
+            
+            // 바닥 쉬기: 피곤함(s)이 40 이하면 강한 음수, 즉 꽤 피곤하고 매우 게으를 때만 바닥에 눕게 됨
+            scores[PetAction.RESTING] = ((s - 40f) / 60f) * (laziness * 4.0f) * exhaustionMultiplier
+            
+            // 침대 쉬기: 피곤함(s)이 10 이하면 음수. 조금만 피곤해도 침대를 선호함
+            scores[PetAction.BED_RESTING] = ((s - 10f) / 90f) * 1.5f * exhaustionMultiplier
         } else {
-            scores[PetAction.RESTING] = (s / 100f) * (1.2f - traits.activity)
+            val exhaustionMultiplier = if (status.vitality <= 30) 4.0f else 1.0f
+            // 침대가 없을 땐 s=20부터 바닥에 누울 수 있게 기준 완화
+            scores[PetAction.RESTING] = ((s - 20f) / 80f) * (1.2f - traits.activity) * 1.5f * exhaustionMultiplier
         }
 
         if (hasToy) {
-            scores[PetAction.PLAYING] = traits.curiosity * traits.activity * ((100f - s) / 100f) * 1.5f
+            scores[PetAction.PLAYING] = traits.curiosity * traits.activity * ((100f - s) / 100f) * 2.8f
         } else {
-            scores[PetAction.PLAYING] = traits.curiosity * traits.activity * ((100f - s) / 100f) * 0.3f
+            // 장난감이 없어도 놀고 싶은 욕구 자체는 수식으로 잔존 (1~2% 수준)
+            scores[PetAction.PLAYING] = traits.curiosity * traits.activity * ((100f - s) / 100f) * 0.2f
         }
 
-        scores[PetAction.WALKING] = traits.activity * 0.5f
+        if (hasDroppedToy && hasToyBox) {
+            scores[PetAction.CLEANING] = traits.attention * 0.7f
+        }
+
+        // 완전히 깨끗할 때(c < 20)는 음수가 되어 스스로 그루밍하지 않음
+        val dirtyMultiplier = if (status.cleanliness <= 30) 4.0f else 1.0f
+        scores[PetAction.GROOM] = ((c - 20f) / 80f) * traits.attention * 3.0f * dirtyMultiplier
+
+        scores[PetAction.WALKING] = traits.activity * 1.6f
 
         return scores
     }
 
-    fun sampleAction(
+    fun calculateActionProbabilities(
         scores: Map<PetAction, Float>,
         patience: Float,
-        volatility: Float,
-        random: Random = Random.Default
-    ): PetAction {
-        val tBase = 1.0f
-        val k = 0.5f
-        val m = 0.5f
-        val temperature = (tBase - k * patience + m * volatility).coerceIn(0.1f, 2.0f)
+        volatility: Float
+    ): Map<PetAction, Float> {
+        val tBase = 0.4f
+        val k = 0.2f
+        val m = 0.2f
+        val temperature = (tBase - k * patience + m * volatility).coerceIn(0.1f, 1.0f)
 
-        val expScores = scores.mapValues { exp(it.value / temperature).toDouble() }
+        // 아날로그 방식 복구: 어떠한 수동 필터링도 하지 않고 Softmax 고유의 수학적 연속성을 유지
+        val expScores = scores.mapValues { kotlin.math.exp(it.value / temperature).toDouble() }
         val sumExp = expScores.values.sum()
 
-        var rand = random.nextDouble() * sumExp
-        for ((action, weight) in expScores) {
-            if (rand < weight) return action
-            rand -= weight
+        return expScores.mapValues { (it.value / sumExp).toFloat() }
+    }
+
+    fun sampleAction(
+        probs: Map<PetAction, Float>,
+        random: Random = Random.Default
+    ): PetAction {
+        var rand = random.nextFloat()
+        for ((action, prob) in probs) {
+            if (rand < prob) return action
+            rand -= prob
         }
 
         return PetAction.IDLE

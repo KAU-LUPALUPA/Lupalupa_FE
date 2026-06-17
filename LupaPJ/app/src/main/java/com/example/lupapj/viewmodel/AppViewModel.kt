@@ -1575,8 +1575,11 @@ class AppViewModel(
         }
         behaviorConsecutiveTicks = 0
 
-        val hasFood = room.houseSceneState.currentSceneRuntime.droppedFoodAnchor != null
-        val hasToy = room.houseSceneState.currentSceneRuntime.droppedToyAnchor != null
+        val hasFood = room.houseSceneState.currentSceneRuntime.droppedFoodAnchor != null ||
+            room.sceneDefinition.objects.any { it.type == com.example.lupapj.data.model.RoomObjectType.FOOD_BAG }
+        val hasDroppedToy = room.houseSceneState.currentSceneRuntime.droppedToyAnchor != null
+        val hasToyBox = room.sceneDefinition.objects.any { it.type == com.example.lupapj.data.model.RoomObjectType.TOY_BOX }
+        val hasToy = hasDroppedToy || hasToyBox
         val hasBed = room.sceneDefinition.objects.any { it.type == com.example.lupapj.data.model.RoomObjectType.BED }
 
         // 새 행동 결정 (Softmax)
@@ -1587,9 +1590,23 @@ class AppViewModel(
             status = pet.status,
             hasFood = hasFood,
             hasToy = hasToy,
-            hasBed = hasBed
+            hasBed = hasBed,
+            hasDroppedToy = hasDroppedToy,
+            hasToyBox = hasToyBox
         )
-        val nextAction = com.example.lupapj.data.model.BehaviorEvaluator.sampleAction(scores, pet.traits.patience, derived.volatility)
+        val probs = com.example.lupapj.data.model.BehaviorEvaluator.calculateActionProbabilities(scores, pet.traits.patience, derived.volatility)
+        
+        // [추가됨(권)] 디버그 정보에 확률 및 수치 저장
+        _uiState.update { s -> 
+            s.copy(behaviorDebugInfo = s.behaviorDebugInfo.copy(
+                actionProbabilities = probs,
+                traits = pet.traits,
+                derived = derived,
+                affect = affect
+            ))
+        }
+
+        val nextAction = com.example.lupapj.data.model.BehaviorEvaluator.sampleAction(probs)
         executeBehaviorAction(nextAction, pet)
     }
 
@@ -1641,7 +1658,17 @@ class AppViewModel(
                     }
                     startPlayingSequence(targetAnchor)
                 } else {
-                    setPetAction(PetAction.IDLE)
+                    // 장난감이 없을 때 PLAYING 당첨 (허공 섀도우복싱/플레이 연출)
+                    // 인위적인 감정 상태(ON/OFF) 주입을 제거하고, 순수하게 행동만 PLAYING으로 둡니다.
+                    // (말풍선 등의 연출은 렌더러 단에서 현재 Action과 환경을 참조하여 자연스럽게 그려야 합니다)
+                    setPetAction(PetAction.PLAYING)
+                    viewModelScope.launch {
+                        delay(2500L)
+                        // 허공 플레이 후 자연스럽게 다른 행동으로 넘어갈 수 있도록 WALKING 전환
+                        if (_uiState.value.room?.houseSceneState?.pet?.action == PetAction.PLAYING) {
+                            setPetAction(PetAction.WALKING)
+                        }
+                    }
                 }
             }
             PetAction.EATING -> {
@@ -1658,6 +1685,37 @@ class AppViewModel(
                     startEatingSequence(targetAnchor, skipMovement = false)
                 } else {
                     setPetAction(PetAction.IDLE)
+                }
+            }
+            PetAction.CLEANING -> {
+                val droppedToyAnchor = houseSceneState.currentSceneRuntime.droppedToyAnchor
+                val toyBoxAnchor = room.sceneDefinition.objects.find { it.type == com.example.lupapj.data.model.RoomObjectType.TOY_BOX }?.anchor as? FloorAnchor
+                if (droppedToyAnchor != null && toyBoxAnchor != null) {
+                    startToyCleanupSequence(droppedToyAnchor, toyBoxAnchor)
+                } else {
+                    setPetAction(PetAction.IDLE)
+                }
+            }
+            PetAction.GROOM -> {
+                setPetAction(PetAction.GROOM)
+                viewModelScope.launch {
+                    delay(3000L) // 몸단장 연출 시간
+                    if (_uiState.value.room?.houseSceneState?.pet?.action == PetAction.GROOM) {
+                        // 청결도 회복 구현
+                        updateRoom { roomState ->
+                            val currentPet = roomState.houseSceneState.pet
+                            roomState.copy(
+                                houseSceneState = roomState.houseSceneState.copy(
+                                    pet = currentPet.copy(
+                                        status = currentPet.status.copy(
+                                            cleanliness = (currentPet.status.cleanliness + 40).coerceAtMost(100)
+                                        )
+                                    )
+                                )
+                            )
+                        }
+                        setPetAction(PetAction.IDLE)
+                    }
                 }
             }
             else -> {
@@ -1802,16 +1860,15 @@ class AppViewModel(
                 action = currentPet.action,
                 movement = currentPet.movement,
                 isLyingSide = currentPet.isLyingSide,
-                status = if (repositoryPet.status.satiety == 80 && repositoryPet.status.vitality == 75) {
-                    currentPet.status 
-                } else {
-                    repositoryPet.status 
-                },
-                equippedItemIds = currentPet.equippedItemIds // [추가됨(권)] 로컬에서 장착한 아이템 상태 유지
+                status = currentPet.status, // [수정됨] RoomRepository는 펫 상태를 관리하지 않으므로 항상 로컬 UI 상태를 유지
+                equippedItemIds = currentPet.equippedItemIds
             )
         } else if (currentPet != null) {
-            // [추가됨(권)] IDLE 상태가 아닐 때도 장착 아이템 상태는 유지
-            repositoryPet.copy(equippedItemIds = currentPet.equippedItemIds)
+            // [수정됨] IDLE 상태가 아닐 때도 장착 아이템과 펫 상태(수치)는 로컬을 유지
+            repositoryPet.copy(
+                equippedItemIds = currentPet.equippedItemIds,
+                status = currentPet.status
+            )
         } else {
             repositoryPet
         }

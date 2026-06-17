@@ -122,6 +122,7 @@ fun LupaMainScreen(
     isDayTime: Boolean? = null,
     petSatiety: Int = 80,
     petVitality: Int = 80,
+    petCleanliness: Int = 100,
     petTraits: com.example.lupapj.data.model.PetTraits = com.example.lupapj.data.model.PetTraits(), // [추가됨(권)] 디버깅용 성격
     recentIconRes: Int? = null,
     onConditionTabClick: () -> Unit = {}, // [추가됨(권)] 디버깅용 클릭 이벤트
@@ -195,6 +196,7 @@ fun LupaMainScreen(
             isDayTime = resolvedIsDayTime,
             petSatiety = petSatiety,
             petVitality = petVitality,
+            petCleanliness = petCleanliness,
             petTraits = petTraits, // [추가됨(권)]
             onTabClick = onConditionTabClick, // [추가됨(권)]
             onSettingClick = onSettingClick,
@@ -222,6 +224,7 @@ fun TopStatusLayer(
     isDayTime: Boolean,
     petSatiety: Int,
     petVitality: Int,
+    petCleanliness: Int,
     petTraits: com.example.lupapj.data.model.PetTraits,
     onTabClick: () -> Unit,
     onSettingClick: () -> Unit,
@@ -262,6 +265,7 @@ fun TopStatusLayer(
                 PetConditionFloatingTab(
                     satiety = petSatiety,
                     vitality = petVitality,
+                    cleanliness = petCleanliness,
                     onTabClick = onTabClick,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -284,6 +288,7 @@ fun TopStatusLayer(
 private fun PetConditionFloatingTab(
     satiety: Int,
     vitality: Int,
+    cleanliness: Int,
     onTabClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -307,6 +312,11 @@ private fun PetConditionFloatingTab(
             label = "활력",
             value = vitality,
             fillColor = VitalityFillColor
+        )
+        PetConditionBar(
+            label = "청결",
+            value = cleanliness,
+            fillColor = androidx.compose.ui.graphics.Color(0xFF81D4FA)
         )
     }
 }
