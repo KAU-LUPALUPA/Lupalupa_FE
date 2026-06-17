@@ -113,7 +113,7 @@ import kotlin.random.Random
 
 private const val PLAZA_PET_MOVE_DURATION_MS = 1_450
 private const val PLAZA_PET_DIRECTION_EPSILON = 0.006f
-private const val PLAZA_PET_HORIZONTAL_DIRECTION_RATIO = 0.7f
+private const val PLAZA_PET_AXIS_DOMINANCE_RATIO = 1.75f
 private const val PLAZA_WANDER_MIN_DELAY_MS = 1_100L
 private const val PLAZA_WANDER_MAX_DELAY_MS = 2_700L
 private const val PLAZA_INTERACTION_SCAN_INTERVAL_MS = 700L
@@ -1166,7 +1166,7 @@ private fun PlazaPetActor(
             abs(animatedX - targetPosition.x) > PLAZA_PET_DIRECTION_EPSILON ||
                 abs(animatedY - targetPosition.y) > PLAZA_PET_DIRECTION_EPSILON
         var lockedAnimation by remember(participant.userId) {
-            mutableStateOf(CharacterAnimation.Row3)
+            mutableStateOf(CharacterAnimation.South)
         }
 
         LaunchedEffect(targetPosition) {
@@ -1733,7 +1733,7 @@ private fun PlazaInteractionEvent.animatedSpriteUsersForInteraction(): Set<Strin
 private fun PlazaInteractionEvent.idleAnimationsForInteraction(): Map<String, CharacterAnimation> {
     val userIds = setOfNotNull(actorUserId, targetUserId)
     return when (type) {
-        PlazaInteractionType.REST -> userIds.associateWith { CharacterAnimation.Row3 }
+        PlazaInteractionType.REST -> userIds.associateWith { CharacterAnimation.South }
         else -> emptyMap()
     }
 }
@@ -1956,12 +1956,19 @@ private fun resolvePlazaCharacterAnimation(
     }
 
     return when {
-        absDeltaX >= absDeltaY * PLAZA_PET_HORIZONTAL_DIRECTION_RATIO -> {
-            if (deltaX >= 0f) CharacterAnimation.Row0 else CharacterAnimation.Row1
+        absDeltaX >= absDeltaY * PLAZA_PET_AXIS_DOMINANCE_RATIO -> {
+            if (deltaX >= 0f) CharacterAnimation.East else CharacterAnimation.West
         }
 
-        deltaY < 0f -> CharacterAnimation.Row2
-        else -> CharacterAnimation.Row3
+        absDeltaY >= absDeltaX * PLAZA_PET_AXIS_DOMINANCE_RATIO -> {
+            if (deltaY < 0f) CharacterAnimation.North else CharacterAnimation.South
+        }
+
+        deltaX >= 0f && deltaY < 0f -> CharacterAnimation.NorthEast
+        deltaX < 0f && deltaY < 0f -> CharacterAnimation.NorthWest
+        deltaX >= 0f && deltaY >= 0f -> CharacterAnimation.SouthEast
+        deltaX < 0f && deltaY >= 0f -> CharacterAnimation.SouthWest
+        else -> fallbackAnimation
     }
 }
 

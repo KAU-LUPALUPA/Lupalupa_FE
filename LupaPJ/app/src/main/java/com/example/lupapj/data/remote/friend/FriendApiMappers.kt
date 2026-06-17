@@ -26,6 +26,7 @@ import com.example.lupapj.data.model.initialRoomUiState
 import com.example.lupapj.data.model.scene.FloorAnchor
 import com.example.lupapj.data.model.scene.PetSceneState
 import com.example.lupapj.data.model.scene.FloorTilePlacement
+import com.example.lupapj.data.model.scene.IsoRoomProjectionSpec
 import com.example.lupapj.data.model.scene.RoomSceneDefinition
 import com.example.lupapj.data.model.scene.SceneObjectDefinition
 import com.example.lupapj.data.model.scene.TileAnchorMode
@@ -297,7 +298,10 @@ private fun List<FriendPlacedItemDto>.toSceneObjects(
             ?: return@mapNotNull null
         val template = baseScene.objects.firstOrNull { it.type == type }
             ?: return@mapNotNull null
-        val tilePlacement = placedItem.tile?.toFloorTilePlacement()
+        val tilePlacement = placedItem.tile?.toFloorTilePlacement(
+            projectionSpec = baseScene.projectionSpec,
+            type = type
+        )
         val anchor = tilePlacement?.toFloorAnchor(baseScene.projectionSpec)
             ?: FloorAnchor(
                 u = placedItem.anchor.u.coerceIn(0f, 1f),
@@ -313,18 +317,35 @@ private fun List<FriendPlacedItemDto>.toSceneObjects(
     }
 }
 
-private fun FriendTileDto.toFloorTilePlacement(): FloorTilePlacement {
+private fun FriendTileDto.toFloorTilePlacement(
+    projectionSpec: IsoRoomProjectionSpec,
+    type: RoomObjectType
+): FloorTilePlacement {
+    val roomWidthTiles = projectionSpec.roomWidthTiles.toInt().coerceAtLeast(1)
+    val roomDepthTiles = projectionSpec.roomDepthTiles.toInt().coerceAtLeast(1)
+    val safeWidthTiles = widthTiles.coerceIn(1, roomWidthTiles)
+    val safeDepthTiles = depthTiles.coerceIn(1, roomDepthTiles)
+    val maxX = (roomWidthTiles - safeWidthTiles).coerceAtLeast(0)
+    val maxY = (roomDepthTiles - safeDepthTiles).coerceAtLeast(0)
+
     return FloorTilePlacement(
         tile = TileCoord(
-            x = x.coerceAtLeast(0),
-            y = y.coerceAtLeast(0)
+            x = x.coerceIn(0, maxX),
+            y = y.coerceIn(0, maxY)
         ),
         footprint = TileFootprint(
-            widthTiles = widthTiles.coerceAtLeast(1),
-            depthTiles = depthTiles.coerceAtLeast(1)
+            widthTiles = safeWidthTiles,
+            depthTiles = safeDepthTiles
         ),
-        anchorMode = enumValueOrDefault(anchorMode, TileAnchorMode.CENTER)
+        anchorMode = resolvedAnchorModeFor(type, anchorMode)
     )
+}
+
+private fun resolvedAnchorModeFor(type: RoomObjectType, rawAnchorMode: String?): TileAnchorMode {
+    if (type == RoomObjectType.BED) {
+        return TileAnchorMode.FRONT_CENTER
+    }
+    return enumValueOrDefault(rawAnchorMode ?: TileAnchorMode.CENTER.name, TileAnchorMode.CENTER)
 }
 
 private fun String?.toRoomObjectTypeOrNull(): RoomObjectType? {

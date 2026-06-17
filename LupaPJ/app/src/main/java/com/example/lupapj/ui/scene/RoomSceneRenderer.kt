@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.example.lupapj.R
+import com.example.lupapj.data.model.PetAction
 import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.scene.DefaultFloorPivot
 import com.example.lupapj.data.model.scene.FloorAnchor
@@ -78,16 +79,17 @@ import kotlin.math.roundToInt
 
 private val PET_MOVE_DURATION_MS = PET_AUTONOMOUS_MOVE_DURATION_MS.toInt()
 private const val PET_DIRECTION_EPSILON = 0.01f
-private const val PET_HORIZONTAL_DIRECTION_RATIO = 0.7f
+private const val PET_AXIS_DOMINANCE_RATIO = 1.75f
+private const val PET_RENDER_DEPTH_BIAS = 0.18f
 
 private val PetSprite = SceneSpriteSpec(
     assetKey = "room/characters/lupa_default",
     fallbackLabel = "루파",
     widthRatio = 0.16f,
-    heightRatio = 1.26f,
-    minWidthDp = 56f,
-    maxWidthDp = 92f,
-    isoTileFillRatio = 0.86f,
+    heightRatio = 1.0f,
+    minWidthDp = 64f,
+    maxWidthDp = 104f,
+    isoTileFillRatio = 1.05f,
     pivot = DefaultFloorPivot
 )
 
@@ -169,7 +171,7 @@ fun RoomSceneRenderer(
                     abs(animatedPetU - pet.anchor.u) > 0.0005f ||
                         abs(animatedPetV - pet.anchor.v) > 0.0005f
                 var lockedPetAnimation by remember(pet.petId, index) {
-                    mutableStateOf(CharacterAnimation.Row3)
+                    mutableStateOf(CharacterAnimation.South)
                 }
                 LaunchedEffect(pet.anchor) {
                     lockedPetAnimation = resolveCharacterAnimationForMovement(
@@ -276,25 +278,45 @@ fun RoomSceneRenderer(
                             }
 
                             is FloorRenderableModel.PetRenderable -> {
+                                val spriteAnimation = when {
+                                    renderable.pet.action == PetAction.EATING &&
+                                        !renderable.isMoving -> CharacterAnimation.Eating
+                                    renderable.pet.action == PetAction.BED_RESTING -> CharacterAnimation.Sleeping
+                                    else -> renderable.animation
+                                }
+                                val isSpritePlaying = renderable.isMoving ||
+                                    renderable.pet.action == PetAction.EATING ||
+                                    renderable.pet.action == PetAction.BED_RESTING
+                                val applyMovementStyle = renderable.isMoving &&
+                                    renderable.pet.action != PetAction.BED_RESTING
+                                val frameDurationMillis = when (spriteAnimation) {
+                                    CharacterAnimation.Eating -> 180L
+                                    CharacterAnimation.Sleeping -> 520L
+                                    else -> 150L
+                                }
+
                                 AnimatedCharacterSprite(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .petMovementStyle(
                                             style = renderable.pet.movement.style,
-                                            isMoving = renderable.isMoving,
+                                            isMoving = applyMovementStyle,
                                             bouncePx = renderable.pet.movement.bouncePx,
                                             durationMillis = renderable.movementDurationMillis
                                         )
                                         // [수정됨(권)] 옆으로 눕기 플래그가 활성화된 경우에만 회전 애니메이션 적용
                                         .petRestingStyle(
-                                            isResting = renderable.pet.isLyingSide
+                                            isResting = renderable.pet.isLyingSide &&
+                                                renderable.pet.action != PetAction.BED_RESTING &&
+                                                spriteAnimation != CharacterAnimation.Sleeping
                                         ),
-                                    animation = renderable.animation,
+                                    animation = spriteAnimation,
                                     appearance = renderable.pet.appearance,
                                     equippedItemIds = renderable.pet.equippedItemIds,
                                     isEgg = renderable.pet.status.isEgg,
-                                    frameDurationMillis = 150L,
-                                    isPlaying = renderable.isMoving,
+                                    frameDurationMillis = frameDurationMillis,
+                                    isPlaying = isSpritePlaying,
+                                    idleBounceEnabled = renderable.pet.action == PetAction.IDLE,
                                     contentDescription = renderable.pet.name.ifBlank {
                                         PetSprite.fallbackLabel
                                     }
@@ -306,7 +328,7 @@ fun RoomSceneRenderer(
                             }
 
                             is FloorRenderableModel.ToyRenderable -> {
-                                val isPlaying = houseSceneState.pet.action == com.example.lupapj.data.model.PetAction.PLAYING
+                                val isPlaying = houseSceneState.pet.action == PetAction.PLAYING
                                 // ToyRenderable은 항상 droppedToyAnchor를 기반으로 생성되므로 isTargetToy는 참으로 간주
                                 val isKnocked = houseSceneState.currentSceneRuntime.isToyKnockedOver
 
@@ -504,7 +526,8 @@ private fun buildFloorRenderables(
                 maxWidthPx = with(density) { PetSprite.maxWidthDp.dp.toPx() },
                 metrics = metrics
             ),
-            pivot = PetSprite.pivot ?: DefaultFloorPivot
+            pivot = PetSprite.pivot ?: DefaultFloorPivot,
+            depthBias = PET_RENDER_DEPTH_BIAS
         )
         renderables += DepthSortable(
             key = petState.key,
@@ -944,22 +967,18 @@ private fun resolveCharacterAnimationForMovement(
     }
 
     return when {
-        absDeltaX >= absDeltaY * PET_HORIZONTAL_DIRECTION_RATIO -> {
-            if (deltaX >= 0f) {
-                CharacterAnimation.Row0
-            } else {
-                CharacterAnimation.Row1
-            }
+        absDeltaX >= absDeltaY * PET_AXIS_DOMINANCE_RATIO -> {
+            if (deltaX >= 0f) CharacterAnimation.East else CharacterAnimation.West
         }
 
-        deltaY < 0f -> {
-            CharacterAnimation.Row2
+        absDeltaY >= absDeltaX * PET_AXIS_DOMINANCE_RATIO -> {
+            if (deltaY < 0f) CharacterAnimation.North else CharacterAnimation.South
         }
 
-        deltaY >= 0f -> {
-            CharacterAnimation.Row3
-        }
-
+        deltaX >= 0f && deltaY < 0f -> CharacterAnimation.NorthEast
+        deltaX < 0f && deltaY < 0f -> CharacterAnimation.NorthWest
+        deltaX >= 0f && deltaY >= 0f -> CharacterAnimation.SouthEast
+        deltaX < 0f && deltaY >= 0f -> CharacterAnimation.SouthWest
         else -> fallbackAnimation
     }
 }

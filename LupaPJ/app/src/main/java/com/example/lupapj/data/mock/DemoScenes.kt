@@ -33,17 +33,17 @@ object DemoScenes {
     private val isoProjection: IsoRoomProjectionSpec = createReferenceIsoRoomProjectionSpec()
     private val compatibilityProjection = createCompatibilityFaceProjectionSpec(isoProjection)
     private val bedPlacement = FloorTilePlacement(
-        tile = TileCoord(0, 0),
+        tile = TileCoord(2, 0),
         footprint = TileFootprint(2, 2),
-        anchorMode = TileAnchorMode.CENTER
+        anchorMode = TileAnchorMode.FRONT_CENTER
     )
     private val toyBoxPlacement = FloorTilePlacement(
-        tile = TileCoord(0, 4),
+        tile = TileCoord(1, 4),
         footprint = TileFootprint(1, 1),
         anchorMode = TileAnchorMode.CENTER
     )
     private val foodBagPlacement = FloorTilePlacement(
-        tile = TileCoord(1, 3),
+        tile = TileCoord(4, 3),
         footprint = TileFootprint(1, 1),
         anchorMode = TileAnchorMode.CENTER
     )
@@ -85,10 +85,10 @@ object DemoScenes {
                     assetKey = "room/objects/bed_basic",
                     fallbackLabel = "침대",
                     widthRatio = 0.24f,
-                    heightRatio = 0.56f,
+                    heightRatio = 0.64f,
                     minWidthDp = 88f,
                     maxWidthDp = 148f,
-                    isoTileFillRatio = 0.94f,
+                    isoTileFillRatio = 0.86f,
                     pivot = ScenePivot(x = 0.5f, y = 0.98f)
                 )
             ),

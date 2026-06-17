@@ -1,5 +1,11 @@
 package com.example.lupapj.ui.components
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
@@ -37,11 +43,20 @@ import com.example.lupapj.R
 import com.example.lupapj.data.model.PetAppearance
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import kotlin.math.min
 
-// 스프라이트 행의 의미는 임시 매핑이다. 추후 캐릭터 방향/상태에 맞게 Idle, WalkDown,
-// WalkUp, WalkSide 등으로 이름을 바꿀 수 있다.
+// Direction names are used by the new 8-way guinea-pig alien sprite set.
+// Row0~Row3 remain as compatibility aliases for older saved/server animation strings.
 enum class CharacterAnimation {
+    East,
+    West,
+    North,
+    South,
+    NorthEast,
+    NorthWest,
+    SouthEast,
+    SouthWest,
+    Eating,
+    Sleeping,
     Row0,
     Row1,
     Row2,
@@ -53,16 +68,21 @@ private data class CharacterFrameSpec(
     val bottomInsetRatio: Float
 )
 
+private const val LUPA_BOTTOM_INSET_RATIO = 26f / 256f
+private const val LUPA_EATING_SPRITE_SCALE = 1.16f
+private const val LUPA_SLEEPING_BED_LIFT_RATIO = 18f / 256f
+
 @Composable
 fun AnimatedCharacterSprite(
     modifier: Modifier = Modifier,
-    animation: CharacterAnimation = CharacterAnimation.Row0,
+    animation: CharacterAnimation = CharacterAnimation.South,
     appearance: PetAppearance = PetAppearance(),
     equippedItemIds: List<String> = emptyList(),
     allShopItems: List<com.example.lupapj.data.model.ShopItem> = com.example.lupapj.data.model.DefaultShopItems, // [수정됨(권)] 데이터 주입을 위한 파라미터 추가
     isEgg: Boolean = false,
     frameDurationMillis: Long = 150L,
     isPlaying: Boolean = true,
+    idleBounceEnabled: Boolean = true,
     contentDescription: String? = "character"
 ) {
     if (isEgg) {
@@ -77,6 +97,25 @@ fun AnimatedCharacterSprite(
     val frames = remember(animation) { framesFor(animation) }
     var frameIndex by remember(animation) { mutableIntStateOf(0) }
     val safeFrameDuration = frameDurationMillis.coerceAtLeast(16L)
+    val idleTransition = rememberInfiniteTransition(label = "LupaIdleBounce")
+    val idleBounceYPx by idleTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = if (!isPlaying && idleBounceEnabled) -4f else 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "LupaIdleBounceY"
+    )
+    val idleScaleY by idleTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (!isPlaying && idleBounceEnabled) 1.035f else 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "LupaIdleScaleY"
+    )
 
     LaunchedEffect(animation, safeFrameDuration, isPlaying, frames.size) {
         frameIndex = 0
@@ -106,7 +145,7 @@ fun AnimatedCharacterSprite(
     ) {
         val boxWidthDp = maxWidth
         val boxHeightDp = maxHeight
-        val petAspectRatio = 170f / 258f
+        val petAspectRatio = 1f
         val boxAspectRatio = if (boxHeightDp.value > 0f) boxWidthDp.value / boxHeightDp.value else 1f
         
         val spriteWidthDp: androidx.compose.ui.unit.Dp
@@ -122,8 +161,19 @@ fun AnimatedCharacterSprite(
 
         val drawnHeightPx = with(density) { spriteHeightDp.toPx() }
         val translationYPx = drawnHeightPx * currentFrame.bottomInsetRatio
-        val spriteScale = ((appearance.headSizeScale + appearance.bodySizeScale) * 0.5f)
+        val animationLiftYPx = if (animation == CharacterAnimation.Sleeping) {
+            -drawnHeightPx * LUPA_SLEEPING_BED_LIFT_RATIO
+        } else {
+            0f
+        }
+        val appearanceScale = ((appearance.headSizeScale + appearance.bodySizeScale) * 0.5f)
             .coerceIn(0.88f, 1.12f)
+        val animationScale = if (animation == CharacterAnimation.Eating) {
+            LUPA_EATING_SPRITE_SCALE
+        } else {
+            1f
+        }
+        val spriteScale = appearanceScale * animationScale
         
         val resolvedDescription = when {
             contentDescription == null -> null
@@ -154,9 +204,9 @@ fun AnimatedCharacterSprite(
                 .size(spriteWidthDp, spriteHeightDp)
                 .graphicsLayer {
                     transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f) // [추가됨(권)] 기준점을 바닥 중앙으로 고정하여 캐릭터와 아이템 축 이탈 방지
-                    translationY = translationYPx
+                    translationY = translationYPx + animationLiftYPx + idleBounceYPx
                     scaleX = spriteScale
-                    scaleY = spriteScale
+                    scaleY = spriteScale * idleScaleY
                 }
         ) {
             // 1. 베이스 캐릭터 펫 스프라이트 그리기 (이너 Box에 맞춤)
@@ -177,11 +227,11 @@ fun AnimatedCharacterSprite(
                         val itemWidth = spriteWidthDp * item.overlayScale
                         val itemHeight = itemWidth * item.overlayAspectRatio
                         
-                        // [추가됨(권)] 픽셀 프레임 애니메이션(Row0)에 맞춘 좌우/상하 흔들림(Sway) 미세 보정
+                        // [추가됨(권)] 픽셀 프레임 애니메이션에 맞춘 좌우/상하 흔들림(Sway) 미세 보정
                         val swayOffsetX = when (animation) {
-                            CharacterAnimation.Row0 -> when (frameIndex) {
+                            CharacterAnimation.East, CharacterAnimation.Row0 -> when (frameIndex) {
                                 1 -> -1.5f // 왼쪽으로 갸우뚱
-                                3 -> 1.5f  // 오른쪽으로 갸우뚱
+                                4 -> 1.5f  // 오른쪽으로 갸우뚱
                                 else -> 0f
                             }
                             else -> 0f
@@ -256,31 +306,97 @@ private fun EggCharacterPlaceholder(
 
 private fun framesFor(animation: CharacterAnimation): List<CharacterFrameSpec> {
     return when (animation) {
-        CharacterAnimation.Row0 -> listOf(
-            CharacterFrameSpec(R.drawable.sprite_0_0, bottomInsetRatio = 66f / 258f),
-            CharacterFrameSpec(R.drawable.sprite_0_1, bottomInsetRatio = 71f / 258f),
-            CharacterFrameSpec(R.drawable.sprite_0_2, bottomInsetRatio = 66f / 258f),
-            CharacterFrameSpec(R.drawable.sprite_0_3, bottomInsetRatio = 66f / 258f)
+        CharacterAnimation.East, CharacterAnimation.Row0 -> walkFrames(
+            R.drawable.lupa_walk_east_00,
+            R.drawable.lupa_walk_east_01,
+            R.drawable.lupa_walk_east_02,
+            R.drawable.lupa_walk_east_03,
+            R.drawable.lupa_walk_east_04,
+            R.drawable.lupa_walk_east_05
         )
 
-        // 왼쪽 이동 자산은 4장을 모두 돌리면 몸이 회전하는 느낌이 강해서,
-        // 중심이 가장 비슷한 두 프레임만 사용해 좌향 보행으로 보이게 고정한다.
-        CharacterAnimation.Row1 -> listOf(
-            CharacterFrameSpec(R.drawable.sprite_1_1, bottomInsetRatio = 47f / 258f),
-            CharacterFrameSpec(R.drawable.sprite_1_2, bottomInsetRatio = 49f / 258f)
+        CharacterAnimation.West, CharacterAnimation.Row1 -> walkFrames(
+            R.drawable.lupa_walk_west_00,
+            R.drawable.lupa_walk_west_01,
+            R.drawable.lupa_walk_west_02,
+            R.drawable.lupa_walk_west_03,
+            R.drawable.lupa_walk_west_04,
+            R.drawable.lupa_walk_west_05
         )
 
-        // 상/하 방향 자산은 현재 4프레임 전체를 순회하면 회전하는 느낌이 강해서,
-        // 일관된 방향으로 보이는 프레임만 골라 우선 2프레임 루프로 사용한다.
-        CharacterAnimation.Row2 -> listOf(
-            CharacterFrameSpec(R.drawable.sprite_2_2, bottomInsetRatio = 15f / 258f),
-            CharacterFrameSpec(R.drawable.sprite_2_3, bottomInsetRatio = 15f / 258f)
+        CharacterAnimation.North, CharacterAnimation.Row2 -> walkFrames(
+            R.drawable.lupa_walk_north_00,
+            R.drawable.lupa_walk_north_01,
+            R.drawable.lupa_walk_north_02,
+            R.drawable.lupa_walk_north_03,
+            R.drawable.lupa_walk_north_04,
+            R.drawable.lupa_walk_north_05
         )
 
-        CharacterAnimation.Row3 -> listOf(
-            CharacterFrameSpec(R.drawable.sprite_3_1, bottomInsetRatio = 0f),
-            CharacterFrameSpec(R.drawable.sprite_3_2, bottomInsetRatio = 0f)
+        CharacterAnimation.South, CharacterAnimation.Row3 -> walkFrames(
+            R.drawable.lupa_walk_south_00,
+            R.drawable.lupa_walk_south_01,
+            R.drawable.lupa_walk_south_02,
+            R.drawable.lupa_walk_south_03,
+            R.drawable.lupa_walk_south_04,
+            R.drawable.lupa_walk_south_05
         )
+
+        CharacterAnimation.NorthEast -> walkFrames(
+            R.drawable.lupa_walk_north_east_00,
+            R.drawable.lupa_walk_north_east_01,
+            R.drawable.lupa_walk_north_east_02,
+            R.drawable.lupa_walk_north_east_03,
+            R.drawable.lupa_walk_north_east_04,
+            R.drawable.lupa_walk_north_east_05
+        )
+
+        CharacterAnimation.NorthWest -> walkFrames(
+            R.drawable.lupa_walk_north_west_00,
+            R.drawable.lupa_walk_north_west_01,
+            R.drawable.lupa_walk_north_west_02,
+            R.drawable.lupa_walk_north_west_03,
+            R.drawable.lupa_walk_north_west_04,
+            R.drawable.lupa_walk_north_west_05
+        )
+
+        CharacterAnimation.SouthEast -> walkFrames(
+            R.drawable.lupa_walk_south_east_00,
+            R.drawable.lupa_walk_south_east_01,
+            R.drawable.lupa_walk_south_east_02,
+            R.drawable.lupa_walk_south_east_03,
+            R.drawable.lupa_walk_south_east_04,
+            R.drawable.lupa_walk_south_east_05
+        )
+
+        CharacterAnimation.SouthWest -> walkFrames(
+            R.drawable.lupa_walk_south_west_00,
+            R.drawable.lupa_walk_south_west_01,
+            R.drawable.lupa_walk_south_west_02,
+            R.drawable.lupa_walk_south_west_03,
+            R.drawable.lupa_walk_south_west_04,
+            R.drawable.lupa_walk_south_west_05
+        )
+
+        CharacterAnimation.Eating -> walkFrames(
+            R.drawable.lupa_eat_01,
+            R.drawable.lupa_eat_02,
+            R.drawable.lupa_eat_03,
+            R.drawable.lupa_eat_04
+        )
+
+        CharacterAnimation.Sleeping -> walkFrames(
+            R.drawable.lupa_sleep_01,
+            R.drawable.lupa_sleep_02,
+            R.drawable.lupa_sleep_03,
+            R.drawable.lupa_sleep_04
+        )
+    }
+}
+
+private fun walkFrames(vararg resIds: Int): List<CharacterFrameSpec> {
+    return resIds.map { resId ->
+        CharacterFrameSpec(resId = resId, bottomInsetRatio = LUPA_BOTTOM_INSET_RATIO)
     }
 }
 
@@ -289,7 +405,7 @@ private fun framesFor(animation: CharacterAnimation): List<CharacterFrameSpec> {
 private fun AnimatedCharacterSpritePreview() {
     AnimatedCharacterSprite(
         modifier = Modifier.size(120.dp),
-        animation = CharacterAnimation.Row0,
+        animation = CharacterAnimation.South,
         frameDurationMillis = 150L
     )
 }
