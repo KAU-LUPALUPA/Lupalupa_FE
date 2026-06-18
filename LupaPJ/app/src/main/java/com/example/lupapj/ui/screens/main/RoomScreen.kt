@@ -98,6 +98,7 @@ fun RoomScreen(
     onEquipClick: (String) -> Unit, // [추가됨(권)] 아이템 장착 콜백 추가
     onUnequipClick: (String) -> Unit, // [추가됨(권)] 아이템 해제 콜백 추가
     onPlaygroundClick: () -> Unit,
+    onContestClick: () -> Unit,
     mailboxVisible: Boolean,
     friendRequests: List<FriendRequest>,
     homeInvitations: List<FriendHomeInvitation>,
@@ -229,6 +230,7 @@ fun RoomScreen(
                     onSettingClick = onSettingsClick,
                     onPopupMenuItemClick = onBottomNavItemClick,
                     onPlaygroundClick = onPlaygroundClick,
+                    onContestClick = onContestClick,
                     onMinigameClick = onMinigameClick, // [수정됨(권)] 전달
                     roomContent = {
                         RoomViewport(
@@ -576,6 +578,7 @@ private fun RoomScreenPreview() {
             onEquipClick = {},
             onUnequipClick = {},
             onPlaygroundClick = {},
+            onContestClick = {},
             mailboxVisible = false,
             friendRequests = emptyList(),
             homeInvitations = emptyList(),

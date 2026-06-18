@@ -7,6 +7,7 @@ import com.example.lupapj.data.model.friend.FriendCode
 import com.example.lupapj.data.model.friend.FriendUser
 import com.example.lupapj.data.model.scene.RoomSceneId
 import com.example.lupapj.data.repository.AuthRepository
+import com.example.lupapj.data.repository.ContestRepository
 import com.example.lupapj.data.repository.FriendRepository
 import com.example.lupapj.data.repository.GalleryRepository // [추가됨]
 import com.example.lupapj.data.repository.PlazaRepository
@@ -21,6 +22,8 @@ import com.example.lupapj.data.remote.CurrencyApiService // [추가됨(권)]
 import com.example.lupapj.data.remote.AuthInterceptor // [추가됨(권)]
 import com.example.lupapj.data.remote.CurrencyRemoteDataSource // [추가됨(권)]
 import com.example.lupapj.data.remote.ServerConfig
+import com.example.lupapj.data.remote.contest.ContestRetrofitService
+import com.example.lupapj.data.remote.contest.RemoteContestRepository
 import com.example.lupapj.data.remote.friend.FriendRetrofitService
 import com.example.lupapj.data.remote.friend.RemoteFriendRepository
 import com.example.lupapj.data.remote.friend.RetrofitFriendApiClient
@@ -61,6 +64,8 @@ class AppContainer(context: Context) {
         retrofit.create(PlazaRetrofitService::class.java)
     private val roomRetrofitService: RoomRetrofitService =
         retrofit.create(RoomRetrofitService::class.java)
+    private val contestRetrofitService: ContestRetrofitService =
+        retrofit.create(ContestRetrofitService::class.java)
     
     // [수정됨(권)] DataSource 인스턴스화
     private val currencyRemoteDataSource = CurrencyRemoteDataSource(currencyApiService)
@@ -90,6 +95,7 @@ class AppContainer(context: Context) {
         val remoteGalleryRepo = com.example.lupapj.data.repository.RemoteGalleryRepository(galleryRetrofitService)
         GalleryRepository(appContext, remoteGalleryRepo) 
     }
+    val contestRepository: ContestRepository = RemoteContestRepository(contestRetrofitService)
     // [수정됨(권)] 로컬 캐시 인스턴스
     private val shopLocalCache = ShopLocalCache(appContext)
 

@@ -31,6 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.lupapj.BuildConfig
 import com.example.lupapj.data.model.AppPhase
+import com.example.lupapj.ui.screens.contest.ContestScreen
 import com.example.lupapj.ui.screens.friends.FriendRoomScreen
 import com.example.lupapj.ui.screens.friends.FriendScreen
 import com.example.lupapj.ui.screens.gallery.GalleryScreen
@@ -65,7 +66,8 @@ fun LupaApp(deepLink: Uri? = null) {
             friendRepository = container.friendRepository,
             plazaRepository = container.plazaRepository,
             currencyRepository = container.currencyRepository,
-            shopRepository = container.shopRepository
+            shopRepository = container.shopRepository,
+            contestRepository = container.contestRepository
         )
     )
 
@@ -220,6 +222,7 @@ fun LupaApp(deepLink: Uri? = null) {
                     onEquipClick = appViewModel::equipItem, // [추가됨(권)] 장착 콜백
                     onUnequipClick = appViewModel::unequipItem, // [추가됨(권)] 해제 콜백
                     onPlaygroundClick = appViewModel::openPlaza,
+                    onContestClick = appViewModel::openContest,
                     mailboxVisible = uiState.mailboxVisible,
                     friendRequests = uiState.receivedFriendRequests,
                     homeInvitations = uiState.receivedHomeInvitations,
@@ -343,6 +346,27 @@ fun LupaApp(deepLink: Uri? = null) {
             } else {
                 appViewModel.exitShopDetail()
             }
+        }
+
+        AppPhase.CONTEST -> {
+            ContestScreen(
+                galleryImages = uiState.galleryImages,
+                isUploadingEntry = uiState.isContestEntryUploading,
+                uploadMessage = uiState.contestUploadMessage,
+                groups = uiState.contestGroups,
+                selectedGroup = uiState.selectedContestGroup,
+                isLoadingGroups = uiState.isContestGroupsLoading,
+                groupMessage = uiState.contestGroupMessage,
+                isParticipating = uiState.isContestParticipating,
+                myEntryImageUrl = uiState.contestMyEntryImageUrl,
+                isSubmittingVote = uiState.isContestVoteSubmitting,
+                voteMessage = uiState.contestVoteMessage,
+                onEntryImageSelected = appViewModel::uploadContestEntryImage,
+                onGroupClick = appViewModel::openContestGroup,
+                onGroupBackClick = appViewModel::exitContestGroup,
+                onVoteEntryClick = appViewModel::voteForContestEntry,
+                onBackClick = appViewModel::exitContest
+            )
         }
 
         AppPhase.MINIGAME -> {

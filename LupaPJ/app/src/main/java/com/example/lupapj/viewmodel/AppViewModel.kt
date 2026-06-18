@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.lupapj.data.model.AppPhase
 import com.example.lupapj.data.model.BottomNavItem
 import com.example.lupapj.data.model.DemoPetConditionPolicy
+import com.example.lupapj.data.model.GalleryImage
 import com.example.lupapj.data.model.MainMenuAction
 import com.example.lupapj.data.model.PetAction
 import com.example.lupapj.data.model.PetConditionTickRemainder
@@ -13,6 +14,8 @@ import com.example.lupapj.data.model.PetUiState
 import com.example.lupapj.data.model.RoomObjectType
 import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.repository.AuthRepository
+import com.example.lupapj.data.repository.ContestRepository
+import com.example.lupapj.data.repository.ContestUploadResult
 import com.example.lupapj.data.repository.FriendRepository
 import com.example.lupapj.data.repository.GalleryRepository // [추가됨]
 import com.example.lupapj.data.repository.RoomRepository
@@ -68,7 +71,8 @@ class AppViewModel(
     private val friendRepository: FriendRepository,
     private val plazaRepository: PlazaRepository,
     private val currencyRepository: CurrencyRepository, // [추가됨(권)] ViewModel 파라미터로 추가
-    private val shopRepository: ShopRepository // [추가됨(권)] ViewModel 파라미터로 추가
+    private val shopRepository: ShopRepository, // [추가됨(권)] ViewModel 파라미터로 추가
+    private val contestRepository: ContestRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AppUiState())
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
@@ -406,6 +410,7 @@ class AppViewModel(
             MainMenuAction.CONTACTS -> onBottomNavItemClick(BottomNavItem.CONTACTS)
             MainMenuAction.SHOP -> onBottomNavItemClick(BottomNavItem.SHOP)
             MainMenuAction.PLAYGROUND -> openPlaza()
+            MainMenuAction.CONTEST -> openContest()
             MainMenuAction.MINIGAME -> openMinigame() // [수정됨(권)] 최근 활동 버튼 클릭 시 미니게임 진입 연결
             null -> _uiState.update {
                 it.copy(placeholderMessage = "최근 사용한 기능이 없습니다.")
@@ -1410,6 +1415,199 @@ class AppViewModel(
         _uiState.update { it.copy(phase = AppPhase.ROOM) }
     }
 
+    fun openContest() {
+        _uiState.update {
+            it.copy(
+                phase = AppPhase.CONTEST,
+                recentMainMenuAction = MainMenuAction.CONTEST,
+                selectedContestGroup = null,
+                contestUploadMessage = null,
+                contestGroupMessage = null,
+                contestVoteMessage = null
+            )
+        }
+        loadContestGroups()
+    }
+
+    fun exitContest() {
+        _uiState.update { it.copy(phase = AppPhase.ROOM) }
+    }
+
+    fun openContestGroup(groupId: String) {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isContestGroupsLoading = true,
+                    contestGroupMessage = null,
+                    contestVoteMessage = null
+                )
+            }
+
+            contestRepository.getGroupDetail(groupId)
+                .onSuccess { group ->
+                    _uiState.update {
+                        it.copy(
+                            selectedContestGroup = group,
+                            isContestGroupsLoading = false
+                        )
+                    }
+                }
+                .onFailure { throwable ->
+                    _uiState.update {
+                        it.copy(
+                            isContestGroupsLoading = false,
+                            contestGroupMessage = throwable.message ?: "Could not load contest group."
+                        )
+                    }
+                }
+        }
+    }
+
+    fun exitContestGroup() {
+        _uiState.update {
+            it.copy(
+                selectedContestGroup = null,
+                contestVoteMessage = null
+            )
+        }
+    }
+
+    fun voteForContestEntry(entryId: Long) {
+        if (_uiState.value.isContestVoteSubmitting) return
+
+        val groupId = _uiState.value.selectedContestGroup?.groupId ?: return
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isContestVoteSubmitting = true,
+                    contestVoteMessage = "Submitting vote..."
+                )
+            }
+
+            contestRepository.vote(entryId)
+                .onSuccess {
+                    val refreshedGroup = contestRepository.getGroupDetail(groupId).getOrNull()
+                    _uiState.update {
+                        it.copy(
+                            selectedContestGroup = refreshedGroup ?: it.selectedContestGroup,
+                            isContestVoteSubmitting = false,
+                            contestVoteMessage = "Vote submitted."
+                        )
+                    }
+                }
+                .onFailure { throwable ->
+                    _uiState.update {
+                        it.copy(
+                            isContestVoteSubmitting = false,
+                            contestVoteMessage = throwable.message ?: "Vote failed."
+                        )
+                    }
+                }
+        }
+    }
+
+    fun uploadContestEntryImage(image: GalleryImage) {
+        if (_uiState.value.isContestEntryUploading) return
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isContestEntryUploading = true,
+                    contestUploadMessage = "Uploading contest image..."
+                )
+            }
+
+            when (val result = contestRepository.uploadEntryImage(image)) {
+                is ContestUploadResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isContestEntryUploading = false,
+                            contestUploadMessage = "Contest image uploaded."
+                        )
+                    }
+                    loadContestGroups(result.groupId)
+                }
+
+                is ContestUploadResult.MatchedWithoutImage -> {
+                    _uiState.update {
+                        it.copy(
+                            isContestEntryUploading = false,
+                            contestUploadMessage = "Group matched, but image upload failed. ${result.message}"
+                        )
+                    }
+                    loadContestGroups(result.groupId)
+                }
+
+                is ContestUploadResult.Failure -> {
+                    _uiState.update {
+                        it.copy(
+                            isContestEntryUploading = false,
+                            contestUploadMessage = result.message
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun loadContestGroups(selectedGroupId: String? = null) {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isContestGroupsLoading = true,
+                    contestGroupMessage = null
+                )
+            }
+
+            contestRepository.getGroups()
+                .onSuccess { groups ->
+                    val myGroupId = groups.firstOrNull { it.isMyGroup }?.groupId
+                    _uiState.update {
+                        it.copy(
+                            contestGroups = groups,
+                            isContestGroupsLoading = false,
+                            isContestParticipating = myGroupId != null,
+                            contestMyEntryImageUrl = if (myGroupId == null) null else it.contestMyEntryImageUrl,
+                            contestGroupMessage = if (groups.isEmpty()) "No contest groups yet." else null
+                        )
+                    }
+
+                    if (myGroupId != null) {
+                        loadContestParticipation(myGroupId)
+                    }
+
+                    if (selectedGroupId != null) {
+                        openContestGroup(selectedGroupId)
+                    }
+                }
+                .onFailure { throwable ->
+                    _uiState.update {
+                        it.copy(
+                            isContestGroupsLoading = false,
+                            contestGroupMessage = throwable.message ?: "Could not load contest groups."
+                        )
+                    }
+                }
+        }
+    }
+
+    private fun loadContestParticipation(groupId: String) {
+        viewModelScope.launch {
+            contestRepository.getGroupDetail(groupId)
+                .onSuccess { group ->
+                    val myEntryImageUrl = group.entries
+                        .firstOrNull { entry -> entry.entryId == group.myEntryId }
+                        ?.imageUrl
+                    _uiState.update {
+                        it.copy(
+                            isContestParticipating = true,
+                            contestMyEntryImageUrl = myEntryImageUrl
+                        )
+                    }
+                }
+        }
+    }
+
     fun consumeShopFeedback() {
         _uiState.update { it.copy(shopFeedbackMessage = null) }
     }
@@ -2113,7 +2311,8 @@ class AppViewModel(
         private val friendRepository: FriendRepository,
         private val plazaRepository: PlazaRepository,
         private val currencyRepository: CurrencyRepository, 
-        private val shopRepository: ShopRepository 
+        private val shopRepository: ShopRepository ,
+        private val contestRepository: ContestRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -2124,7 +2323,8 @@ class AppViewModel(
                 friendRepository = friendRepository,
                 plazaRepository = plazaRepository,
                 currencyRepository = currencyRepository,
-                shopRepository = shopRepository
+                shopRepository = shopRepository,
+                contestRepository = contestRepository
             ) as T
         }
     }

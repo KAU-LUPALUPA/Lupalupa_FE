@@ -13,6 +13,8 @@ import com.example.lupapj.data.model.friend.FriendSummary
 import com.example.lupapj.data.model.friend.FriendUser
 import com.example.lupapj.data.model.InventoryItem // [추가됨]
 import com.example.lupapj.data.model.plaza.PlazaRoom // [보존] 팀원 작업 내용
+import com.example.lupapj.data.repository.ContestGroupDetail
+import com.example.lupapj.data.repository.ContestGroupSummary
 import com.example.lupapj.data.model.ShopItem // [추가됨(권)] 상점 아이템 데이터 모델 Import
 
 data class AppUiState(
@@ -24,6 +26,16 @@ data class AppUiState(
     val recentMainMenuAction: MainMenuAction? = null,
     val placeholderMessage: String? = null,
     val galleryImages: List<GalleryImage> = emptyList(), // [추가됨] 갤러리 상태 관리를 위한 이미지 목록
+    val isContestEntryUploading: Boolean = false,
+    val contestUploadMessage: String? = null,
+    val contestGroups: List<ContestGroupSummary> = emptyList(),
+    val selectedContestGroup: ContestGroupDetail? = null,
+    val isContestGroupsLoading: Boolean = false,
+    val contestGroupMessage: String? = null,
+    val isContestParticipating: Boolean = false,
+    val contestMyEntryImageUrl: String? = null,
+    val isContestVoteSubmitting: Boolean = false,
+    val contestVoteMessage: String? = null,
     val myFriendProfile: FriendUser? = null,
     val friends: List<FriendSummary> = emptyList(),
     val receivedFriendRequests: List<FriendRequest> = emptyList(),
