@@ -120,7 +120,9 @@ fun RoomScreen(
     onRejectHomeInvitation: (String) -> Unit,
     behaviorDebugInfo: com.example.lupapj.data.model.BehaviorDebugInfo,
     onToggleBehaviorDebugClick: () -> Unit,
-    onMinigameClick: () -> Unit // [수정됨(권)] 미니게임 클릭 콜백 추가
+    onRandomizeTraitsClick: () -> Unit, // [추가됨(권)] 랜덤 수치 디버그용
+    onResetTraitsClick: () -> Unit, // [추가됨(권)] 기본 수치 복구 디버그용
+    onMinigameClick: () -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope() // [추가됨(권)]
@@ -291,11 +293,25 @@ fun RoomScreen(
                         }
                         
                         // [추가됨(권)] 행동 디버깅 토글 버튼
-                        androidx.compose.material3.TextButton(
-                            onClick = onToggleBehaviorDebugClick,
-                            modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 120.dp)
+                        Row(
+                            modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 120.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("디버그", color = Color.White)
+                            androidx.compose.material3.TextButton(
+                                onClick = onToggleBehaviorDebugClick
+                            ) {
+                                Text("디버그", color = Color.White)
+                            }
+                            androidx.compose.material3.TextButton(
+                                onClick = onRandomizeTraitsClick
+                            ) {
+                                Text("🎲 랜덤", color = Color.White)
+                            }
+                            androidx.compose.material3.TextButton(
+                                onClick = onResetTraitsClick
+                            ) {
+                                Text("🔄 롤백", color = Color.White)
+                            }
                         }
 
                         // [추가됨(권)] 행동 디버깅 윈도우 (구석 배치)
@@ -594,6 +610,8 @@ private fun RoomScreenPreview() {
             onRejectHomeInvitation = {},
             behaviorDebugInfo = com.example.lupapj.data.model.BehaviorDebugInfo(),
             onToggleBehaviorDebugClick = {},
+            onRandomizeTraitsClick = {},
+            onResetTraitsClick = {},
             onMinigameClick = {} // [수정됨(권)] 프리뷰 파라미터 추가
         )
     }

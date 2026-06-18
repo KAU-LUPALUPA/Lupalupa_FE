@@ -208,10 +208,12 @@ class RemoteRoomRepository(
             }
 
             cacheRoomLayout(serverLayout)
-            serverLayout.toDomainRoomState(
+            val domainState = serverLayout.toDomainRoomState(
                 sceneResolver = sceneResolver,
                 fallbackHouseSceneState = currentRoom.houseSceneState
             )
+            android.util.Log.d("LupaBackendSync", "Loaded server room layout with pet info. Interaction Events: ${domainState.houseSceneState.pet.interactionEvents}, Traits: ${domainState.houseSceneState.pet.traits}")
+            domainState
         } catch (exception: CancellationException) {
             throw exception
         } catch (_: Exception) {
@@ -227,10 +229,12 @@ class RemoteRoomRepository(
             .getRoomLayout()
             .roomLayout
         cacheRoomLayout(serverLayout)
-        return serverLayout.toDomainRoomState(
+        val domainState = serverLayout.toDomainRoomState(
             sceneResolver = sceneResolver,
             fallbackHouseSceneState = currentRoom.houseSceneState
         )
+        android.util.Log.d("LupaBackendSync", "Loaded remote layout. Interactions: ${domainState.houseSceneState.pet.interactionEvents}")
+        return domainState
     }
 
     private suspend fun cacheRoomLayout(roomLayout: RoomLayoutDto) {

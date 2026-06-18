@@ -16,10 +16,12 @@ import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.repository.AuthRepository
 import com.example.lupapj.data.repository.ContestRepository
 import com.example.lupapj.data.repository.ContestUploadResult
+import com.example.lupapj.data.repository.CurrencyRepository
 import com.example.lupapj.data.repository.FriendRepository
 import com.example.lupapj.data.repository.GalleryRepository // [추가됨]
+import com.example.lupapj.data.repository.PetRepository
+import com.example.lupapj.data.repository.PlazaRepository
 import com.example.lupapj.data.repository.RoomRepository
-import com.example.lupapj.data.repository.CurrencyRepository // [추가됨(권)] 재화 리포지토리 의존성
 import com.example.lupapj.data.repository.ShopRepository // [추가됨(권)] 상점 리포지토리 의존성
 import android.graphics.Bitmap // [추가됨]
 import com.example.lupapj.data.model.ShopItem // [추가됨(권)] 상점 아이템 모델 Import
@@ -39,7 +41,6 @@ import com.example.lupapj.data.model.scene.autonomousMovementProfileFor
 import com.example.lupapj.data.model.scene.chooseAutonomousPetTarget
 import com.example.lupapj.data.model.scene.updatePet
 import com.example.lupapj.data.remote.room.RoomLayoutApiException
-import com.example.lupapj.data.repository.PlazaRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -67,12 +68,13 @@ private const val DEV_LOGIN_NICKNAME = "개발자"
 class AppViewModel(
     private val authRepository: AuthRepository,
     private val roomRepository: RoomRepository,
-    private val galleryRepository: GalleryRepository, // [추가됨]
+    private val galleryRepository: GalleryRepository,
     private val friendRepository: FriendRepository,
     private val plazaRepository: PlazaRepository,
-    private val currencyRepository: CurrencyRepository, // [추가됨(권)] ViewModel 파라미터로 추가
-    private val shopRepository: ShopRepository, // [추가됨(권)] ViewModel 파라미터로 추가
-    private val contestRepository: ContestRepository
+    private val currencyRepository: CurrencyRepository,
+    private val shopRepository: ShopRepository,
+    private val contestRepository: ContestRepository,
+    private val petRepository: PetRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AppUiState())
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
@@ -455,6 +457,40 @@ class AppViewModel(
                 val bedAnchor = roomState.sceneDefinition.objects.find { it.type == RoomObjectType.BED }?.anchor as? FloorAnchor
                 if (bedAnchor != null) {
                     startBedRestingSequence(bedAnchor)
+                    
+                    // 서버 연동 및 이벤트 로깅: 플레이어 행동 (침대 클릭) 즉시 카운트
+                    val pet = _uiState.value.room?.houseSceneState?.pet ?: return@launch
+                    val room = _uiState.value.room ?: return@launch
+                    try {
+                        val serverPetState = petRepository.sleepPet(pet.petId, room.sceneDefinition.id)
+                        _uiState.update { state ->
+                            val r = state.room ?: return@update state
+                            val currentPet = r.houseSceneState.pet
+                            val newPetState = currentPet.copy(
+                                status = serverPetState.pet.status,
+                                traits = serverPetState.pet.traits,
+                                interactionEvents = serverPetState.pet.interactionEvents
+                            )
+                            state.copy(room = r.copy(houseSceneState = r.houseSceneState.copy(pet = newPetState)))
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("AppViewModel", "Failed to sync sleep command to server", e)
+                    }
+                    _uiState.update { state ->
+                        val currentRoom = state.room ?: return@update state
+                        val currentPet = currentRoom.houseSceneState.pet
+                        val updatedEvents = currentPet.interactionEvents.copy(
+                            recentSleepCommandCount = currentPet.interactionEvents.recentSleepCommandCount + 1,
+                            totalSleepCommandCount = currentPet.interactionEvents.totalSleepCommandCount + 1
+                        )
+                        state.copy(
+                            room = currentRoom.copy(
+                                houseSceneState = currentRoom.houseSceneState.copy(
+                                    pet = currentPet.copy(interactionEvents = updatedEvents)
+                                )
+                            )
+                        )
+                    }
                 }
             } else {
                 val nextRoom = roomRepository.performObjectAction(objectType)
@@ -599,6 +635,56 @@ class AppViewModel(
                 // [수정됨(권)] 직접 먹이 주기 시 즉시 반응하지 않고, 행동 엔진의 다음 틱에서 확률적으로 결정하도록 유도
                 _uiState.update { it.copy(placeholderMessage = "바닥에 사료를 놓았습니다.") }
             }
+            
+            // 서버 연동: 플레이어의 행동 즉시 카운트
+            try {
+                val petId = nextRoom.houseSceneState.pet.petId
+                val sceneId = room.sceneDefinition.id
+                val serverPetState = if (placingFood) {
+                    petRepository.feedPet(petId, sceneId)
+                } else {
+                    petRepository.playPet(petId, sceneId)
+                }
+                _uiState.update { state ->
+                    val r = state.room ?: return@update state
+                    val currentPet = r.houseSceneState.pet
+                    val newPetState = currentPet.copy(
+                        status = serverPetState.pet.status,
+                        traits = serverPetState.pet.traits,
+                        interactionEvents = serverPetState.pet.interactionEvents
+                    )
+                    state.copy(room = r.copy(houseSceneState = r.houseSceneState.copy(pet = newPetState)))
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("AppViewModel", "Failed to sync feed/play action to server", e)
+            }
+            
+            // 로컬 폴백: 서버 실패 시에도 상호작용 카운트 증가 (UI 즉각 반응 및 롤백 방지용)
+            _uiState.update { state ->
+                val currentRoom = state.room ?: return@update state
+                val currentPet = currentRoom.houseSceneState.pet
+                val currentEvents = currentPet.interactionEvents
+                val updatedEvents = if (placingFood) {
+                    currentEvents.copy(
+                        recentFeedCount = currentEvents.recentFeedCount + 1,
+                        totalFeedCount = currentEvents.totalFeedCount + 1,
+                        neglectTicks = 0
+                    )
+                } else {
+                    currentEvents.copy(
+                        recentPlayCount = currentEvents.recentPlayCount + 1,
+                        totalPlayCount = currentEvents.totalPlayCount + 1,
+                        neglectTicks = 0
+                    )
+                }
+                state.copy(
+                    room = currentRoom.copy(
+                        houseSceneState = currentRoom.houseSceneState.copy(
+                            pet = currentPet.copy(interactionEvents = updatedEvents)
+                        )
+                    )
+                )
+            }
         }
     }
 
@@ -613,7 +699,43 @@ class AppViewModel(
 
         if (!runtime.isToyKnockedOver) return
         if (room.feedMode || room.toyMode || room.rearrangeMode || room.isCameraMode) return
-        if (pet.movement.isMoving || pet.action == PetAction.CLEANING) return
+        if (pet.action == PetAction.CLEANING) return
+
+        // 서버 연동: 플레이어의 행동 즉시 카운트
+        viewModelScope.launch {
+            try {
+                val serverPetState = petRepository.cleanPet(pet.petId, room.sceneDefinition.id)
+                _uiState.update { state ->
+                    val r = state.room ?: return@update state
+                    val currentPet = r.houseSceneState.pet
+                    val newPetState = currentPet.copy(
+                        status = serverPetState.pet.status,
+                        traits = serverPetState.pet.traits,
+                        interactionEvents = serverPetState.pet.interactionEvents
+                    )
+                    state.copy(room = r.copy(houseSceneState = r.houseSceneState.copy(pet = newPetState)))
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("AppViewModel", "Failed to sync clean command to server", e)
+            }
+        }
+        
+        _uiState.update { state ->
+            val currentRoom = state.room ?: return@update state
+            val currentPet = currentRoom.houseSceneState.pet
+            val updatedEvents = currentPet.interactionEvents.copy(
+                recentCleanCommandCount = currentPet.interactionEvents.recentCleanCommandCount + 1,
+                totalCleanCommandCount = currentPet.interactionEvents.totalCleanCommandCount + 1,
+                neglectTicks = 0
+            )
+            state.copy(
+                room = currentRoom.copy(
+                    houseSceneState = currentRoom.houseSceneState.copy(
+                        pet = currentPet.copy(interactionEvents = updatedEvents)
+                    )
+                )
+            )
+        }
 
         startToyCleanupSequence(
             droppedToyAnchor = droppedToyAnchor,
@@ -1734,18 +1856,11 @@ class AppViewModel(
         // [수정됨(권)] 틱 증가를 로직 최상단으로 이동하여 UI와 실제 판정 시점을 동기화
         behaviorConsecutiveTicks++
 
-        val isRestingState = pet.action == PetAction.RESTING || pet.action == PetAction.BED_RESTING
-        
-        // [수정됨(권)] 취침/휴식 중에는 10초(5틱) 단위로만 확률 계산 및 행동 전이 판정 수행
-        if (isRestingState) {
-            if (behaviorConsecutiveTicks % 5 != 0) return
-        }
-
         // V2 감정 및 상태 파생
         val derived = com.example.lupapj.data.model.BehaviorEvaluator.calculateDerivedTraits(pet.traits)
-        val affect = com.example.lupapj.data.model.BehaviorEvaluator.calculateAffect(pet.traits, derived, pet.status)
+        val affect = com.example.lupapj.data.model.BehaviorEvaluator.calculateAffect(pet.traits, derived, pet.status, pet.interactionEvents)
 
-        // 감정 기반 디버그 정보 갱신
+        // 감정 기반 디버그 정보 갱신 (휴식 중 얼리 리턴 전에도 UI 틱이 계속 증가하도록 최상단에 배치)
         _uiState.update { s -> 
             s.copy(behaviorDebugInfo = s.behaviorDebugInfo.copy(
                 consecutiveTicks = behaviorConsecutiveTicks,
@@ -1754,6 +1869,13 @@ class AppViewModel(
                 mValue = affect.valence,
                 kValue = affect.arousal
             ))
+        }
+
+        val isRestingState = pet.action == PetAction.RESTING || pet.action == PetAction.BED_RESTING
+        
+        // [수정됨(권)] 취침/휴식 중에는 10초(5틱) 단위로만 확률 계산 및 행동 전이 판정 수행
+        if (isRestingState) {
+            if (behaviorConsecutiveTicks % 5 != 0) return
         }
 
         // 기존 행동 이탈 체크 (Hazard)
@@ -1823,6 +1945,8 @@ class AppViewModel(
                 )
                 if (targetAnchor != null) {
                     moveToTargetAndExecute(targetAnchor, pet, PetAction.IDLE, profile) 
+                } else {
+                    setPetAction(PetAction.IDLE)
                 }
             }
             PetAction.RESTING -> {
@@ -1912,6 +2036,26 @@ class AppViewModel(
                                 )
                             )
                         }
+                        
+                        // [추가됨] 자가 청결(그루밍) 후 변경된 수치를 서버와 접속 중 동기화
+                        val pet = _uiState.value.room?.houseSceneState?.pet
+                        if (pet != null) {
+                            viewModelScope.launch {
+                                try {
+                                    val req = com.example.lupapj.data.remote.pet.PetStatusSyncRequestDto(
+                                        satiety = pet.status.satiety,
+                                        vitality = pet.status.vitality,
+                                        cleanliness = pet.status.cleanliness,
+                                        offlineSync = false
+                                    )
+                                    val sceneId = _uiState.value.room?.sceneDefinition?.id ?: com.example.lupapj.data.model.scene.RoomSceneId("main_room")
+                                    petRepository.syncPetStatus(pet.petId, sceneId, req)
+                                } catch (e: Exception) {
+                                    android.util.Log.e("AppViewModel", "Failed to sync grooming status", e)
+                                }
+                            }
+                        }
+
                         setPetAction(PetAction.IDLE)
                     }
                 }
@@ -1928,7 +2072,8 @@ class AppViewModel(
         finalAction: PetAction,
         profile: com.example.lupapj.data.model.scene.PetAutonomousMovementProfile
     ) {
-        viewModelScope.launch {
+        autonomousPetMovementJob?.cancel()
+        autonomousPetMovementJob = viewModelScope.launch {
             // [추가됨] 기상 연출 지연
             if (pet.isLyingSide) {
                 setPetAction(PetAction.IDLE)
@@ -2059,13 +2204,17 @@ class AppViewModel(
                 movement = currentPet.movement,
                 isLyingSide = currentPet.isLyingSide,
                 status = currentPet.status, // [수정됨] RoomRepository는 펫 상태를 관리하지 않으므로 항상 로컬 UI 상태를 유지
+                traits = currentPet.traits,
+                interactionEvents = currentPet.interactionEvents,
                 equippedItemIds = currentPet.equippedItemIds
             )
         } else if (currentPet != null) {
             // [수정됨] IDLE 상태가 아닐 때도 장착 아이템과 펫 상태(수치)는 로컬을 유지
             repositoryPet.copy(
                 equippedItemIds = currentPet.equippedItemIds,
-                status = currentPet.status
+                status = currentPet.status,
+                traits = currentPet.traits,
+                interactionEvents = currentPet.interactionEvents
             )
         } else {
             repositoryPet
@@ -2108,6 +2257,7 @@ class AppViewModel(
 
     private fun startEatingSequence(targetAnchor: FloorAnchor, skipMovement: Boolean = false) {
         pendingFoodConsumeJob?.cancel()
+        autonomousPetMovementJob?.cancel()
         pendingFoodConsumeJob = viewModelScope.launch {
             val pet = _uiState.value.room?.houseSceneState?.pet ?: return@launch
             val profile = autonomousMovementProfileFor(pet.traits)
@@ -2148,6 +2298,7 @@ class AppViewModel(
 
     private fun startPlayingSequence(targetAnchor: FloorAnchor) {
         pendingFoodConsumeJob?.cancel()
+        autonomousPetMovementJob?.cancel()
         pendingFoodConsumeJob = viewModelScope.launch {
             val pet = _uiState.value.room?.houseSceneState?.pet ?: return@launch
             val profile = autonomousMovementProfileFor(pet.traits)
@@ -2183,6 +2334,7 @@ class AppViewModel(
         toyBoxAnchor: FloorAnchor
     ) {
         pendingFoodConsumeJob?.cancel()
+        autonomousPetMovementJob?.cancel()
         pendingFoodConsumeJob = viewModelScope.launch {
             var pet = _uiState.value.room?.houseSceneState?.pet ?: return@launch
             val profile = autonomousMovementProfileFor(pet.traits)
@@ -2241,6 +2393,7 @@ class AppViewModel(
 
     private fun startBedRestingSequence(targetAnchor: FloorAnchor) {
         pendingFoodConsumeJob?.cancel()
+        autonomousPetMovementJob?.cancel()
         pendingFoodConsumeJob = viewModelScope.launch {
             val pet = _uiState.value.room?.houseSceneState?.pet ?: return@launch
             val profile = autonomousMovementProfileFor(pet.traits)
@@ -2276,6 +2429,77 @@ class AppViewModel(
         }
     }
 
+    fun applyOfflineProgression(elapsedSeconds: Long): String {
+        if (elapsedSeconds <= 0L) return ""
+        
+        val room = _uiState.value.room ?: return ""
+        val pet = room.houseSceneState.pet
+        val currentStatus = pet.status
+        val traits = pet.traits
+        
+        // 평균 변화율 산정 (현재 수치 기반 및 캐릭터 특성 반영)
+        // - 식욕(appetite)이 높을수록 포만감(satiety)이 더 빨리 떨어짐
+        // - 활동성(activity)이 높을수록 활력(vitality)과 청결도(cleanliness)가 더 빨리 떨어짐
+        val appetiteMod = 0.5f + traits.appetite // 0.5 ~ 1.5배 보정
+        val activityMod = 0.5f + traits.activity // 0.5 ~ 1.5배 보정
+        
+        val satietyDecay = ((elapsedSeconds / 600L) * appetiteMod).toInt().coerceIn(0, currentStatus.satiety) // 기준: 10분당 1
+        val vitalityDecay = ((elapsedSeconds / 900L) * activityMod).toInt().coerceIn(0, currentStatus.vitality) // 기준: 15분당 1
+        val cleanlinessDecay = ((elapsedSeconds / 1800L) * activityMod).toInt().coerceIn(0, currentStatus.cleanliness) // 기준: 30분당 1
+        
+        val nextStatus = currentStatus.copy(
+            satiety = currentStatus.satiety - satietyDecay,
+            vitality = currentStatus.vitality - vitalityDecay,
+            cleanliness = currentStatus.cleanliness - cleanlinessDecay
+        )
+        
+        // 부재중 행동 예측 일지 (Missed You Log)
+        val logMessage = buildString {
+            if (vitalityDecay > 10) {
+                append("방을 뽈뽈거리며 돌아다녔어요! ")
+            } else if (vitalityDecay > 3) {
+                append("혼자서도 얌전히 놀았어요. ")
+            } else {
+                append("계속 쿨쿨 잠을 잤나봐요. ")
+            }
+            
+            if (satietyDecay > 15) {
+                append("\n배가 많이 고파요! ")
+            } else if (satietyDecay > 5) {
+                append("\n배가 살짝 출출해요. ")
+            }
+            
+            if (cleanlinessDecay > 5) {
+                append("\n조금 꼬질꼬질해졌어요.")
+            }
+        }.trimEnd()
+
+        val updatedRoom = room.copy(
+            houseSceneState = room.houseSceneState.copy(
+                pet = pet.copy(status = nextStatus)
+            )
+        )
+        
+        _uiState.update { it.copy(room = updatedRoom) }
+
+        // [추가됨] 백엔드 서버에 오프라인 감가 수치 강제 동기화 (오프라인 플래그 켜서)
+        viewModelScope.launch {
+            try {
+                val req = com.example.lupapj.data.remote.pet.PetStatusSyncRequestDto(
+                    satiety = nextStatus.satiety,
+                    vitality = nextStatus.vitality,
+                    cleanliness = nextStatus.cleanliness,
+                    offlineSync = true
+                )
+                petRepository.syncPetStatus(pet.petId, room.sceneDefinition.id, req)
+            } catch (e: Exception) {
+                android.util.Log.e("AppViewModel", "Failed to sync offline status to server", e)
+            }
+        }
+
+        return logMessage
+    }
+
     private fun setPetAction(action: PetAction) {
         _uiState.update { state ->
             val room = state.room ?: return@update state
@@ -2289,6 +2513,88 @@ class AppViewModel(
                     )
                 )
             )
+        }
+    }
+
+    // [추가됨(권)] 랜덤 수치 디버그용
+    fun randomizeTraitsDebug() {
+        val random = kotlin.random.Random.Default
+        val newTraits = com.example.lupapj.data.model.PetTraits(
+            activity = random.nextFloat(),
+            patience = random.nextFloat(),
+            curiosity = random.nextFloat(),
+            appetite = random.nextFloat(),
+            attention = random.nextFloat()
+        )
+        
+        _uiState.update { state ->
+            val room = state.room ?: return@update state
+            state.copy(
+                room = room.copy(
+                    houseSceneState = room.houseSceneState.copy(
+                        pet = room.houseSceneState.pet.copy(traits = newTraits)
+                    )
+                )
+            )
+        }
+        
+        // Sync to backend
+        viewModelScope.launch {
+            try {
+                val room = _uiState.value.room ?: return@launch
+                val petId = room.houseSceneState.pet.petId
+                val req = com.example.lupapj.data.remote.pet.PetTraitsDto(
+                    activity = newTraits.activity,
+                    patience = newTraits.patience,
+                    curiosity = newTraits.curiosity,
+                    appetite = newTraits.appetite,
+                    attention = newTraits.attention
+                )
+                petRepository.updateTraitsDebug(petId, room.sceneDefinition.id, req)
+                android.util.Log.d("AppViewModel", "Synced random traits to server")
+            } catch (e: Exception) {
+                android.util.Log.e("AppViewModel", "Failed to sync random traits", e)
+            }
+        }
+    }
+
+    // [추가됨(권)] 수치 기본값 롤백용
+    fun resetTraitsDebug() {
+        val defaultTraits = com.example.lupapj.data.model.PetTraits(
+            activity = 0.5f,
+            patience = 0.5f,
+            curiosity = 0.5f,
+            appetite = 0.5f,
+            attention = 0.5f
+        )
+        
+        _uiState.update { state ->
+            val room = state.room ?: return@update state
+            state.copy(
+                room = room.copy(
+                    houseSceneState = room.houseSceneState.copy(
+                        pet = room.houseSceneState.pet.copy(traits = defaultTraits)
+                    )
+                )
+            )
+        }
+        
+        viewModelScope.launch {
+            try {
+                val room = _uiState.value.room ?: return@launch
+                val petId = room.houseSceneState.pet.petId
+                val req = com.example.lupapj.data.remote.pet.PetTraitsDto(
+                    activity = defaultTraits.activity,
+                    patience = defaultTraits.patience,
+                    curiosity = defaultTraits.curiosity,
+                    appetite = defaultTraits.appetite,
+                    attention = defaultTraits.attention
+                )
+                petRepository.updateTraitsDebug(petId, room.sceneDefinition.id, req)
+                android.util.Log.d("AppViewModel", "Synced default traits to server")
+            } catch (e: Exception) {
+                android.util.Log.e("AppViewModel", "Failed to sync default traits", e)
+            }
         }
     }
 
@@ -2312,7 +2618,8 @@ class AppViewModel(
         private val plazaRepository: PlazaRepository,
         private val currencyRepository: CurrencyRepository, 
         private val shopRepository: ShopRepository ,
-        private val contestRepository: ContestRepository
+        private val contestRepository: ContestRepository,
+        private val petRepository: com.example.lupapj.data.repository.PetRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -2324,7 +2631,8 @@ class AppViewModel(
                 plazaRepository = plazaRepository,
                 currencyRepository = currencyRepository,
                 shopRepository = shopRepository,
-                contestRepository = contestRepository
+                contestRepository = contestRepository,
+                petRepository = petRepository
             ) as T
         }
     }

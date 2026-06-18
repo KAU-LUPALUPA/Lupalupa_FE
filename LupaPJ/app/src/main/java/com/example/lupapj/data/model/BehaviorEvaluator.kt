@@ -12,16 +12,43 @@ object BehaviorEvaluator {
         return DerivedTraits(vigor, volatility, restfulness)
     }
 
-    fun calculateAffect(traits: PetTraits, derived: DerivedTraits, status: PetStatus): AffectState {
+    fun calculateAffect(traits: PetTraits, derived: DerivedTraits, status: PetStatus, events: InteractionEvents, tickCount: Long = 0L): AffectState {
         val vHome = (0.3f + 0.2f * (derived.restfulness - 0.5f)).coerceIn(0f, 1f)
         val aHome = (0.2f + 0.7f * derived.vigor).coerceIn(0f, 1f)
 
         val valenceMod = ((status.satiety + status.vitality) / 200f - 0.5f) * 0.5f
         val arousalMod = ((100f - status.vitality) / 100f) * -0.2f
+        
+        val feedBonus = (events.recentFeedCount * 0.15f).coerceAtMost(0.3f)
+        val playBonus = (events.recentPlayCount * 0.1f).coerceAtMost(0.2f)
+        val commandBonus = ((events.recentCleanCommandCount + events.recentSleepCommandCount) * 0.1f * traits.attention).coerceAtMost(0.2f)
+        val neglectPenalty = (events.neglectTicks * 0.005f).coerceAtMost(0.3f)
+
+        var finalValence = vHome + valenceMod + feedBonus + playBonus + commandBonus - neglectPenalty
+        var finalArousal = aHome + arousalMod
+        
+        val noiseV = kotlin.math.sin(tickCount * 0.1f).toFloat() * (0.1f + 0.3f * derived.volatility)
+        val noiseA = kotlin.math.cos(tickCount * 0.15f).toFloat() * (0.1f + 0.3f * derived.volatility)
+        
+        finalValence += noiseV
+        finalArousal += noiseA
+        
+        finalValence = finalValence.coerceIn(0f, 1f)
+        finalArousal = finalArousal.coerceIn(0f, 1f)
+        
+        val moodLabel = when {
+            finalValence > 0.7f && finalArousal > 0.6f -> "신남"
+            finalValence > 0.6f && finalArousal <= 0.4f -> "나른함"
+            finalValence < 0.4f && finalArousal > 0.6f -> "불안함"
+            finalValence < 0.4f && finalArousal <= 0.4f -> "뾰로통"
+            finalValence in 0.4f..0.6f && finalArousal < 0.3f -> "심심함"
+            else -> "평온함"
+        }
 
         return AffectState(
-            valence = (vHome + valenceMod).coerceIn(0f, 1f),
-            arousal = (aHome + arousalMod).coerceIn(0f, 1f)
+            valence = finalValence,
+            arousal = finalArousal,
+            moodLabel = moodLabel
         )
     }
 
@@ -49,10 +76,17 @@ object BehaviorEvaluator {
 
         val scores = mutableMapOf<PetAction, Float>()
 
+        // 감정 기반 가산적 편향(Additive Bias) 적용
+        val arousalBias = affect.arousal * 2.0f
+        val comfortBias = (1.0f - affect.valence) * 1.5f
+
         // [최종 교정] 기저(IDLE) 점수를 1.0으로 앵커링 (exp(2.5) ≈ 12.18의 강력한 중심축)
         // 중간값(0.5)일 때 대기 38%, 걷기 23%, 놀이 19%, 정리 8% 수준으로 자연 분배되는 최적의 계수 튜닝
         scores[PetAction.IDLE] = 1.0f
         
+        // 기지개(STRETCH) 행동: 활력이 남아있고 흥분도(Arousal)가 낮을 때 확률 상승
+        scores[PetAction.STRETCH] = 0.5f + (status.vitality / 100f) * 1.0f - (affect.arousal * 1.5f)
+
         if (hasFood) {
             val hungerMultiplier = if (status.satiety <= 30) 5.0f else 1.0f
             // 배고픔(h)이 20 이하일 경우 음수가 되어 수학적으로 확률이 소멸됨
@@ -64,32 +98,32 @@ object BehaviorEvaluator {
             val exhaustionMultiplier = if (status.vitality <= 30) 4.0f else 1.0f
             
             // 바닥 쉬기: 피곤함(s)이 40 이하면 강한 음수, 즉 꽤 피곤하고 매우 게으를 때만 바닥에 눕게 됨
-            scores[PetAction.RESTING] = ((s - 40f) / 60f) * (laziness * 4.0f) * exhaustionMultiplier
+            scores[PetAction.RESTING] = ((s - 40f) / 60f) * (laziness * 4.0f) * exhaustionMultiplier + comfortBias
             
             // 침대 쉬기: 피곤함(s)이 10 이하면 음수. 조금만 피곤해도 침대를 선호함
-            scores[PetAction.BED_RESTING] = ((s - 10f) / 90f) * 1.5f * exhaustionMultiplier
+            scores[PetAction.BED_RESTING] = ((s - 10f) / 90f) * 1.5f * exhaustionMultiplier + comfortBias
         } else {
             val exhaustionMultiplier = if (status.vitality <= 30) 4.0f else 1.0f
             // 침대가 없을 땐 s=20부터 바닥에 누울 수 있게 기준 완화
-            scores[PetAction.RESTING] = ((s - 20f) / 80f) * (1.2f - traits.activity) * 1.5f * exhaustionMultiplier
+            scores[PetAction.RESTING] = ((s - 20f) / 80f) * (1.2f - traits.activity) * 1.5f * exhaustionMultiplier + comfortBias
         }
 
         if (hasToy) {
-            scores[PetAction.PLAYING] = traits.curiosity * traits.activity * ((100f - s) / 100f) * 2.8f
+            scores[PetAction.PLAYING] = traits.curiosity * traits.activity * ((100f - s) / 100f) * 2.8f + arousalBias
         } else {
             // 장난감이 없어도 놀고 싶은 욕구 자체는 수식으로 잔존 (1~2% 수준)
-            scores[PetAction.PLAYING] = traits.curiosity * traits.activity * ((100f - s) / 100f) * 0.2f
+            scores[PetAction.PLAYING] = traits.curiosity * traits.activity * ((100f - s) / 100f) * 0.2f + arousalBias
         }
 
         if (hasDroppedToy && hasToyBox) {
-            scores[PetAction.CLEANING] = traits.attention * 0.7f
+            scores[PetAction.CLEANING] = traits.attention * 0.7f + comfortBias * 0.5f
         }
 
         // 완전히 깨끗할 때(c < 20)는 음수가 되어 스스로 그루밍하지 않음
         val dirtyMultiplier = if (status.cleanliness <= 30) 4.0f else 1.0f
-        scores[PetAction.GROOM] = ((c - 20f) / 80f) * traits.attention * 3.0f * dirtyMultiplier
+        scores[PetAction.GROOM] = ((c - 20f) / 80f) * traits.attention * 3.0f * dirtyMultiplier + comfortBias
 
-        scores[PetAction.WALKING] = traits.activity * 1.6f
+        scores[PetAction.WALKING] = traits.activity * 1.6f + arousalBias
 
         return scores
     }
@@ -109,6 +143,18 @@ object BehaviorEvaluator {
         val sumExp = expScores.values.sum()
 
         return expScores.mapValues { (it.value / sumExp).toFloat() }
+    }
+
+    fun applyEmaTraitUpdate(traits: PetTraits, events: InteractionEvents, alpha: Float = 0.05f): PetTraits {
+        val targetActivity = ((events.totalPlayCount * 0.5f) / 7f / 3.0f).coerceIn(0f, 1f)
+        val targetAppetite = ((events.totalFeedCount.toFloat()) / 7f / 2.0f).coerceIn(0f, 1f)
+        val targetAttention = ((events.daysActive * 1.0f + (events.totalCleanCommandCount + events.totalSleepCommandCount) * 0.3f) / 7f / 4.0f).coerceIn(0.1f, 1f)
+        
+        return traits.copy(
+            activity = (traits.activity * (1 - alpha) + targetActivity * alpha).coerceIn(0f, 1f),
+            appetite = (traits.appetite * (1 - alpha) + targetAppetite * alpha).coerceIn(0f, 1f),
+            attention = (traits.attention * (1 - alpha) + targetAttention * alpha).coerceIn(0.1f, 1f)
+        )
     }
 
     fun sampleAction(

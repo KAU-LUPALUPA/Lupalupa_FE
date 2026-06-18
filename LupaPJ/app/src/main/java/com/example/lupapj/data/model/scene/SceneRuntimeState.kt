@@ -8,6 +8,7 @@ import com.example.lupapj.data.model.PetAction
 import com.example.lupapj.data.model.PetAppearance
 import com.example.lupapj.data.model.PetTraits
 import com.example.lupapj.data.model.AffectState
+import com.example.lupapj.data.model.InteractionEvents
 import com.example.lupapj.data.model.PetStatus
 
 data class PetSceneState(
@@ -19,6 +20,7 @@ data class PetSceneState(
     val status: PetStatus = PetStatus(),
     val traits: PetTraits = PetTraits(),
     val affect: AffectState = AffectState(),
+    val interactionEvents: InteractionEvents = InteractionEvents(),
     val equippedItemIds: List<String> = emptyList(),
     val movement: PetMovementState = PetMovementState(),
     val action: PetAction,
@@ -52,7 +54,8 @@ data class RoomSceneRuntimeState(
 data class HouseSceneState(
     val currentSceneId: RoomSceneId,
     val pet: PetSceneState,
-    val currentSceneRuntime: RoomSceneRuntimeState
+    val currentSceneRuntime: RoomSceneRuntimeState,
+    val lastBehaviorEvalMillis: Long = 0L
     // TODO: expand to runtimeByScene: Map<RoomSceneId, RoomSceneRuntimeState> for multi-room persistence.
 )
 
@@ -66,6 +69,7 @@ fun initialHouseSceneState(
     petStatus: PetStatus = PetStatus(),
     petTraits: PetTraits = PetTraits(),
     petAffect: AffectState = AffectState(),
+    petInteractionEvents: InteractionEvents = InteractionEvents(),
     equippedItemIds: List<String> = emptyList(),
     petAnchor: FloorAnchor = FloorAnchor(u = 0.44f, v = 0.64f),
     petAction: PetAction = PetAction.IDLE
@@ -81,6 +85,7 @@ fun initialHouseSceneState(
             status = petStatus,
             traits = petTraits,
             affect = petAffect,
+            interactionEvents = petInteractionEvents,
             equippedItemIds = equippedItemIds,
             action = petAction,
             anchor = petAnchor
@@ -92,14 +97,18 @@ fun HouseSceneState.updatePet(
     action: PetAction? = null,
     anchor: FloorAnchor? = null,
     isMoving: Boolean? = null,
-    isLyingSide: Boolean? = null // [추가됨]
+    isLyingSide: Boolean? = null, // [추가됨]
+    interactionEvents: InteractionEvents? = null, // [추가됨]
+    affect: AffectState? = null // [추가됨]
 ): HouseSceneState {
     return copy(
         pet = pet.copy(
             action = action ?: pet.action,
             anchor = anchor ?: pet.anchor,
             movement = if (isMoving != null) pet.movement.copy(isMoving = isMoving) else pet.movement,
-            isLyingSide = isLyingSide ?: pet.isLyingSide
+            isLyingSide = isLyingSide ?: pet.isLyingSide,
+            interactionEvents = interactionEvents ?: pet.interactionEvents,
+            affect = affect ?: pet.affect
         )
     )
 }

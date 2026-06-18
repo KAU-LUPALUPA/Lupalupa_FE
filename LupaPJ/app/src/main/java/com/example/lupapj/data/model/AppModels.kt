@@ -100,6 +100,20 @@ data class AffectState(
     val moodLabel: String = "NORMAL"
 )
 
+// [수정됨] 상호작용 기록 추적 (터치 제거, 치우기/자기 명령 추가)
+data class InteractionEvents(
+    val recentFeedCount: Int = 0,
+    val recentPlayCount: Int = 0,
+    val recentCleanCommandCount: Int = 0,
+    val recentSleepCommandCount: Int = 0,
+    val neglectTicks: Int = 0,
+    val totalFeedCount: Int = 0,
+    val totalPlayCount: Int = 0,
+    val totalCleanCommandCount: Int = 0,
+    val totalSleepCommandCount: Int = 0,
+    val daysActive: Int = 1
+)
+
 const val DEFAULT_PET_ID = "pet_local"
 const val DEFAULT_PET_OWNER_USER_ID = "user_local"
 const val DEFAULT_PET_NAME = "루파"
@@ -129,6 +143,7 @@ data class PetUiState(
     val status: PetStatus = PetStatus(),
     val traits: PetTraits = PetTraits(),
     val affect: AffectState = AffectState(),
+    val interactionEvents: InteractionEvents = InteractionEvents(),
     val equippedItemIds: List<String> = emptyList(),
     val currentAction: PetAction = PetAction.IDLE,
     val position: RoomPoint = RoomPoint(
