@@ -9,4 +9,6 @@ interface PetRepository {
     suspend fun playPet(petId: String, sceneId: RoomSceneId): HouseSceneState
     suspend fun sleepPet(petId: String, sceneId: RoomSceneId): HouseSceneState
     suspend fun cleanPet(petId: String, sceneId: RoomSceneId): HouseSceneState
+    suspend fun syncPetStatus(petId: String, sceneId: RoomSceneId, request: com.example.lupapj.data.remote.pet.PetStatusSyncRequestDto): HouseSceneState
+    suspend fun updateTraitsDebug(petId: String, sceneId: RoomSceneId, request: com.example.lupapj.data.remote.pet.PetTraitsDto): HouseSceneState
 }

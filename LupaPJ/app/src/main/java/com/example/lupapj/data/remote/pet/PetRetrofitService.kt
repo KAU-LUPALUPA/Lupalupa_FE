@@ -37,4 +37,16 @@ interface PetRetrofitService {
 
     @POST("api/pets/{petId}/clean")
     suspend fun cleanPet(@Path("petId") petId: String): Response<PetDto>
+
+    @retrofit2.http.PATCH("api/pets/{petId}/status")
+    suspend fun syncPetStatus(
+        @Path("petId") petId: String,
+        @Body request: PetStatusSyncRequestDto
+    ): Response<PetDto>
+
+    @PUT("api/pets/{petId}/traits/debug")
+    suspend fun updateTraitsDebug(
+        @Path("petId") petId: String,
+        @Body request: PetTraitsDto
+    ): Response<PetDto>
 }

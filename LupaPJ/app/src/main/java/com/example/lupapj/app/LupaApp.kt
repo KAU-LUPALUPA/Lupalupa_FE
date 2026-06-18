@@ -249,6 +249,8 @@ fun LupaApp(deepLink: Uri? = null) {
                     onRejectHomeInvitation = appViewModel::rejectHomeInvitation,
                     behaviorDebugInfo = uiState.behaviorDebugInfo,
                     onToggleBehaviorDebugClick = appViewModel::toggleBehaviorDebugWindow,
+                    onRandomizeTraitsClick = appViewModel::randomizeTraitsDebug,
+                    onResetTraitsClick = appViewModel::resetTraitsDebug,
                     onMinigameClick = appViewModel::openMinigame // [수정됨(권)] 미니게임 진입 연결
                 )
             }

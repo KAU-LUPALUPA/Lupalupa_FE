@@ -18,6 +18,13 @@ data class PetResponseDto(
     val pet: PetDto
 )
 
+data class PetStatusSyncRequestDto(
+    val satiety: Int,
+    val vitality: Int,
+    val cleanliness: Int,
+    val offlineSync: Boolean
+)
+
 data class UpdatePetStatusRequestDto(
     val satiety: Int? = null,
     val vitality: Int? = null,

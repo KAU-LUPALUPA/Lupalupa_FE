@@ -27,4 +27,20 @@ class RemotePetRepository(
     override suspend fun cleanPet(petId: String, sceneId: RoomSceneId): HouseSceneState {
         return apiClient.cleanPet(petId).toHouseSceneState(sceneId)
     }
+
+    override suspend fun syncPetStatus(
+        petId: String,
+        sceneId: RoomSceneId,
+        request: com.example.lupapj.data.remote.pet.PetStatusSyncRequestDto
+    ): HouseSceneState {
+        return apiClient.syncPetStatus(petId, request).toHouseSceneState(sceneId)
+    }
+
+    override suspend fun updateTraitsDebug(
+        petId: String,
+        sceneId: RoomSceneId,
+        request: com.example.lupapj.data.remote.pet.PetTraitsDto
+    ): HouseSceneState {
+        return apiClient.updateTraitsDebug(petId, request).toHouseSceneState(sceneId)
+    }
 }

@@ -29,6 +29,12 @@ class RetrofitPetApiClient(
     override suspend fun cleanPet(petId: String): PetDto =
         service.cleanPet(petId).bodyOrThrow()
 
+    override suspend fun syncPetStatus(petId: String, request: PetStatusSyncRequestDto): PetDto =
+        service.syncPetStatus(petId, request).bodyOrThrow()
+
+    override suspend fun updateTraitsDebug(petId: String, request: PetTraitsDto): PetDto =
+        service.updateTraitsDebug(petId, request).bodyOrThrow()
+
     private fun <T> Response<T>.bodyOrThrow(): T {
         if (!isSuccessful) throw PetApiException("HTTP_${code()}", code(), message())
         return body() ?: throw PetApiException("EMPTY_BODY", code(), "Empty body")
