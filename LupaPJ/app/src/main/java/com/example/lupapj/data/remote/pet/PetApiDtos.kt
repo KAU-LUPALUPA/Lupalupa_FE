@@ -45,7 +45,8 @@ data class PetDto(
     val characterAssetKey: String,
     val appearance: PetAppearanceDto,
     val status: PetStatusDto,
-    val traits: PetTraitsDto, // [변경됨(V2)] personality -> traits
+    val traits: PetTraitsDto? = null, // [변경됨(V2)] personality -> traits (fallback 지원)
+    val interactions: InteractionEventsDto? = null, // [추가됨(V2)] 누적 횟수 (fallback 지원)
     val equippedItemIds: List<String> = emptyList(),
     val action: String,
     val anchor: PetAnchorDto,
@@ -65,16 +66,24 @@ data class PetAppearanceDto(
 data class PetStatusDto(
     val satiety: Int,
     val vitality: Int,
-    val cleanliness: Int, // [추가됨(V2)]
+    val cleanliness: Int? = null, // [추가됨(V2)] fallback 지원
     val isEgg: Boolean
 )
 
 data class PetTraitsDto( // [추가됨(V2)]
-    val activity: Float,
-    val appetite: Float,
-    val attention: Float,
-    val curiosity: Float,
-    val patience: Float
+    val activity: Float? = null,
+    val appetite: Float? = null,
+    val attention: Float? = null,
+    val curiosity: Float? = null,
+    val patience: Float? = null
+)
+
+data class InteractionEventsDto( // [추가됨(V2)]
+    val feedCount: Int? = null,
+    val playCount: Int? = null,
+    val cleanCommandCount: Int? = null,
+    val sleepCommandCount: Int? = null,
+    val daysActive: Int? = null
 )
 
 data class PetAnchorDto(

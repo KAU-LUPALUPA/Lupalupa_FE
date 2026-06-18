@@ -67,7 +67,8 @@ fun LupaApp(deepLink: Uri? = null) {
             plazaRepository = container.plazaRepository,
             currencyRepository = container.currencyRepository,
             shopRepository = container.shopRepository,
-            contestRepository = container.contestRepository
+            contestRepository = container.contestRepository,
+            petRepository = container.petRepository
         )
     )
 
@@ -132,9 +133,16 @@ fun LupaApp(deepLink: Uri? = null) {
         ) {
             val offlineSeconds = withContext(Dispatchers.IO) {
                 sendHeartbeatToServer(currentUserId, accessToken)
-            }
+            } ?: 0L
 
-            offlineDialogMessage = formatOfflineMessage(offlineSeconds ?: 0L)
+            val predictionMessage = appViewModel.applyOfflineProgression(offlineSeconds)
+            
+            val timeMessage = formatOfflineMessage(offlineSeconds)
+            offlineDialogMessage = if (predictionMessage.isNotBlank()) {
+                "$timeMessage\n$predictionMessage"
+            } else {
+                timeMessage
+            }
             showOfflineDialog = true
 
             shouldCheckOfflineTime = false

@@ -16,10 +16,12 @@ import com.example.lupapj.data.model.RoomUiState
 import com.example.lupapj.data.repository.AuthRepository
 import com.example.lupapj.data.repository.ContestRepository
 import com.example.lupapj.data.repository.ContestUploadResult
+import com.example.lupapj.data.repository.CurrencyRepository
 import com.example.lupapj.data.repository.FriendRepository
 import com.example.lupapj.data.repository.GalleryRepository // [추가됨]
+import com.example.lupapj.data.repository.PetRepository
+import com.example.lupapj.data.repository.PlazaRepository
 import com.example.lupapj.data.repository.RoomRepository
-import com.example.lupapj.data.repository.CurrencyRepository // [추가됨(권)] 재화 리포지토리 의존성
 import com.example.lupapj.data.repository.ShopRepository // [추가됨(권)] 상점 리포지토리 의존성
 import android.graphics.Bitmap // [추가됨]
 import com.example.lupapj.data.model.ShopItem // [추가됨(권)] 상점 아이템 모델 Import
@@ -39,7 +41,6 @@ import com.example.lupapj.data.model.scene.autonomousMovementProfileFor
 import com.example.lupapj.data.model.scene.chooseAutonomousPetTarget
 import com.example.lupapj.data.model.scene.updatePet
 import com.example.lupapj.data.remote.room.RoomLayoutApiException
-import com.example.lupapj.data.repository.PlazaRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -67,12 +68,13 @@ private const val DEV_LOGIN_NICKNAME = "개발자"
 class AppViewModel(
     private val authRepository: AuthRepository,
     private val roomRepository: RoomRepository,
-    private val galleryRepository: GalleryRepository, // [추가됨]
+    private val galleryRepository: GalleryRepository,
     private val friendRepository: FriendRepository,
     private val plazaRepository: PlazaRepository,
-    private val currencyRepository: CurrencyRepository, // [추가됨(권)] ViewModel 파라미터로 추가
-    private val shopRepository: ShopRepository, // [추가됨(권)] ViewModel 파라미터로 추가
-    private val contestRepository: ContestRepository
+    private val currencyRepository: CurrencyRepository,
+    private val shopRepository: ShopRepository,
+    private val contestRepository: ContestRepository,
+    private val petRepository: PetRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AppUiState())
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
@@ -455,6 +457,32 @@ class AppViewModel(
                 val bedAnchor = roomState.sceneDefinition.objects.find { it.type == RoomObjectType.BED }?.anchor as? FloorAnchor
                 if (bedAnchor != null) {
                     startBedRestingSequence(bedAnchor)
+                    
+                    // 서버 연동 및 이벤트 로깅: 플레이어 행동 (침대 클릭) 즉시 카운트
+                    val pet = _uiState.value.room?.houseSceneState?.pet ?: return@launch
+                    val room = _uiState.value.room ?: return@launch
+                    try {
+                        val serverPetState = petRepository.sleepPet(pet.petId, room.sceneDefinition.id)
+                        _uiState.update { state ->
+                            val r = state.room ?: return@update state
+                            state.copy(room = r.copy(houseSceneState = serverPetState))
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("AppViewModel", "Failed to sync sleep command to server", e)
+                    }
+                    val updatedEvents = pet.interactionEvents.copy(
+                        recentSleepCommandCount = pet.interactionEvents.recentSleepCommandCount + 1,
+                        totalSleepCommandCount = pet.interactionEvents.totalSleepCommandCount + 1
+                    )
+                    _uiState.update { state ->
+                        state.copy(
+                            room = room.copy(
+                                houseSceneState = room.houseSceneState.copy(
+                                    pet = room.houseSceneState.pet.copy(interactionEvents = updatedEvents)
+                                )
+                            )
+                        )
+                    }
                 }
             } else {
                 val nextRoom = roomRepository.performObjectAction(objectType)
@@ -599,6 +627,23 @@ class AppViewModel(
                 // [수정됨(권)] 직접 먹이 주기 시 즉시 반응하지 않고, 행동 엔진의 다음 틱에서 확률적으로 결정하도록 유도
                 _uiState.update { it.copy(placeholderMessage = "바닥에 사료를 놓았습니다.") }
             }
+            
+            // 서버 연동: 플레이어의 행동 즉시 카운트
+            try {
+                val petId = nextRoom.houseSceneState.pet.petId
+                val sceneId = room.sceneDefinition.id
+                val serverPetState = if (placingFood) {
+                    petRepository.feedPet(petId, sceneId)
+                } else {
+                    petRepository.playPet(petId, sceneId)
+                }
+                _uiState.update { state ->
+                    val r = state.room ?: return@update state
+                    state.copy(room = r.copy(houseSceneState = serverPetState))
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("AppViewModel", "Failed to sync feed/play action to server", e)
+            }
         }
     }
 
@@ -614,6 +659,34 @@ class AppViewModel(
         if (!runtime.isToyKnockedOver) return
         if (room.feedMode || room.toyMode || room.rearrangeMode || room.isCameraMode) return
         if (pet.movement.isMoving || pet.action == PetAction.CLEANING) return
+
+        // 서버 연동: 플레이어의 행동 즉시 카운트
+        viewModelScope.launch {
+            try {
+                val serverPetState = petRepository.cleanPet(pet.petId, room.sceneDefinition.id)
+                _uiState.update { state ->
+                    val r = state.room ?: return@update state
+                    state.copy(room = r.copy(houseSceneState = serverPetState))
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("AppViewModel", "Failed to sync clean command to server", e)
+            }
+        }
+        
+        val updatedEvents = pet.interactionEvents.copy(
+            recentCleanCommandCount = pet.interactionEvents.recentCleanCommandCount + 1,
+            totalCleanCommandCount = pet.interactionEvents.totalCleanCommandCount + 1,
+            neglectTicks = 0
+        )
+        _uiState.update { state ->
+            state.copy(
+                room = room.copy(
+                    houseSceneState = room.houseSceneState.copy(
+                        pet = pet.copy(interactionEvents = updatedEvents)
+                    )
+                )
+            )
+        }
 
         startToyCleanupSequence(
             droppedToyAnchor = droppedToyAnchor,
@@ -1743,7 +1816,7 @@ class AppViewModel(
 
         // V2 감정 및 상태 파생
         val derived = com.example.lupapj.data.model.BehaviorEvaluator.calculateDerivedTraits(pet.traits)
-        val affect = com.example.lupapj.data.model.BehaviorEvaluator.calculateAffect(pet.traits, derived, pet.status)
+        val affect = com.example.lupapj.data.model.BehaviorEvaluator.calculateAffect(pet.traits, derived, pet.status, pet.interactionEvents)
 
         // 감정 기반 디버그 정보 갱신
         _uiState.update { s -> 
@@ -2276,6 +2349,61 @@ class AppViewModel(
         }
     }
 
+    fun applyOfflineProgression(elapsedSeconds: Long): String {
+        if (elapsedSeconds <= 0L) return ""
+        
+        val room = _uiState.value.room ?: return ""
+        val pet = room.houseSceneState.pet
+        val currentStatus = pet.status
+        val traits = pet.traits
+        
+        // 평균 변화율 산정 (현재 수치 기반 및 캐릭터 특성 반영)
+        // - 식욕(appetite)이 높을수록 포만감(satiety)이 더 빨리 떨어짐
+        // - 활동성(activity)이 높을수록 활력(vitality)과 청결도(cleanliness)가 더 빨리 떨어짐
+        val appetiteMod = 0.5f + traits.appetite // 0.5 ~ 1.5배 보정
+        val activityMod = 0.5f + traits.activity // 0.5 ~ 1.5배 보정
+        
+        val satietyDecay = ((elapsedSeconds / 600L) * appetiteMod).toInt().coerceIn(0, currentStatus.satiety) // 기준: 10분당 1
+        val vitalityDecay = ((elapsedSeconds / 900L) * activityMod).toInt().coerceIn(0, currentStatus.vitality) // 기준: 15분당 1
+        val cleanlinessDecay = ((elapsedSeconds / 1800L) * activityMod).toInt().coerceIn(0, currentStatus.cleanliness) // 기준: 30분당 1
+        
+        val nextStatus = currentStatus.copy(
+            satiety = currentStatus.satiety - satietyDecay,
+            vitality = currentStatus.vitality - vitalityDecay,
+            cleanliness = currentStatus.cleanliness - cleanlinessDecay
+        )
+        
+        // 부재중 행동 예측 일지 (Missed You Log)
+        val logMessage = buildString {
+            if (vitalityDecay > 10) {
+                append("방을 뽈뽈거리며 돌아다녔어요! ")
+            } else if (vitalityDecay > 3) {
+                append("혼자서도 얌전히 놀았어요. ")
+            } else {
+                append("계속 쿨쿨 잠을 잤나봐요. ")
+            }
+            
+            if (satietyDecay > 15) {
+                append("\n배가 많이 고파요! ")
+            } else if (satietyDecay > 5) {
+                append("\n배가 살짝 출출해요. ")
+            }
+            
+            if (cleanlinessDecay > 5) {
+                append("\n조금 꼬질꼬질해졌어요.")
+            }
+        }.trimEnd()
+
+        val updatedRoom = room.copy(
+            houseSceneState = room.houseSceneState.copy(
+                pet = pet.copy(status = nextStatus)
+            )
+        )
+        
+        _uiState.update { it.copy(room = updatedRoom) }
+        return logMessage
+    }
+
     private fun setPetAction(action: PetAction) {
         _uiState.update { state ->
             val room = state.room ?: return@update state
@@ -2312,7 +2440,8 @@ class AppViewModel(
         private val plazaRepository: PlazaRepository,
         private val currencyRepository: CurrencyRepository, 
         private val shopRepository: ShopRepository ,
-        private val contestRepository: ContestRepository
+        private val contestRepository: ContestRepository,
+        private val petRepository: com.example.lupapj.data.repository.PetRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -2324,7 +2453,8 @@ class AppViewModel(
                 plazaRepository = plazaRepository,
                 currencyRepository = currencyRepository,
                 shopRepository = shopRepository,
-                contestRepository = contestRepository
+                contestRepository = contestRepository,
+                petRepository = petRepository
             ) as T
         }
     }

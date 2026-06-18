@@ -5,15 +5,20 @@ interface PetApiClient {
         request: ValidatePetRequestDto
     ): PetValidationResponseDto
 
-    suspend fun getMyPet(): PetResponseDto
+    suspend fun getMyPet(): PetDto
 
     suspend fun updatePetStatus(
         request: UpdatePetStatusRequestDto
-    ): PetResponseDto
+    ): PetDto
 
     suspend fun updatePetEquipment(
         request: UpdatePetEquipmentRequestDto
     ): UpdatePetEquipmentResponseDto
+
+    suspend fun feedPet(petId: String): PetDto
+    suspend fun sleepPet(petId: String): PetDto
+    suspend fun playPet(petId: String): PetDto
+    suspend fun cleanPet(petId: String): PetDto
 }
 
 class PetApiException(

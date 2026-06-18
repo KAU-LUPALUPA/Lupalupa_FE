@@ -10,6 +10,7 @@ import com.example.lupapj.data.repository.AuthRepository
 import com.example.lupapj.data.repository.ContestRepository
 import com.example.lupapj.data.repository.FriendRepository
 import com.example.lupapj.data.repository.GalleryRepository // [추가됨]
+import com.example.lupapj.data.repository.PetRepository
 import com.example.lupapj.data.repository.PlazaRepository
 import com.example.lupapj.data.repository.RoomRepository
 import com.example.lupapj.data.mock.MockCurrencyRepository
@@ -22,6 +23,9 @@ import com.example.lupapj.data.remote.CurrencyApiService // [추가됨(권)]
 import com.example.lupapj.data.remote.AuthInterceptor // [추가됨(권)]
 import com.example.lupapj.data.remote.CurrencyRemoteDataSource // [추가됨(권)]
 import com.example.lupapj.data.remote.ServerConfig
+import com.example.lupapj.data.remote.pet.PetRetrofitService
+import com.example.lupapj.data.remote.pet.RemotePetRepository
+import com.example.lupapj.data.remote.pet.RetrofitPetApiClient
 import com.example.lupapj.data.remote.contest.ContestRetrofitService
 import com.example.lupapj.data.remote.contest.RemoteContestRepository
 import com.example.lupapj.data.remote.friend.FriendRetrofitService
@@ -64,6 +68,8 @@ class AppContainer(context: Context) {
         retrofit.create(PlazaRetrofitService::class.java)
     private val roomRetrofitService: RoomRetrofitService =
         retrofit.create(RoomRetrofitService::class.java)
+    private val petRetrofitService: PetRetrofitService =
+        retrofit.create(PetRetrofitService::class.java)
     private val contestRetrofitService: ContestRetrofitService =
         retrofit.create(ContestRetrofitService::class.java)
     
@@ -76,6 +82,9 @@ class AppContainer(context: Context) {
         apiClient = RetrofitRoomLayoutApiClient(roomRetrofitService),
         localCache = roomLocalCache,
         sceneResolver = { sceneId -> DemoScenes.sceneFor(RoomSceneId(sceneId)) }
+    )
+    val petRepository: PetRepository = RemotePetRepository(
+        apiClient = RetrofitPetApiClient(petRetrofitService)
     )
 
     val friendRepository: FriendRepository = RemoteFriendRepository(
