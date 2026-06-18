@@ -87,9 +87,9 @@ private val PetSprite = SceneSpriteSpec(
     fallbackLabel = "루파",
     widthRatio = 0.16f,
     heightRatio = 1.0f,
-    minWidthDp = 64f,
-    maxWidthDp = 104f,
-    isoTileFillRatio = 1.05f,
+    minWidthDp = 58f,
+    maxWidthDp = 96f,
+    isoTileFillRatio = 0.94f,
     pivot = DefaultFloorPivot
 )
 

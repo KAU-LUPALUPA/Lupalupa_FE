@@ -1,5 +1,6 @@
 package com.example.lupapj.data.remote.plaza
 
+import android.util.Log
 import com.example.lupapj.data.model.plaza.PLAZA_MESSAGE_MAX_LENGTH
 import com.example.lupapj.data.model.plaza.PlazaChatMessage
 import com.example.lupapj.data.model.plaza.PlazaCode
@@ -13,6 +14,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import java.io.IOException
+import com.google.gson.JsonParseException
 
 class RemotePlazaRepository(
     private val apiClient: PlazaApiClient
@@ -148,11 +151,26 @@ class RemotePlazaRepository(
         return try {
             PlazaOperationResult.Success(block())
         } catch (exception: PlazaApiException) {
+            Log.w(
+                TAG,
+                "Plaza API failed: code=${exception.code}, http=${exception.httpStatus}, message=${exception.message}"
+            )
             PlazaOperationResult.Failure(exception.toPlazaOperationFailure())
+        } catch (exception: IOException) {
+            Log.w(TAG, "Plaza network failed.", exception)
+            PlazaOperationResult.Failure(PlazaOperationFailure.NETWORK_ERROR)
+        } catch (exception: JsonParseException) {
+            Log.w(TAG, "Plaza response parse failed.", exception)
+            PlazaOperationResult.Failure(PlazaOperationFailure.RESPONSE_ERROR)
         } catch (exception: CancellationException) {
             throw exception
-        } catch (_: Exception) {
+        } catch (exception: Exception) {
+            Log.e(TAG, "Unexpected plaza failure.", exception)
             PlazaOperationResult.Failure(PlazaOperationFailure.UNKNOWN)
         }
+    }
+
+    private companion object {
+        const val TAG = "LupaPlaza"
     }
 }

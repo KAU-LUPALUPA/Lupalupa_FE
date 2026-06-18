@@ -249,7 +249,7 @@ class AppViewModel(
                     if (
                         plaza != null &&
                         currentPlaza?.plazaId == plaza.plazaId &&
-                        plaza.roomRevision <= currentPlaza.roomRevision
+                        plaza.isOlderThan(currentPlaza)
                     ) {
                         state
                     } else {
@@ -2690,5 +2690,20 @@ private val PlazaOperationFailure.message: String
         PlazaOperationFailure.MESSAGE_TOO_LONG -> "메시지는 ${PLAZA_MESSAGE_MAX_LENGTH}자까지 보낼 수 있어요."
         PlazaOperationFailure.NOT_IN_PLAZA -> "입장한 광장이 없어요."
         PlazaOperationFailure.UNAUTHORIZED -> "로그인이 필요해요."
+        PlazaOperationFailure.API_NOT_FOUND -> "광장 API 경로를 찾을 수 없어요. 서버 배포 상태를 확인해주세요."
+        PlazaOperationFailure.SERVER_ERROR -> "광장 서버 내부 오류가 발생했어요. 서버 로그를 확인해주세요."
+        PlazaOperationFailure.NETWORK_ERROR -> "광장 서버에 연결할 수 없어요. 서버 주소나 네트워크를 확인해주세요."
+        PlazaOperationFailure.RESPONSE_ERROR -> "광장 서버 응답 형식이 맞지 않아요. FE/BE 응답 DTO를 확인해주세요."
         PlazaOperationFailure.UNKNOWN -> "광장 기능을 잠시 사용할 수 없어요."
     }
+
+private fun com.example.lupapj.data.model.plaza.PlazaRoom.isOlderThan(
+    current: com.example.lupapj.data.model.plaza.PlazaRoom
+): Boolean {
+    if (roomRevision < current.roomRevision) return true
+    if (roomRevision > current.roomRevision) return false
+
+    val snapshotTime = serverTime?.serverNowMillis ?: return false
+    val currentSnapshotTime = current.serverTime?.serverNowMillis ?: return false
+    return snapshotTime <= currentSnapshotTime
+}

@@ -154,6 +154,10 @@ enum class PlazaOperationFailure {
     MESSAGE_TOO_LONG,
     NOT_IN_PLAZA,
     UNAUTHORIZED,
+    API_NOT_FOUND,
+    SERVER_ERROR,
+    NETWORK_ERROR,
+    RESPONSE_ERROR,
     UNKNOWN
 }
 

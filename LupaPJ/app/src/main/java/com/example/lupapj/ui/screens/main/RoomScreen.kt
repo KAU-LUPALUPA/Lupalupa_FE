@@ -344,21 +344,12 @@ fun RoomScreen(
             }
 
             if (!room.rearrangeMode && !room.isCameraMode) {
-                Surface(
-                    onClick = onRearrangeClick,
-                    shape = RoundedCornerShape(18.dp),
-                    color = Color(0xFF7F5539),
-                    shadowElevation = 6.dp,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 112.dp, end = 16.dp)
-                ) {
-                    Text(
-                        text = "재배치",
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
-                    )
-                }
+                RoomTopActionStack(
+                    mailboxItemCount = mailboxItemCount,
+                    onRearrangeClick = onRearrangeClick,
+                    onMailboxClick = onMailboxClick,
+                    modifier = Modifier.align(Alignment.TopEnd)
+                )
             } else if (room.rearrangeMode) { // [수정됨] 카메라 모드일 땐 이 팝업 표시 안 함
                 Surface(
                     shape = RoundedCornerShape(18.dp),
@@ -391,16 +382,6 @@ fun RoomScreen(
                         }
                     }
                 }
-            }
-
-            if (!room.isCameraMode && !room.rearrangeMode) {
-                FloatingMailboxButton(
-                    itemCount = mailboxItemCount,
-                    onClick = onMailboxClick,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 198.dp, end = 14.dp)
-                )
             }
             if (room.rearrangeMode) {
                 Box(
@@ -566,6 +547,46 @@ fun RoomScreen(
 }
 
 // [수정됨(권)] 로컬 iconRes 제거하고 AppModels의 전역 확장 프로퍼티 사용
+
+@Composable
+private fun RoomTopActionStack(
+    mailboxItemCount: Int,
+    onRearrangeClick: () -> Unit,
+    onMailboxClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .windowInsetsPadding(
+                WindowInsets.safeDrawing.only(
+                    WindowInsetsSides.Top + WindowInsetsSides.Horizontal
+                )
+            )
+            .padding(top = 88.dp, end = 18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Surface(
+            onClick = onRearrangeClick,
+            shape = RoundedCornerShape(16.dp),
+            color = Color(0xFF7F5539),
+            shadowElevation = 6.dp,
+            modifier = Modifier.size(width = 68.dp, height = 44.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = "재배치",
+                    color = Color.White
+                )
+            }
+        }
+
+        FloatingMailboxButton(
+            itemCount = mailboxItemCount,
+            onClick = onMailboxClick
+        )
+    }
+}
 
 @Composable
 private fun SettingsDialog(

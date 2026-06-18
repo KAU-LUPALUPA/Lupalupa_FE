@@ -654,6 +654,18 @@ private fun PlazaScene(
     var seenChatMessageIds by remember(sceneKey) {
         mutableStateOf(messages.map { it.id }.toSet())
     }
+    var frameClientNowMillis by remember(sceneKey) {
+        mutableStateOf(System.currentTimeMillis())
+    }
+
+    LaunchedEffect(sceneKey, isServerAuthoritative, serverTime) {
+        if (!isServerAuthoritative) return@LaunchedEffect
+
+        while (isActive) {
+            frameClientNowMillis = System.currentTimeMillis()
+            delay(50L)
+        }
+    }
 
     LaunchedEffect(participants, sceneKey) {
         val now = currentServerTime.serverNowMillis()
@@ -789,6 +801,25 @@ private fun PlazaScene(
             PlazaSceneBackground(modifier = Modifier.fillMaxSize())
             PlazaFountain(modifier = Modifier.fillMaxSize())
 
+            val frameServerNowMillis = currentServerTime.serverNowMillis(frameClientNowMillis)
+            val serverDrivenPetPositions = if (isServerAuthoritative) {
+                participants
+                    .mapIndexed { index, participant ->
+                        participant.userId to (
+                            participant.authoritativePositionAt(frameServerNowMillis)
+                                ?: participant.position
+                                ?: initialPlazaPetPosition(index, participant.userId)
+                        )
+                    }
+                    .toMap()
+            } else {
+                emptyMap()
+            }
+            val displayPetPositions = if (isServerAuthoritative) {
+                serverDrivenPetPositions
+            } else {
+                petPositions
+            }
             val activeInteraction = activeRemoteInteraction ?: if (isServerAuthoritative) {
                 null
             } else {
@@ -799,22 +830,22 @@ private fun PlazaScene(
                 activeInteraction?.movementTargetByUserId,
                 activeInteraction?.facingTargetByUserId,
                 activeInteraction?.animationByUserId,
-                petPositions
+                displayPetPositions
             ) {
-                activeInteraction?.toPresentation(petPositions)
+                activeInteraction?.toPresentation(displayPetPositions)
             }
 
             participants
                 .mapIndexed { index, participant -> index to participant }
                 .sortedBy {
-                    petPositions[it.second.userId]?.y
+                    displayPetPositions[it.second.userId]?.y
                         ?: initialPlazaPetPosition(it.first, it.second.userId).y
                 }
                 .forEach { (index, participant) ->
                     val interaction = interactionPresentation?.event
                     val interactionPartnerId = interaction?.partnerOf(participant.userId)
                     val chatBubble = activeChatBubbles[participant.userId]
-                    val serverNowMillis = currentServerTime.serverNowMillis()
+                    val serverNowMillis = frameServerNowMillis
                     val authoritativePosition = participant.authoritativePositionAt(
                         serverNowMillis
                     )
@@ -850,9 +881,11 @@ private fun PlazaScene(
                                 ?: interactionPresentation
                                     ?.movementTargetByUserId
                                     ?.get(participant.userId)
-                                ?: interactionPartnerId?.let { petPositions[it] },
+                                ?: interactionPartnerId?.let { displayPetPositions[it] },
                             onPositionChange = { position ->
-                                petPositions = petPositions + (participant.userId to position)
+                                if (!isServerAuthoritative) {
+                                    petPositions = petPositions + (participant.userId to position)
+                                }
                             },
                             modifier = Modifier.fillMaxSize()
                         )
@@ -1168,12 +1201,26 @@ private fun PlazaPetActor(
             ),
             label = "PlazaPetY"
         )
-        val animatedPosition = PlazaPosition(animatedX, animatedY)
-        val isMoving =
-            abs(animatedX - targetPosition.x) > PLAZA_PET_DIRECTION_EPSILON ||
-                abs(animatedY - targetPosition.y) > PLAZA_PET_DIRECTION_EPSILON
         var lockedAnimation by remember(participant.userId) {
             mutableStateOf(CharacterAnimation.South)
+        }
+        val animatedPosition = PlazaPosition(animatedX, animatedY)
+        val serverDrivenPosition = authoritativePosition?.takeIf { !canWander }
+        val renderedPosition = serverDrivenPosition ?: animatedPosition
+        val serverDrivenAnimation = authoritativeMovement
+            ?.takeIf { !canWander }
+            ?.let { movement ->
+                resolvePlazaCharacterAnimation(
+                    currentPosition = movement.from,
+                    targetPosition = movement.to,
+                    fallbackAnimation = lockedAnimation
+                )
+            }
+        val isMoving = if (!canWander) {
+            authoritativeMovement?.isActiveAt(serverNowMillis) == true || isInteractionAnimating
+        } else {
+            abs(animatedX - targetPosition.x) > PLAZA_PET_DIRECTION_EPSILON ||
+                abs(animatedY - targetPosition.y) > PLAZA_PET_DIRECTION_EPSILON
         }
 
         LaunchedEffect(targetPosition) {
@@ -1233,16 +1280,16 @@ private fun PlazaPetActor(
             }
         }
 
-        val offsetX = (animatedX * viewportWidthPx - actorWidthPx * 0.5f)
+        val offsetX = (renderedPosition.x * viewportWidthPx - actorWidthPx * 0.5f)
             .roundToInt()
             .coerceIn(0, maxOf(0, (viewportWidthPx - actorWidthPx).roundToInt()))
-        val offsetY = (animatedY * viewportHeightPx - actorHeightPx * 0.66f)
+        val offsetY = (renderedPosition.y * viewportHeightPx - actorHeightPx * 0.66f)
             .roundToInt()
             .coerceIn(0, maxOf(0, (viewportHeightPx - actorHeightPx).roundToInt()))
         val spriteAnimation = if (!isMoving && interactionIdleAnimation != null) {
             interactionIdleAnimation
         } else {
-            lockedAnimation
+            serverDrivenAnimation ?: lockedAnimation
         }
 
         Box(
@@ -1419,6 +1466,10 @@ private fun PlazaMovementCommand.remainingDurationMillis(nowMillis: Long): Int {
 
 private fun PlazaMovementCommand.delayUntilStartMillis(nowMillis: Long): Long {
     return (startedAtMillis - nowMillis).coerceAtLeast(0L)
+}
+
+private fun PlazaMovementCommand.isActiveAt(nowMillis: Long): Boolean {
+    return startedAtMillis <= nowMillis && nowMillis < startedAtMillis + durationMillis
 }
 
 private fun PlazaInteractionEvent.isActiveAt(nowMillis: Long): Boolean {

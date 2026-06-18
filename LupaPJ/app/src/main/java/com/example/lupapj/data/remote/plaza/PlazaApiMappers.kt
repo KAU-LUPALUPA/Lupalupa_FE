@@ -85,7 +85,13 @@ internal fun PlazaApiException.toPlazaOperationFailure(): PlazaOperationFailure 
         "UNAUTHORIZED",
         "INVALID_TOKEN",
         "HTTP_401" -> PlazaOperationFailure.UNAUTHORIZED
-        else -> PlazaOperationFailure.UNKNOWN
+        "HTTP_404" -> PlazaOperationFailure.API_NOT_FOUND
+        else -> when (httpStatus) {
+            401 -> PlazaOperationFailure.UNAUTHORIZED
+            404 -> PlazaOperationFailure.API_NOT_FOUND
+            in 500..599 -> PlazaOperationFailure.SERVER_ERROR
+            else -> PlazaOperationFailure.UNKNOWN
+        }
     }
 }
 
