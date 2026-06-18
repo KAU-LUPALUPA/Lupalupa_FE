@@ -1,6 +1,8 @@
 package com.example.lupapj.ui.screens.main
 
 import android.graphics.Bitmap
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -45,6 +47,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.view.drawToBitmap
 import com.example.lupapj.R
+import com.example.lupapj.data.model.BehaviorDebugInfo
 import com.example.lupapj.data.model.BottomNavItem
 import com.example.lupapj.data.model.MainMenuAction
 import com.example.lupapj.data.model.PetAction
@@ -72,8 +75,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.sp
 @Composable
 fun RoomScreen(
     uiState: RoomUiState?,
@@ -228,6 +234,7 @@ fun RoomScreen(
                 LupaMainScreen(
                     petSatiety = room.pet.status.satiety.coerceIn(0, 100),
                     petVitality = room.pet.status.vitality.coerceIn(0, 100),
+                    petCleanliness = room.pet.status.cleanliness.coerceIn(0, 100),
                     petTraits = room.pet.traits, // [추가됨(권)]
                     recentIconRes = recentMainMenuAction?.iconRes,
                     onConditionTabClick = { // [추가됨(권)] 터치 시 성격 스낵바 출력
@@ -322,22 +329,13 @@ fun RoomScreen(
 
                         // [추가됨(권)] 행동 디버깅 윈도우 (구석 배치)
                         if (behaviorDebugInfo.isVisible) {
-                            Surface(
-                                color = Color.Black.copy(alpha = 0.7f),
-                                contentColor = Color.Green,
-                                shape = RoundedCornerShape(8.dp),
+                            BehaviorDebugPanel(
+                                currentAction = room.pet.currentAction,
+                                debugInfo = behaviorDebugInfo,
                                 modifier = Modifier
                                     .align(Alignment.BottomStart)
                                     .padding(start = 16.dp, bottom = 180.dp)
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Text("Action: ${room.pet.currentAction.name}")
-                                    Text("Crisis: ${behaviorDebugInfo.isCrisis}")
-                                    Text("Ticks: ${behaviorDebugInfo.consecutiveTicks}")
-                                    Text("Prob: ${"%.2f".format(behaviorDebugInfo.currentProbability)}")
-                                    Text("M: ${behaviorDebugInfo.mValue}, k: ${behaviorDebugInfo.kValue}")
-                                }
-                            }
+                            )
                         }
                     }
                 )
@@ -668,6 +666,115 @@ private fun SettingsSwitchRow(
         )
     }
 }
+
+@Composable
+private fun BehaviorDebugPanel(
+    currentAction: PetAction,
+    debugInfo: BehaviorDebugInfo,
+    modifier: Modifier = Modifier
+) {
+    val scrollState = rememberScrollState()
+    val debugText = remember(currentAction, debugInfo) {
+        buildBehaviorDebugText(currentAction, debugInfo)
+    }
+
+    Surface(
+        color = Color.Black.copy(alpha = 0.76f),
+        contentColor = Color(0xFF8DFF82),
+        shape = RoundedCornerShape(8.dp),
+        modifier = modifier
+            .widthIn(min = 260.dp, max = 340.dp)
+            .heightIn(max = 430.dp)
+    ) {
+        Text(
+            text = debugText,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 11.sp,
+            lineHeight = 15.sp,
+            modifier = Modifier
+                .padding(12.dp)
+                .verticalScroll(scrollState)
+        )
+    }
+}
+
+private fun buildBehaviorDebugText(
+    currentAction: PetAction,
+    debugInfo: BehaviorDebugInfo
+): String {
+    val traits = debugInfo.traits
+    val derived = debugInfo.derived
+    val affect = debugInfo.affect
+
+    return buildString {
+        appendLine("Action: ${currentAction.toDebugActionName()}")
+        appendLine()
+        appendLine("Crisis: ${debugInfo.isCrisis}")
+        appendLine()
+        appendLine("Ticks: ${debugInfo.consecutiveTicks}")
+        appendLine()
+        appendLine("Traits (Act/App/Att/Cur/Pat):")
+        appendLine(
+            "${traits.activity.formatDecimal()}/" +
+                "${traits.appetite.formatDecimal()}/" +
+                "${traits.attention.formatDecimal()}/" +
+                "${traits.curiosity.formatDecimal()}/" +
+                traits.patience.formatDecimal()
+        )
+        appendLine()
+        appendLine("Derived (Vig/Vol/Rest):")
+        appendLine(
+            "${derived.vigor.formatDecimal()}/" +
+                "${derived.volatility.formatDecimal()}/" +
+                derived.restfulness.formatDecimal()
+        )
+        appendLine()
+        appendLine("Affect (Val/Aro):")
+        appendLine("${affect.valence.formatDecimal()}/${affect.arousal.formatDecimal()}")
+        appendLine()
+        appendLine("Roulette Probabilities:")
+        appendLine()
+        debugProbabilityRows(debugInfo.actionProbabilities).forEach { row ->
+            appendLine("- ${row.label}: ${row.probability.formatPercent()}")
+        }
+    }
+}
+
+private data class DebugProbabilityRow(
+    val label: String,
+    val probability: Float
+)
+
+private fun debugProbabilityRows(
+    probabilities: Map<PetAction, Float>
+): List<DebugProbabilityRow> {
+    fun probabilityOf(action: PetAction): Float = probabilities[action] ?: 0f
+    val tidyProbability = probabilityOf(PetAction.TIDY) + probabilityOf(PetAction.CLEANING)
+
+    return listOf(
+        DebugProbabilityRow("IDLE", probabilityOf(PetAction.IDLE)),
+        DebugProbabilityRow("WALKING", probabilityOf(PetAction.WALKING)),
+        DebugProbabilityRow("RESTING", probabilityOf(PetAction.RESTING)),
+        DebugProbabilityRow("BED_RESTING", probabilityOf(PetAction.BED_RESTING)),
+        DebugProbabilityRow("PLAYING", probabilityOf(PetAction.PLAYING)),
+        DebugProbabilityRow("EATING", probabilityOf(PetAction.EATING)),
+        DebugProbabilityRow("GROOM", probabilityOf(PetAction.GROOM)),
+        DebugProbabilityRow("TIDY", tidyProbability),
+        DebugProbabilityRow("STRETCH", probabilityOf(PetAction.STRETCH)),
+        DebugProbabilityRow("YAWN", 0f)
+    )
+}
+
+private fun PetAction.toDebugActionName(): String {
+    return when (this) {
+        PetAction.CLEANING -> "TIDY"
+        else -> name
+    }
+}
+
+private fun Float.formatDecimal(): String = "%.2f".format(this)
+
+private fun Float.formatPercent(): String = "%.1f%%".format((this.coerceAtLeast(0f) * 100f))
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable

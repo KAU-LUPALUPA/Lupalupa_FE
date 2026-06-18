@@ -1854,7 +1854,8 @@ class AppViewModel(
             room.isCameraMode ||
             pet.status.isEgg ||
             pet.movement.isMoving ||
-            pet.action == PetAction.CLEANING
+            pet.action == PetAction.CLEANING ||
+            pet.action == PetAction.GROOM
         ) {
             return
         }

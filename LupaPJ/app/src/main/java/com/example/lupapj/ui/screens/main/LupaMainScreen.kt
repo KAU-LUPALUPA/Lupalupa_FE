@@ -497,7 +497,7 @@ fun BottomMenuLayer(
                 ) {
                     BottomMenuButton(
                         buttonWidth = sideButtonWidth,
-                        iconRes = recentIconRes,
+                        iconRes = recentIconRes ?: R.drawable.the_latest,
                         iconWidthFraction = 0.54f,
                         contentDescription = "최근 사용 기능",
                         onClick = onRecentActionClick

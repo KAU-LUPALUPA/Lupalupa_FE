@@ -1,7 +1,7 @@
 package com.example.lupapj.data.model.scene
 
 import com.example.lupapj.data.mock.DemoScenes
-import com.example.lupapj.data.model.PetPersonality
+import com.example.lupapj.data.model.PetTraits
 import kotlin.math.hypot
 import kotlin.random.Random
 import org.junit.Assert.assertNotNull
@@ -12,7 +12,7 @@ class PetAutonomousMovementTest {
     @Test
     fun chooseAutonomousPetTarget_staysInsidePersonalityRadiusAndWalkableArea() {
         val currentAnchor = FloorAnchor(u = 0.44f, v = 0.64f)
-        val profile = autonomousMovementProfileFor(PetPersonality.ACTIVE)
+        val profile = autonomousMovementProfileFor(PetTraits(activity = 0.8f))
         val random = Random(7)
 
         repeat(30) {
@@ -31,10 +31,10 @@ class PetAutonomousMovementTest {
     }
 
     @Test
-    fun autonomousMovementProfileFor_usesWiderRadiusForMoreActivePersonalities() {
-        val active = autonomousMovementProfileFor(PetPersonality.ACTIVE)
-        val calm = autonomousMovementProfileFor(PetPersonality.CALM)
-        val lazy = autonomousMovementProfileFor(PetPersonality.LAZY)
+    fun autonomousMovementProfileFor_usesWiderRadiusForMoreActiveTraits() {
+        val active = autonomousMovementProfileFor(PetTraits(activity = 0.8f))
+        val calm = autonomousMovementProfileFor(PetTraits(activity = 0.5f))
+        val lazy = autonomousMovementProfileFor(PetTraits(activity = 0.2f))
 
         assertTrue(active.radius > calm.radius)
         assertTrue(calm.radius > lazy.radius)

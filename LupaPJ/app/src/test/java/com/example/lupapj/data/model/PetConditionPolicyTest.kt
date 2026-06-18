@@ -15,9 +15,22 @@ class PetConditionPolicyTest {
             remainder = PetConditionTickRemainder()
         )
 
-        assertEquals(78, result.status.satiety)
-        assertEquals(79, result.status.vitality)
+        assertEquals(74, result.status.satiety)
+        assertEquals(76, result.status.vitality)
+        assertEquals(96, result.status.cleanliness)
         assertEquals(0L, result.remainder.vitalityDecaySeconds)
+    }
+
+    @Test
+    fun advancePetCondition_decaysCleanlinessByTwoEveryFiveSeconds() {
+        val result = advancePetCondition(
+            status = PetStatus(satiety = 80, vitality = 80, cleanliness = 80),
+            action = PetAction.IDLE,
+            elapsedSeconds = 5L,
+            remainder = PetConditionTickRemainder()
+        )
+
+        assertEquals(78, result.status.cleanliness)
     }
 
     @Test
@@ -36,7 +49,7 @@ class PetConditionPolicyTest {
         )
 
         assertEquals(80, first.status.satiety)
-        assertEquals(78, second.status.satiety)
+        assertEquals(74, second.status.satiety)
     }
 
     @Test

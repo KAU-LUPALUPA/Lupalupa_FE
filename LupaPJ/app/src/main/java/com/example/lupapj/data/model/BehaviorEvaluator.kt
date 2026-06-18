@@ -9,7 +9,11 @@ object BehaviorEvaluator {
         val vigor = (Math.pow(traits.activity.toDouble(), 0.8) * (0.5 + 0.5 * traits.curiosity)).toFloat().coerceIn(0f, 1f)
         val volatility = ((1f - traits.patience) * (0.5f + 0.5f * traits.curiosity)).coerceIn(0f, 1f)
         val restfulness = ((1f - traits.activity) * (0.5f + 0.5f * traits.patience)).coerceIn(0f, 1f)
-        return DerivedTraits(vigor, volatility, restfulness)
+        return DerivedTraits(
+            vigor = vigor,
+            volatility = volatility,
+            restfulness = restfulness
+        )
     }
 
     fun calculateAffect(traits: PetTraits, derived: DerivedTraits, status: PetStatus, events: InteractionEvents, tickCount: Long = 0L): AffectState {
@@ -119,9 +123,14 @@ object BehaviorEvaluator {
             scores[PetAction.CLEANING] = traits.attention * 0.7f + comfortBias * 0.5f
         }
 
-        // 완전히 깨끗할 때(c < 20)는 음수가 되어 스스로 그루밍하지 않음
-        val dirtyMultiplier = if (status.cleanliness <= 30) 4.0f else 1.0f
-        scores[PetAction.GROOM] = ((c - 20f) / 80f) * traits.attention * 3.0f * dirtyMultiplier + comfortBias
+        val groomingUrgency = when {
+            status.cleanliness <= 35 -> 8.0f
+            status.cleanliness <= 50 -> 5.2f
+            status.cleanliness <= 70 -> 3.0f
+            else -> ((c - 20f) / 80f) * traits.attention * 3.0f
+        }
+        val attentionFactor = 0.75f + traits.attention * 0.5f
+        scores[PetAction.GROOM] = groomingUrgency * attentionFactor + comfortBias
 
         scores[PetAction.WALKING] = traits.activity * 1.6f + arousalBias
 
