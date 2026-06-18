@@ -64,9 +64,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 @Composable
 fun RoomScreen(
     uiState: RoomUiState?,
@@ -95,8 +98,8 @@ fun RoomScreen(
     onGalleryClick: () -> Unit, // [추가됨] 카메라 오버레이 내 갤러리 버튼 콜백
     currencyAmount: Int,
     purchasedShopItems: List<com.example.lupapj.data.model.ShopItem>,
-    onEquipClick: (String) -> Unit, // [추가됨(권)] 아이템 장착 콜백 추가
-    onUnequipClick: (String) -> Unit, // [추가됨(권)] 아이템 해제 콜백 추가
+    onEquipClick: (String) -> Unit,
+    onUnequipClick: (String) -> Unit,
     onPlaygroundClick: () -> Unit,
     onContestClick: () -> Unit,
     mailboxVisible: Boolean,
@@ -217,12 +220,11 @@ fun RoomScreen(
                 LupaMainScreen(
                     petSatiety = room.pet.status.satiety.coerceIn(0, 100),
                     petVitality = room.pet.status.vitality.coerceIn(0, 100),
-                    petCleanliness = room.pet.status.cleanliness.coerceIn(0, 100),
                     petTraits = room.pet.traits, // [추가됨(권)]
                     recentIconRes = recentMainMenuAction?.iconRes,
                     onConditionTabClick = { // [추가됨(권)] 터치 시 성격 스낵바 출력
                         coroutineScope.launch {
-                            snackbarHostState.showSnackbar("현재 활동성: ${room.pet.traits.activity}")
+                            snackbarHostState.showSnackbar("현재 성격 정보: ${room.pet.traits}")
                         }
                     },
                     onRecentActionClick = onButtonAClick,
@@ -307,19 +309,11 @@ fun RoomScreen(
                                     .padding(start = 16.dp, bottom = 180.dp)
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
-                                    Text("Action: ${room.pet.currentAction.name}", color = Color.Green)
-                                    Text("Crisis: ${behaviorDebugInfo.isCrisis}", color = Color.Green)
-                                    Text("Ticks: ${behaviorDebugInfo.consecutiveTicks}", color = Color.Green)
-                                    Text("Traits (Act/App/Att/Cur/Pat): ${"%.2f".format(behaviorDebugInfo.traits.activity)}/${"%.2f".format(behaviorDebugInfo.traits.appetite)}/${"%.2f".format(behaviorDebugInfo.traits.attention)}/${"%.2f".format(behaviorDebugInfo.traits.curiosity)}/${"%.2f".format(behaviorDebugInfo.traits.patience)}", color = Color.White)
-                                    Text("Derived (Vig/Vol/Rest): ${"%.2f".format(behaviorDebugInfo.derived.vigor)}/${"%.2f".format(behaviorDebugInfo.derived.volatility)}/${"%.2f".format(behaviorDebugInfo.derived.restfulness)}", color = Color.White)
-                                    Text("Affect (Val/Aro): ${"%.2f".format(behaviorDebugInfo.affect.valence)}/${"%.2f".format(behaviorDebugInfo.affect.arousal)}", color = Color.White)
-                                    Text("Roulette Probabilities:", color = Color.Yellow)
-                                    com.example.lupapj.data.model.PetAction.values().forEach { action ->
-                                        if (action != com.example.lupapj.data.model.PetAction.CLEANING) {
-                                            val prob = behaviorDebugInfo.actionProbabilities[action] ?: 0f
-                                            Text("- ${action.name}: ${"%.1f".format(prob * 100)}%", color = Color.White)
-                                        }
-                                    }
+                                    Text("Action: ${room.pet.currentAction.name}")
+                                    Text("Crisis: ${behaviorDebugInfo.isCrisis}")
+                                    Text("Ticks: ${behaviorDebugInfo.consecutiveTicks}")
+                                    Text("Prob: ${"%.2f".format(behaviorDebugInfo.currentProbability)}")
+                                    Text("M: ${behaviorDebugInfo.mValue}, k: ${behaviorDebugInfo.kValue}")
                                 }
                             }
                         }
@@ -399,77 +393,79 @@ fun RoomScreen(
                 )
             }
             if (room.rearrangeMode && room.selectedRearrangeObjectType != null) {
-
-                Column(
+                Surface(
+                    shape = RoundedCornerShape(26.dp),
+                    color = Color(0xFFFFF7E8).copy(alpha = 0.96f),
+                    shadowElevation = 8.dp,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 85.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .padding(bottom = 78.dp)
+                        .widthIn(max = 218.dp)
                 ) {
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(80.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RearrangeCircleButton(
+                                onClick = onRearrangeMoveLeft
+                            ) {
+                                Text(
+                                    text = "↖",
+                                    color = Color.White
+                                )
+                            }
 
-                        RearrangeCircleButton(
-                            onClick = onRearrangeMoveLeft
+                            RearrangeCircleButton(
+                                onClick = onRearrangeMoveUp
+                            ) {
+                                Text(
+                                    text = "↗",
+                                    color = Color.White
+                                )
+                            }
+                        }
+
+                        Surface(
+                            onClick = onRearrangeConfirm,
+                            shape = RoundedCornerShape(50),
+                            color = Color(0xFFB08968),
+                            shadowElevation = 4.dp,
+                            modifier = Modifier.padding(vertical = 8.dp)
                         ) {
                             Text(
-                                text = "↖",
-                                color = Color.White
+                                text = "✓",
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 18.dp, vertical = 11.dp)
                             )
                         }
 
-                        RearrangeCircleButton(
-                            onClick = onRearrangeMoveUp
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "↗",
-                                color = Color.White
-                            )
+                            RearrangeCircleButton(
+                                onClick = onRearrangeMoveDown
+                            ) {
+                                Text(
+                                    text = "↙",
+                                    color = Color.White
+                                )
+                            }
+
+                            RearrangeCircleButton(
+                                onClick = onRearrangeMoveRight
+                            ) {
+                                Text(
+                                    text = "↘",
+                                    color = Color.White
+                                )
+                            }
                         }
                     }
-
-                    Surface(
-                        onClick = onRearrangeConfirm,
-                        shape = RoundedCornerShape(50),
-                        color = Color(0xFFB08968),
-                        shadowElevation = 6.dp,
-                        modifier = Modifier.padding(vertical = 10.dp)
-                    ) {
-
-                        Text(
-                            text = "✓",
-                            color = Color.White,
-                            modifier = Modifier.padding(16.dp)
-                        )
-                    }
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(80.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-
-                        RearrangeCircleButton(
-                            onClick = onRearrangeMoveDown
-                        ) {
-                            Text(
-                                text = "↙",
-                                color = Color.White
-                            )
-                        }
-
-                        RearrangeCircleButton(
-                            onClick = onRearrangeMoveRight
-                        ) {
-                            Text(
-                                text = "↘",
-                                color = Color.White
-                            )
-                        }
-                    }
-                }
                 }
             }
 
@@ -517,14 +513,15 @@ fun RoomScreen(
                 )
             }
         }
+    }
 
 
     if (room.inventoryVisible) {
         InventorySheet(
             purchasedShopItems = purchasedShopItems,
-            equippedItemIds = room.pet.equippedItemIds, // [추가됨(권)] 장착 상태 전달
-            onEquipClick = onEquipClick,               // [추가됨(권)] 장착 콜백 연결
-            onUnequipClick = onUnequipClick,           // [추가됨(권)] 해제 콜백 연결
+            equippedItemIds = room.pet.equippedItemIds,
+            onEquipClick = onEquipClick,
+            onUnequipClick = onUnequipClick,
             onDismiss = onInventoryDismiss
         )
     }
@@ -611,12 +608,18 @@ private fun RearrangeCircleButton(
         onClick = onClick,
         shape = RoundedCornerShape(50),
         color = Color(0xFF7F5539),
-        shadowElevation = 6.dp,
-        modifier = Modifier.padding(3.dp)
+        shadowElevation = 4.dp,
+        modifier = Modifier
+            .size(42.dp)
+            .border(
+                width = 1.dp,
+                color = Color(0xFFE8C99B),
+                shape = RoundedCornerShape(50)
+            )
     ) {
 
         Box(
-            modifier = Modifier.padding(8.dp),
+            modifier = Modifier,
             contentAlignment = Alignment.Center
         ) {
             content()
