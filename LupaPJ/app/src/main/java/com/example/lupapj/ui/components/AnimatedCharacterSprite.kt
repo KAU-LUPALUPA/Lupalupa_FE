@@ -57,6 +57,8 @@ enum class CharacterAnimation {
     SouthWest,
     Eating,
     Sleeping,
+    Playing,
+    Grooming,
     Row0,
     Row1,
     Row2,
@@ -70,7 +72,8 @@ private data class CharacterFrameSpec(
 
 private const val LUPA_BOTTOM_INSET_RATIO = 26f / 256f
 private const val LUPA_EATING_SPRITE_SCALE = 1.16f
-private const val LUPA_SLEEPING_BED_LIFT_RATIO = 18f / 256f
+private const val LUPA_SLEEPING_SPRITE_SCALE = 1.4f
+private const val LUPA_SLEEPING_BED_LIFT_RATIO = 40f / 256f
 
 @Composable
 fun AnimatedCharacterSprite(
@@ -168,10 +171,10 @@ fun AnimatedCharacterSprite(
         }
         val appearanceScale = ((appearance.headSizeScale + appearance.bodySizeScale) * 0.5f)
             .coerceIn(0.88f, 1.12f)
-        val animationScale = if (animation == CharacterAnimation.Eating) {
-            LUPA_EATING_SPRITE_SCALE
-        } else {
-            1f
+        val animationScale = when (animation) {
+            CharacterAnimation.Eating -> LUPA_EATING_SPRITE_SCALE
+            CharacterAnimation.Sleeping -> LUPA_SLEEPING_SPRITE_SCALE
+            else -> 1f
         }
         val spriteScale = appearanceScale * animationScale
         
@@ -390,6 +393,24 @@ private fun framesFor(animation: CharacterAnimation): List<CharacterFrameSpec> {
             R.drawable.lupa_sleep_02,
             R.drawable.lupa_sleep_03,
             R.drawable.lupa_sleep_04
+        )
+
+        CharacterAnimation.Playing -> walkFrames(
+            R.drawable.lupa_play_00,
+            R.drawable.lupa_play_01,
+            R.drawable.lupa_play_02,
+            R.drawable.lupa_play_03,
+            R.drawable.lupa_play_04,
+            R.drawable.lupa_play_05
+        )
+
+        CharacterAnimation.Grooming -> walkFrames(
+            R.drawable.lupa_groom_00,
+            R.drawable.lupa_groom_01,
+            R.drawable.lupa_groom_02,
+            R.drawable.lupa_groom_03,
+            R.drawable.lupa_groom_04,
+            R.drawable.lupa_groom_05
         )
     }
 }

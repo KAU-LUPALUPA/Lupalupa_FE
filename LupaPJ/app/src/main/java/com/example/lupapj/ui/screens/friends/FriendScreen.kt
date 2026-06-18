@@ -240,41 +240,6 @@ fun FriendList(
 }
 
 @Composable
-fun HomeInvitationList(
-    invitations: List<FriendHomeInvitation>,
-    onAcceptHomeInvitation: (String) -> Unit,
-    onRejectHomeInvitation: (String) -> Unit
-) {
-    if (invitations.isEmpty()) {
-        EmptyState(text = "받은 집 초대가 없습니다.")
-        return
-    }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        items(invitations, key = { it.id }) { invitation ->
-            UserRow(
-                user = invitation.fromUser,
-                supportingText = invitation.message ?: invitation.status.displayText,
-                trailingContent = {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { onRejectHomeInvitation(invitation.id) }) {
-                            Text("거절")
-                        }
-                        Button(onClick = { onAcceptHomeInvitation(invitation.id) }) {
-                            Text("수락")
-                        }
-                    }
-                }
-            )
-        }
-    }
-}
-
-@Composable
 fun ReceivedRequestList(
     requests: List<FriendRequest>,
     onAcceptRequest: (String) -> Unit,
@@ -496,15 +461,6 @@ private val FriendRequestStatus.displayText: String
         FriendRequestStatus.ACCEPTED -> "수락됨"
         FriendRequestStatus.REJECTED -> "거절됨"
         FriendRequestStatus.CANCELED -> "취소됨"
-    }
-
-private val FriendHomeInvitationStatus.displayText: String
-    get() = when (this) {
-        FriendHomeInvitationStatus.PENDING -> "집 초대 대기 중"
-        FriendHomeInvitationStatus.ACCEPTED -> "초대 수락됨"
-        FriendHomeInvitationStatus.REJECTED -> "초대 거절됨"
-        FriendHomeInvitationStatus.CANCELED -> "초대 취소됨"
-        FriendHomeInvitationStatus.EXPIRED -> "만료됨"
     }
 
 private fun copyToClipboard(context: Context, text: String) {

@@ -203,6 +203,8 @@ fun LupaApp(deepLink: Uri? = null) {
                     onButtonBClick = appViewModel::onButtonBClick,
                     onInventoryDismiss = appViewModel::onInventoryDismiss,
                     onSettingsClick = appViewModel::onSettingsClick,
+                    settingsVisible = uiState.settingsVisible,
+                    onSettingsDismiss = appViewModel::onSettingsDismiss,
                     onRoomObjectClick = appViewModel::onRoomObjectClick,
 
                     onRearrangeClick = appViewModel::onRearrangeClick,

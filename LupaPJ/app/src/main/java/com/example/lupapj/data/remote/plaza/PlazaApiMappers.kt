@@ -9,11 +9,15 @@ import com.example.lupapj.data.model.PetStatus
 import com.example.lupapj.data.model.plaza.PLAZA_MAX_PARTICIPANTS
 import com.example.lupapj.data.model.plaza.PlazaChatMessage
 import com.example.lupapj.data.model.plaza.PlazaCode
+import com.example.lupapj.data.model.plaza.PlazaInteractionEvent
+import com.example.lupapj.data.model.plaza.PlazaInteractionType
+import com.example.lupapj.data.model.plaza.PlazaMovementCommand
 import com.example.lupapj.data.model.plaza.PlazaOperationFailure
 import com.example.lupapj.data.model.plaza.PlazaParticipant
 import com.example.lupapj.data.model.plaza.PlazaPetSnapshot
 import com.example.lupapj.data.model.plaza.PlazaPosition
 import com.example.lupapj.data.model.plaza.PlazaRoom
+import com.example.lupapj.data.model.plaza.PlazaServerTime
 
 internal fun PlazaRoomResponseDto.toDomain(
     currentUserId: String?,
@@ -38,12 +42,19 @@ internal fun PlazaRoomResponseDto.toDomain(
         plazaCode = domainCode,
         participants = participantDomains,
         messages = messages.orEmpty().map { it.toDomain(plazaId = roomId, nowMillis = nowMillis) },
-        interactions = emptyList(),
+        interactions = interactions.orEmpty().mapNotNull {
+            it.toDomain(plazaId = roomId, nowMillis = nowMillis)
+        },
         maxParticipants = maxParticipants ?: PLAZA_MAX_PARTICIPANTS,
         joinedAtMillis = participantDomains.firstOrNull { it.isMe }?.joinedAtMillis ?: nowMillis,
         roomRevision = roomRevision ?: 0L,
-        serverTime = null,
-        isServerAuthoritative = false
+        serverTime = serverNowMillis?.let {
+            PlazaServerTime(
+                serverNowMillis = it,
+                clientReceivedAtMillis = nowMillis
+            )
+        },
+        isServerAuthoritative = serverNowMillis != null
     )
 }
 
@@ -95,8 +106,53 @@ private fun PlazaParticipantResponseDto.toDomain(
         joinedAtMillis = joinedAtMillis ?: nowMillis,
         isMe = isMe,
         position = position?.toDomain(),
-        movement = null,
-        positionUpdatedAtMillis = null
+        movement = movement?.toDomain(),
+        positionUpdatedAtMillis = positionUpdatedAtMillis
+    )
+}
+
+private fun PlazaMovementResponseDto.toDomain(): PlazaMovementCommand? {
+    val fromPosition = from?.toDomain() ?: return null
+    val toPosition = to?.toDomain() ?: return null
+    val startedAt = startedAtMillis ?: return null
+    val duration = durationMillis?.takeIf { it > 0L } ?: return null
+
+    return PlazaMovementCommand(
+        from = fromPosition,
+        to = toPosition,
+        startedAtMillis = startedAt,
+        durationMillis = duration
+    )
+}
+
+private fun PlazaInteractionResponseDto.toDomain(
+    plazaId: String,
+    nowMillis: Long
+): PlazaInteractionEvent? {
+    val actorId = actorUserId?.takeIf { it.isNotBlank() } ?: return null
+    val interactionType = type
+        ?.takeIf { it.isNotBlank() }
+        ?.let { rawType ->
+            runCatching { PlazaInteractionType.valueOf(rawType.uppercase()) }.getOrNull()
+        }
+        ?: return null
+    val startedAt = startedAtMillis ?: nowMillis
+    val duration = durationMillis?.takeIf { it > 0L } ?: return null
+
+    return PlazaInteractionEvent(
+        id = id?.takeIf { it.isNotBlank() } ?: "plaza_interaction_${plazaId}_$startedAt",
+        plazaId = plazaId,
+        type = interactionType,
+        actorUserId = actorId,
+        targetUserId = targetUserId?.takeIf { it.isNotBlank() },
+        textByUserId = textByUserId.orEmpty().filterKeys { it.isNotBlank() },
+        startedAtMillis = startedAt,
+        durationMillis = duration,
+        movementTargetByUserId = movementTargetByUserId.toPositionMap(),
+        facingTargetByUserId = facingTargetByUserId.toPositionMap(),
+        animationByUserId = animationByUserId.orEmpty()
+            .filterKeys { it.isNotBlank() }
+            .filterValues { it.isNotBlank() }
     )
 }
 
@@ -129,4 +185,12 @@ private fun PlazaPositionResponseDto.toDomain(): PlazaPosition {
         x = (x ?: 0.5f).coerceIn(0f, 1f),
         y = (y ?: 0.7f).coerceIn(0f, 1f)
     )
+}
+
+private fun Map<String, PlazaPositionResponseDto>?.toPositionMap(): Map<String, PlazaPosition> {
+    return orEmpty()
+        .mapNotNull { (userId, position) ->
+            userId.takeIf { it.isNotBlank() }?.let { it to position.toDomain() }
+        }
+        .toMap()
 }

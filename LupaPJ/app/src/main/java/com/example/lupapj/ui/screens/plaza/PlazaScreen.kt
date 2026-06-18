@@ -725,7 +725,10 @@ private fun PlazaScene(
     }
 
     LaunchedEffect(sceneKey, remoteInteractions, isServerAuthoritative) {
-        if (isServerAuthoritative) return@LaunchedEffect
+        if (isServerAuthoritative) {
+            localInteraction = null
+            return@LaunchedEffect
+        }
 
         var scansWithoutNearby = 0
         while (isActive) {
@@ -778,7 +781,7 @@ private fun PlazaScene(
         tonalElevation = 2.dp,
         shadowElevation = 4.dp
     ) {
-        BoxWithConstraints(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(RoundedCornerShape(8.dp))
@@ -786,7 +789,11 @@ private fun PlazaScene(
             PlazaSceneBackground(modifier = Modifier.fillMaxSize())
             PlazaFountain(modifier = Modifier.fillMaxSize())
 
-            val activeInteraction = activeRemoteInteraction ?: localInteraction
+            val activeInteraction = activeRemoteInteraction ?: if (isServerAuthoritative) {
+                null
+            } else {
+                localInteraction
+            }
             val interactionPresentation = remember(
                 activeInteraction?.id,
                 activeInteraction?.movementTargetByUserId,

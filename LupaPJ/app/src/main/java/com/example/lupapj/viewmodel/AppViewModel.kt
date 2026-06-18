@@ -58,7 +58,7 @@ private const val FOOD_CONSUME_PAUSE_MS = 650L
 private const val AUTONOMOUS_MOVEMENT_RETRY_DELAY_MS = 800L
 private const val FRIEND_MESSAGE_POLL_INTERVAL_MS = 3_000L
 private const val HOME_VISIT_POLL_INTERVAL_MS = 3_000L
-private const val PLAZA_SNAPSHOT_POLL_INTERVAL_MS = 2_000L
+private const val PLAZA_SNAPSHOT_POLL_INTERVAL_MS = 1_200L
 
 // [수정됨(권)] 성격별 행동 엔진 밸런스를 위해 2초 틱 유지
 private const val PET_CONDITION_TICK_INTERVAL_MS = 2_000L 
@@ -428,7 +428,13 @@ class AppViewModel(
 
     fun onSettingsClick() {
         _uiState.update {
-            it.copy(placeholderMessage = "설정 기능은 다음 데모 범위에서 연결할게요.")
+            it.copy(settingsVisible = true)
+        }
+    }
+
+    fun onSettingsDismiss() {
+        _uiState.update {
+            it.copy(settingsVisible = false)
         }
     }
 
@@ -2074,12 +2080,6 @@ class AppViewModel(
     ) {
         autonomousPetMovementJob?.cancel()
         autonomousPetMovementJob = viewModelScope.launch {
-            // [추가됨] 기상 연출 지연
-            if (pet.isLyingSide) {
-                setPetAction(PetAction.IDLE)
-                delay(600L)
-            }
-            
             movePetAutonomously(
                 targetAnchor = targetAnchor,
                 movementState = com.example.lupapj.data.model.scene.PetMovementState(
@@ -2151,8 +2151,7 @@ class AppViewModel(
                     pet = houseSceneState.pet.copy(
                         action = PetAction.WALKING,
                         anchor = targetAnchor,
-                        movement = movementState,
-                        isLyingSide = false 
+                        movement = movementState
                     )
                 )
             )
@@ -2197,12 +2196,11 @@ class AppViewModel(
         
         // [수정됨(권)] 로컬 변화량 보호 로직
         val repositoryPet = repositoryRoom.houseSceneState.pet
-        val mergedPet = if (currentPet != null && repositoryPet.action == PetAction.IDLE && !repositoryPet.isLyingSide) {
+        val mergedPet = if (currentPet != null && repositoryPet.action == PetAction.IDLE) {
             repositoryPet.copy(
                 anchor = currentPet.anchor,
                 action = currentPet.action,
                 movement = currentPet.movement,
-                isLyingSide = currentPet.isLyingSide,
                 status = currentPet.status, // [수정됨] RoomRepository는 펫 상태를 관리하지 않으므로 항상 로컬 UI 상태를 유지
                 traits = currentPet.traits,
                 interactionEvents = currentPet.interactionEvents,
@@ -2263,11 +2261,6 @@ class AppViewModel(
             val profile = autonomousMovementProfileFor(pet.traits)
 
             if (!skipMovement) {
-                if (pet.isLyingSide) {
-                    setPetAction(PetAction.IDLE)
-                    delay(600L)
-                }
-
                 val delayMs = calculateMovementDelay(pet.anchor, targetAnchor, profile)
                 movePetAutonomously(
                     targetAnchor = targetAnchor,
@@ -2336,14 +2329,8 @@ class AppViewModel(
         pendingFoodConsumeJob?.cancel()
         autonomousPetMovementJob?.cancel()
         pendingFoodConsumeJob = viewModelScope.launch {
-            var pet = _uiState.value.room?.houseSceneState?.pet ?: return@launch
+            val pet = _uiState.value.room?.houseSceneState?.pet ?: return@launch
             val profile = autonomousMovementProfileFor(pet.traits)
-
-            if (pet.isLyingSide) {
-                setPetAction(PetAction.IDLE)
-                delay(600L)
-                pet = _uiState.value.room?.houseSceneState?.pet ?: return@launch
-            }
 
             _uiState.update { it.copy(placeholderMessage = "장난감을 정리하러 갑니다.") }
 
@@ -2419,8 +2406,7 @@ class AppViewModel(
                     room = room.copy(
                         houseSceneState = room.houseSceneState.copy(
                             pet = room.houseSceneState.pet.copy(
-                                action = PetAction.BED_RESTING,
-                                isLyingSide = true
+                                action = PetAction.BED_RESTING
                             )
                         )
                     )
@@ -2507,8 +2493,7 @@ class AppViewModel(
                 room = room.copy(
                     houseSceneState = room.houseSceneState.copy(
                         pet = room.houseSceneState.pet.copy(
-                            action = action,
-                            isLyingSide = false 
+                            action = action
                         )
                     )
                 )

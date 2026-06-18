@@ -136,8 +136,7 @@ fun FriendRoomScreen(
                         isMoving = true,
                         speedMultiplier = 1f,
                         bouncePx = 8f
-                    ),
-                    isLyingSide = false
+                    )
                 )
                 val displayVisitorPet = visitorPet?.copy(
                     petId = "${visitorPet.petId}_visitor",
@@ -148,8 +147,7 @@ fun FriendRoomScreen(
                         isMoving = true,
                         speedMultiplier = 1f,
                         bouncePx = 8f
-                    ),
-                    isLyingSide = false
+                    )
                 )
                 val displayRoom = room.copy(
                     houseSceneState = room.houseSceneState.copy(

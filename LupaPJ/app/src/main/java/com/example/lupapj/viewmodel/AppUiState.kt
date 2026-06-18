@@ -25,6 +25,7 @@ data class AppUiState(
     val room: RoomUiState? = null,
     val recentMainMenuAction: MainMenuAction? = null,
     val placeholderMessage: String? = null,
+    val settingsVisible: Boolean = false,
     val galleryImages: List<GalleryImage> = emptyList(), // [추가됨] 갤러리 상태 관리를 위한 이미지 목록
     val isContestEntryUploading: Boolean = false,
     val contestUploadMessage: String? = null,

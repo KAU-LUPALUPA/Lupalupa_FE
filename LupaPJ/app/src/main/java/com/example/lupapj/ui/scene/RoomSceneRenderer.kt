@@ -282,16 +282,21 @@ fun RoomSceneRenderer(
                                     renderable.pet.action == PetAction.EATING &&
                                         !renderable.isMoving -> CharacterAnimation.Eating
                                     renderable.pet.action == PetAction.BED_RESTING -> CharacterAnimation.Sleeping
+                                    renderable.pet.action == PetAction.PLAYING &&
+                                        !renderable.isMoving -> CharacterAnimation.Playing
+                                    renderable.pet.action == PetAction.GROOM -> CharacterAnimation.Grooming
                                     else -> renderable.animation
                                 }
                                 val isSpritePlaying = renderable.isMoving ||
                                     renderable.pet.action == PetAction.EATING ||
-                                    renderable.pet.action == PetAction.BED_RESTING
-                                val applyMovementStyle = renderable.isMoving &&
-                                    renderable.pet.action != PetAction.BED_RESTING
+                                    renderable.pet.action == PetAction.BED_RESTING ||
+                                    renderable.pet.action == PetAction.PLAYING ||
+                                    renderable.pet.action == PetAction.GROOM
                                 val frameDurationMillis = when (spriteAnimation) {
                                     CharacterAnimation.Eating -> 180L
                                     CharacterAnimation.Sleeping -> 520L
+                                    CharacterAnimation.Playing -> 150L
+                                    CharacterAnimation.Grooming -> 160L
                                     else -> 150L
                                 }
 
@@ -300,15 +305,9 @@ fun RoomSceneRenderer(
                                         .fillMaxSize()
                                         .petMovementStyle(
                                             style = renderable.pet.movement.style,
-                                            isMoving = applyMovementStyle,
+                                            isMoving = renderable.isMoving,
                                             bouncePx = renderable.pet.movement.bouncePx,
                                             durationMillis = renderable.movementDurationMillis
-                                        )
-                                        // [수정됨(권)] 옆으로 눕기 플래그가 활성화된 경우에만 회전 애니메이션 적용
-                                        .petRestingStyle(
-                                            isResting = renderable.pet.isLyingSide &&
-                                                renderable.pet.action != PetAction.BED_RESTING &&
-                                                spriteAnimation != CharacterAnimation.Sleeping
                                         ),
                                     animation = spriteAnimation,
                                     appearance = renderable.pet.appearance,
@@ -329,6 +328,7 @@ fun RoomSceneRenderer(
 
                             is FloorRenderableModel.ToyRenderable -> {
                                 val isPlaying = houseSceneState.pet.action == PetAction.PLAYING
+                                if (isPlaying) return@ProjectedNodeBox
                                 // ToyRenderable은 항상 droppedToyAnchor를 기반으로 생성되므로 isTargetToy는 참으로 간주
                                 val isKnocked = houseSceneState.currentSceneRuntime.isToyKnockedOver
 
@@ -625,30 +625,6 @@ private fun Modifier.petMovementStyle(
             )
             this.graphicsLayer { translationY = yOffset }
         }
-    }
-}
-
-private fun Modifier.petRestingStyle(
-    isResting: Boolean
-): Modifier = composed {
-    if (!isResting) return@composed this
-
-    val infiniteTransition = rememberInfiniteTransition(label = "RestingBreathing")
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 1.08f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "BreathingScale"
-    )
-
-    this.graphicsLayer {
-        rotationZ = 90f // 옆으로 누운 자세
-        scaleX = scale
-        scaleY = scale * 0.85f // 약간 납작해진 느낌
-        translationX = 15f // 회전으로 인한 중심축 이탈 보정
     }
 }
 

@@ -12,9 +12,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -78,6 +82,8 @@ fun RoomScreen(
     onButtonBClick: () -> Unit,
     onInventoryDismiss: () -> Unit,
     onSettingsClick: () -> Unit,
+    settingsVisible: Boolean,
+    onSettingsDismiss: () -> Unit,
     onRoomObjectClick: (RoomObjectType) -> Unit,
     onRearrangeClick: () -> Unit,
     onRearrangeMoveUp: () -> Unit,
@@ -553,9 +559,94 @@ fun RoomScreen(
             onRejectHomeInvitation = onRejectHomeInvitation
         )
     }
+
+    if (settingsVisible) {
+        SettingsDialog(onDismiss = onSettingsDismiss)
+    }
 }
 
 // [수정됨(권)] 로컬 iconRes 제거하고 AppModels의 전역 확장 프로퍼티 사용
+
+@Composable
+private fun SettingsDialog(
+    onDismiss: () -> Unit
+) {
+    var soundEnabled by remember { mutableStateOf(true) }
+    var vibrationEnabled by remember { mutableStateOf(true) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(8.dp),
+        containerColor = Color(0xFFFFFBF2),
+        title = {
+            Text(
+                text = "설정",
+                style = MaterialTheme.typography.titleLarge,
+                color = Color(0xFF3F3028)
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                SettingsSwitchRow(
+                    title = "효과음",
+                    description = "버튼과 행동 효과음",
+                    checked = soundEnabled,
+                    onCheckedChange = { soundEnabled = it }
+                )
+                SettingsSwitchRow(
+                    title = "진동",
+                    description = "터치 반응",
+                    checked = vibrationEnabled,
+                    onCheckedChange = { vibrationEnabled = it }
+                )
+                HorizontalDivider(color = Color(0xFFE5D4C5))
+                Text(
+                    text = "루파루파 v1.0",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF7B675C)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("닫기")
+            }
+        }
+    )
+}
+
+@Composable
+private fun SettingsSwitchRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color(0xFF3F3028)
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF7B675C)
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange
+        )
+    }
+}
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
@@ -568,6 +659,8 @@ private fun RoomScreenPreview() {
             onButtonBClick = {},
             onInventoryDismiss = {},
             onSettingsClick = {},
+            settingsVisible = false,
+            onSettingsDismiss = {},
             onRoomObjectClick = {},
             onRearrangeClick = {},
             onRearrangeMoveUp = {},

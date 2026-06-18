@@ -24,9 +24,7 @@ data class PetSceneState(
     val equippedItemIds: List<String> = emptyList(),
     val movement: PetMovementState = PetMovementState(),
     val action: PetAction,
-    val anchor: FloorAnchor,
-    // [수정됨(권)] 침대 휴식 도착 후 옆으로 누운 상태를 표현하기 위한 플래그
-    val isLyingSide: Boolean = false
+    val anchor: FloorAnchor
 )
 
 enum class PetMovementStyle {
@@ -97,7 +95,6 @@ fun HouseSceneState.updatePet(
     action: PetAction? = null,
     anchor: FloorAnchor? = null,
     isMoving: Boolean? = null,
-    isLyingSide: Boolean? = null, // [추가됨]
     interactionEvents: InteractionEvents? = null, // [추가됨]
     affect: AffectState? = null // [추가됨]
 ): HouseSceneState {
@@ -106,7 +103,6 @@ fun HouseSceneState.updatePet(
             action = action ?: pet.action,
             anchor = anchor ?: pet.anchor,
             movement = if (isMoving != null) pet.movement.copy(isMoving = isMoving) else pet.movement,
-            isLyingSide = isLyingSide ?: pet.isLyingSide,
             interactionEvents = interactionEvents ?: pet.interactionEvents,
             affect = affect ?: pet.affect
         )
